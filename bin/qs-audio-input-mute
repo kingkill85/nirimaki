@@ -1,0 +1,15 @@
+#!/bin/bash
+# qs-audio-input-mute — toggle microphone mute and pop up the OSD.
+# Port of Omarchy's `omarchy-audio-input-mute` (sans keyboard-LED hook,
+# which doesn't apply on this desktop).
+#
+# PATH is forced — see qs-audio-output-volume for the reason.
+export PATH="$HOME/.local/bin:$PATH"
+
+wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle >/dev/null
+
+if wpctl get-volume @DEFAULT_AUDIO_SOURCE@ | grep -q MUTED; then
+  qs-osd -i microphone-muted -m "Microphone muted"
+else
+  qs-osd -i microphone -m "Microphone on"
+fi

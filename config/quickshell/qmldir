@@ -1,0 +1,34 @@
+singleton Theme 1.0 Theme.qml
+singleton NiriService 1.0 NiriService.qml
+singleton NotificationService 1.0 NotificationService.qml
+singleton PopupBus 1.0 PopupBus.qml
+singleton I18n 1.0 I18n.qml
+Bar 1.0 Bar.qml
+Workspaces 1.0 Workspaces.qml
+ActiveWindow 1.0 ActiveWindow.qml
+Clock 1.0 Clock.qml
+Calendar 1.0 Calendar.qml
+Audio 1.0 Audio.qml
+Tray 1.0 Tray.qml
+SystemStats 1.0 SystemStats.qml
+Media 1.0 Media.qml
+Network 1.0 Network.qml
+Bluetooth 1.0 Bluetooth.qml
+DialogShell 1.0 DialogShell.qml
+Launcher 1.0 Launcher.qml
+Notifications 1.0 Notifications.qml
+NotificationToast 1.0 NotificationToast.qml
+Osd 1.0 Osd.qml
+ClipboardPicker 1.0 ClipboardPicker.qml
+PowerMenu 1.0 PowerMenu.qml
+Updates 1.0 Updates.qml
+singleton UpdatesService 1.0 UpdatesService.qml
+Weather 1.0 Weather.qml
+EmojiPicker 1.0 EmojiPicker.qml
+ThemePicker 1.0 ThemePicker.qml
+BackgroundPicker 1.0 BackgroundPicker.qml
+KeybindSheet 1.0 KeybindSheet.qml
+SettingsMenu 1.0 SettingsMenu.qml
+LanguagePicker 1.0 LanguagePicker.qml
+ScreenRecord 1.0 ScreenRecord.qml
+Voxtype 1.0 Voxtype.qml

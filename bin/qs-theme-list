@@ -1,0 +1,25 @@
+#!/bin/bash
+# qs-theme-list — print available themes, marking the current one.
+
+set -euo pipefail
+
+THEMES_DIR="$HOME/.config/theme/themes"
+CURRENT_FILE="$HOME/.config/theme/current/theme.name"
+
+current=""
+[[ -r $CURRENT_FILE ]] && current=$(< "$CURRENT_FILE")
+
+if [[ ! -d $THEMES_DIR ]]; then
+  echo "qs-theme-list: $THEMES_DIR doesn't exist" >&2
+  exit 1
+fi
+
+shopt -s nullglob
+for dir in "$THEMES_DIR"/*/; do
+  name=$(basename "$dir")
+  if [[ $name == "$current" ]]; then
+    printf '* %s\n' "$name"
+  else
+    printf '  %s\n' "$name"
+  fi
+done

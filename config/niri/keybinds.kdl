@@ -1,0 +1,233 @@
+// niri keybinds — single source of truth.
+// Included from ~/.config/niri/config.kdl via:
+//   include "/home/michael/.config/niri/keybinds.kdl"
+//
+// Design rules:
+//   1. One bind per action. No aliases.
+//   2. App-launching + pickers follow OMARCHY conventions
+//      (Mod+Shift+<letter> for apps; Mod+Ctrl+<key> for pickers;
+//       Mod+Space for launcher; Mod+Escape for power menu;
+//       universal clipboard on Mod+C/V/X).
+//   3. Window management keeps NIRI defaults verbatim (focus / move /
+//      workspace / layout). Where niri ships both an arrow-key and
+//      an HJKL variant for the same action we keep both — they are
+//      niri's intentional alternates, not duplicates.
+//   4. Every bind has a `hotkey-overlay-title` so the Quickshell
+//      keybind sheet (parses this file) can label it.
+//
+// Modifier reference:
+//   Mod    = Super (on TTY) / Alt (when running in winit)
+//   Super  = Super, explicit
+
+binds {
+    // ===== Help =====
+    // Mod+F1 — universal-keyboard-friendly (xkb name is the same on
+    // every layout). Bare F1 would shadow apps' own help bind.
+    Mod+F1 hotkey-overlay-title="Keybinds" { spawn "quickshell" "ipc" "call" "--" "keybind-sheet" "toggle"; }
+
+    // ===== App launchers =====
+    // Omarchy convention: Mod+Return / Mod+Space / Mod+Shift+<letter>.
+    Mod+Return       hotkey-overlay-title="Terminal: kitty"        { spawn "kitty"; }
+    Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "launcher" "toggle"; }
+    Mod+Shift+B      hotkey-overlay-title="Browser: Zen"           { spawn "zen-browser"; }
+    Mod+Shift+E      hotkey-overlay-title="File explorer: nautilus" { spawn "nautilus"; }
+
+    // ===== Pickers =====
+    // Omarchy uses the Mod+Ctrl+<key> family for pickers.
+    Mod+Ctrl+V           hotkey-overlay-title="Clipboard manager"   { spawn "quickshell" "ipc" "call" "--" "clipboard-picker"  "toggle"; }
+    Mod+Ctrl+E           hotkey-overlay-title="Emoji picker"        { spawn "quickshell" "ipc" "call" "--" "emoji-picker"      "toggle"; }
+    Mod+Ctrl+Space       hotkey-overlay-title="Background picker"   { spawn "quickshell" "ipc" "call" "--" "background-picker" "toggle"; }
+    Mod+Shift+Ctrl+Space hotkey-overlay-title="Theme picker"        { spawn "quickshell" "ipc" "call" "--" "theme-picker"      "toggle"; }
+    Mod+Escape           hotkey-overlay-title="Power menu"          { spawn "quickshell" "ipc" "call" "--" "power-menu"        "toggle"; }
+    Mod+Alt+Space        hotkey-overlay-title="Settings"            { spawn "quickshell" "ipc" "call" "--" "settings-menu"    "toggle"; }
+
+    // ===== Dictation =====
+    // Mod+F9 toggles voxtype recording. Bare F9 would shadow apps'
+    // own F9 binds; Mod+F9 stays universal-keyboard-friendly.
+    // True push-to-talk needs niri press/release bind support —
+    // see niri-wm/niri#2456, not yet.
+    Mod+F9 allow-when-locked=false hotkey-overlay-title="Toggle dictation" { spawn "voxtype" "record" "toggle"; }
+
+    // ===== System actions =====
+    // Lock — Ctrl+Alt+L. Super+Alt+L would alias to Mod+Alt+L which
+    // is now monitor-focus-right (HJKL family).
+    Ctrl+Alt+L hotkey-overlay-title="Lock the screen" { spawn "quickshell" "-p" "/home/michael/.config/quickshell/lock/shell.qml"; }
+    // Screen reader (orca). Allowed when locked.
+    Super+Alt+S allow-when-locked=true hotkey-overlay-title="Toggle screen reader" { spawn-sh "pkill orca || exec orca"; }
+    Mod+Shift+P hotkey-overlay-title="Power off monitors"                          { power-off-monitors; }
+
+    // ===== Screenshot / recording =====
+    // No Print key on this keyboard → Mod+Shift+S (Windows-snip
+    // muscle memory). Region selected with slurp, opened in satty
+    // for annotation; saved under $XDG_PICTURES_DIR/Screenshots and
+    // copied to the clipboard.
+    Mod+Shift+S allow-when-locked=false hotkey-overlay-title="Screenshot region (satty)" {
+        spawn-sh "DIR=\"$(xdg-user-dir PICTURES)/Screenshots\"; mkdir -p \"$DIR\"; grim -g \"$(slurp -o -d)\" - | satty --filename - --output-filename \"$DIR/Screenshot_$(date '+%Y-%m-%d_%H-%M-%S').png\" --early-exit --copy-command wl-copy"
+    }
+    Mod+Alt+R allow-when-locked=false hotkey-overlay-title="Toggle screen recording" {
+        spawn "/home/michael/.local/bin/qs-screenrecord";
+    }
+
+    // ===== Universal clipboard (Omarchy parity) =====
+    // wtype injects Ctrl+Insert / Shift+Insert / Ctrl+X into the
+    // focused window. Every sane app (browsers, GTK, vim, …) treats
+    // those as Copy / Paste / Cut. kitty needs `map ctrl+insert
+    // copy_to_clipboard` + `map shift+insert paste_from_clipboard`
+    // in kitty.conf to recognise the injected keys.
+    Mod+C hotkey-overlay-title="Copy (universal)"  { spawn "wtype" "-M" "ctrl"  "-P" "Insert" "-p" "Insert" "-m" "ctrl"; }
+    Mod+V hotkey-overlay-title="Paste (universal)" { spawn "wtype" "-M" "shift" "-P" "Insert" "-p" "Insert" "-m" "shift"; }
+    Mod+X hotkey-overlay-title="Cut (universal)"   { spawn "wtype" "-M" "ctrl"  "-P" "x"      "-p" "x"      "-m" "ctrl"; }
+
+    // ===== Volume / mute (XF86Audio*) =====
+    // Wrappers in ~/.local/bin adjust the default sink/source via
+    // wpctl and pop the Quickshell OSD. Absolute paths — niri's
+    // PATH doesn't include ~/.local/bin.
+    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume up"   { spawn "/home/michael/.local/bin/qs-audio-output-volume" "raise"; }
+    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "/home/michael/.local/bin/qs-audio-output-volume" "lower"; }
+    XF86AudioMute        allow-when-locked=true hotkey-overlay-title="Mute output" { spawn "/home/michael/.local/bin/qs-audio-output-volume" "mute-toggle"; }
+    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="Mute mic"    { spawn "/home/michael/.local/bin/qs-audio-input-mute"; }
+
+    // ===== Media playback (MPRIS via playerctl) =====
+    XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Play / pause" { spawn-sh "playerctl play-pause"; }
+    XF86AudioStop allow-when-locked=true hotkey-overlay-title="Stop"         { spawn-sh "playerctl stop"; }
+    XF86AudioPrev allow-when-locked=true hotkey-overlay-title="Previous"     { spawn-sh "playerctl previous"; }
+    XF86AudioNext allow-when-locked=true hotkey-overlay-title="Next"         { spawn-sh "playerctl next"; }
+
+    // ===== External-monitor brightness (DDC/CI via ddcutil) =====
+    // brightnessctl --class=backlight is a no-op here (no laptop
+    // panel); qs-brightness-display drives every external monitor.
+    XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="Brightness up"   { spawn "/home/michael/.local/bin/qs-brightness-display" "raise"; }
+    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness down" { spawn "/home/michael/.local/bin/qs-brightness-display" "lower"; }
+
+    // ===== Overview + close =====
+    Mod+O repeat=false { toggle-overview; }
+    Mod+Q repeat=false { close-window; }
+
+    // ===== Focus (niri defaults — arrows AND HJKL kept as alternates) =====
+    Mod+Left  { focus-column-left; }
+    Mod+Down  { focus-window-down; }
+    Mod+Up    { focus-window-up; }
+    Mod+Right { focus-column-right; }
+    Mod+H     { focus-column-left; }
+    Mod+J     { focus-window-down; }
+    Mod+K     { focus-window-up; }
+    Mod+L     { focus-column-right; }
+    Mod+Home  { focus-column-first; }
+    Mod+End   { focus-column-last; }
+
+    // ===== Move column / window =====
+    // Consistent arrows + HJKL on Mod+Ctrl.
+    Mod+Ctrl+Left  { move-column-left; }
+    Mod+Ctrl+Down  { move-window-down; }
+    Mod+Ctrl+Up    { move-window-up; }
+    Mod+Ctrl+Right { move-column-right; }
+    Mod+Ctrl+H     { move-column-left; }
+    Mod+Ctrl+J     { move-window-down; }
+    Mod+Ctrl+K     { move-window-up; }
+    Mod+Ctrl+L     { move-column-right; }
+    Mod+Ctrl+Home  { move-column-to-first; }
+    Mod+Ctrl+End   { move-column-to-last; }
+
+    // ===== Monitor: focus =====
+    // Consistent arrows + HJKL on Mod+Alt. Mod+Shift namespace is
+    // reserved for app launches.
+    Mod+Alt+Left  { focus-monitor-left; }
+    Mod+Alt+Down  { focus-monitor-down; }
+    Mod+Alt+Up    { focus-monitor-up; }
+    Mod+Alt+Right { focus-monitor-right; }
+    Mod+Alt+H     { focus-monitor-left; }
+    Mod+Alt+J     { focus-monitor-down; }
+    Mod+Alt+K     { focus-monitor-up; }
+    Mod+Alt+L     { focus-monitor-right; }
+
+    // ===== Monitor: move column =====
+    // Consistent arrows + HJKL on Mod+Ctrl+Alt.
+    Mod+Ctrl+Alt+Left  { move-column-to-monitor-left; }
+    Mod+Ctrl+Alt+Down  { move-column-to-monitor-down; }
+    Mod+Ctrl+Alt+Up    { move-column-to-monitor-up; }
+    Mod+Ctrl+Alt+Right { move-column-to-monitor-right; }
+    Mod+Ctrl+Alt+H     { move-column-to-monitor-left; }
+    Mod+Ctrl+Alt+J     { move-column-to-monitor-down; }
+    Mod+Ctrl+Alt+K     { move-column-to-monitor-up; }
+    Mod+Ctrl+Alt+L     { move-column-to-monitor-right; }
+
+    // ===== Workspace: focus + move =====
+    Mod+Page_Down       { focus-workspace-down; }
+    Mod+Page_Up         { focus-workspace-up; }
+    Mod+U               { focus-workspace-down; }
+    Mod+I               { focus-workspace-up; }
+    Mod+Ctrl+Page_Down  { move-column-to-workspace-down; }
+    Mod+Ctrl+Page_Up    { move-column-to-workspace-up; }
+    Mod+Ctrl+U          { move-column-to-workspace-down; }
+    Mod+Ctrl+I          { move-column-to-workspace-up; }
+    Mod+Shift+Page_Down { move-workspace-down; }
+    Mod+Shift+Page_Up   { move-workspace-up; }
+    Mod+Shift+U         { move-workspace-down; }
+    Mod+Shift+I         { move-workspace-up; }
+
+    // ===== Workspace by index =====
+    // Niri workspaces are dynamic; an index beyond the current count
+    // refers to the bottom (empty) workspace.
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+    Mod+Ctrl+1 { move-column-to-workspace 1; }
+    Mod+Ctrl+2 { move-column-to-workspace 2; }
+    Mod+Ctrl+3 { move-column-to-workspace 3; }
+    Mod+Ctrl+4 { move-column-to-workspace 4; }
+    Mod+Ctrl+5 { move-column-to-workspace 5; }
+    Mod+Ctrl+6 { move-column-to-workspace 6; }
+    Mod+Ctrl+7 { move-column-to-workspace 7; }
+    Mod+Ctrl+8 { move-column-to-workspace 8; }
+    Mod+Ctrl+9 { move-column-to-workspace 9; }
+
+    // ===== Mouse wheel navigation =====
+    Mod+WheelScrollDown      cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp        cooldown-ms=150 { focus-workspace-up; }
+    Mod+Ctrl+WheelScrollDown cooldown-ms=150 { move-column-to-workspace-down; }
+    Mod+Ctrl+WheelScrollUp   cooldown-ms=150 { move-column-to-workspace-up; }
+    Mod+WheelScrollRight      { focus-column-right; }
+    Mod+WheelScrollLeft       { focus-column-left; }
+    Mod+Ctrl+WheelScrollRight { move-column-right; }
+    Mod+Ctrl+WheelScrollLeft  { move-column-left; }
+    // Shift+wheel = horizontal scroll convention.
+    Mod+Shift+WheelScrollDown      { focus-column-right; }
+    Mod+Shift+WheelScrollUp        { focus-column-left; }
+    Mod+Ctrl+Shift+WheelScrollDown { move-column-right; }
+    Mod+Ctrl+Shift+WheelScrollUp   { move-column-left; }
+
+    // ===== Column / window layout =====
+    // Consume / expel: move the focused window in/out of a column.
+    Mod+BracketLeft  { consume-or-expel-window-left; }
+    Mod+BracketRight { consume-or-expel-window-right; }
+    Mod+Comma  { consume-window-into-column; }
+    Mod+Period { expel-window-from-column; }
+    // Preset column / window widths.
+    Mod+R            { switch-preset-column-width; }
+    Mod+Shift+R      { switch-preset-column-width-back; }
+    Mod+Ctrl+Shift+R { switch-preset-window-height; }
+    Mod+Ctrl+R       { reset-window-height; }
+    // Maximise / fullscreen.
+    Mod+F      { maximize-column; }
+    Mod+Alt+F  { fullscreen-window; }      // Mod+Shift+F is reserved for apps
+    Mod+M      { maximize-window-to-edges; }
+    Mod+Ctrl+F { expand-column-to-available-width; }
+    // Centring. Mod+C is universal Copy; centring moves one slot over.
+    Mod+Alt+C   { center-column; }
+    Mod+Shift+C { center-visible-columns; }
+    // Fine-grained width / height adjustments (10 % steps).
+    Mod+Minus       { set-column-width "-10%"; }
+    Mod+Equal       { set-column-width "+10%"; }
+    Mod+Shift+Minus { set-window-height "-10%"; }
+    Mod+Shift+Equal { set-window-height "+10%"; }
+    // Floating / tabbed. Mod+V is universal Paste.
+    Mod+Alt+V   { toggle-window-floating; }
+    Mod+Shift+V { switch-focus-between-floating-and-tiling; }
+    Mod+W       { toggle-column-tabbed-display; }
+}

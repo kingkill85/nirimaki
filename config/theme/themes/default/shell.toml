@@ -1,0 +1,26 @@
+# Per-surface overrides for the Quickshell singleton. Optional — keys
+# omitted fall back to the foundational palette in colors.toml. Same
+# schema Omarchy's shell/Commons/Color.qml expects (`<section>.<key>`),
+# so their themes drop in verbatim once D2 wires this up.
+
+[bar]
+background = "#101315"
+text       = "#cacccc"
+# Bar "active" tint = a warm red so urgent state stands out.
+active     = "#a55555"
+
+[popups]
+background = "#101315"
+border     = "#cacccc"
+
+[notifications]
+background = "#101315"
+text       = "#cacccc"
+border     = "#cacccc"
+countdown  = "#cacccc"
+
+[menu]
+background = "#101315"
+text       = "#cacccc"
+# Selection highlight — same as foreground (monochrome flat look).
+selected   = "#cacccc"

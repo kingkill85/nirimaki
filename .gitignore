@@ -1,0 +1,25 @@
+# User-state files that live inside the symlinked config dirs but
+# are written at runtime by the user / quickshell / niri. Each must
+# not be tracked because it diverges per-machine.
+
+# Quickshell-written: user's chosen UI locale (managed by
+# LanguagePicker). When absent, I18n falls back to $LANG.
+config/quickshell/locale
+
+# Stray *.bak files niri / editors leave behind in config/niri/ when
+# they reload the config.
+*.bak
+*.orig
+*~
+
+# Anything the user might `git pull && nano something.local` etc.
+*.local
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Misc
+*.swp
+*.swo

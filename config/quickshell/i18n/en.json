@@ -1,0 +1,57 @@
+{
+  "launcher.placeholder": "Search applications…",
+
+  "theme.placeholder":      "Theme…",
+  "background.placeholder": "Background…",
+
+  "emoji.placeholder":  "Search emojis…",
+  "emoji.no_matches":   "No matches for \"{0}\"",
+
+  "clipboard.placeholder": "Search clipboard…",
+  "clipboard.empty":       "Clipboard is empty",
+  "clipboard.image":       "Image",
+
+  "keybinds.placeholder":   "Keybinds — type to filter",
+
+  "settings.placeholder":           "Settings",
+  "settings.style":                 "Style",
+  "settings.style.theme":           "Theme",
+  "settings.style.background":      "Background",
+  "settings.style.keybinds":        "Keybinds",
+  "settings.setup":                 "Setup",
+  "settings.setup.audio":           "Audio",
+  "settings.setup.bluetooth":       "Bluetooth",
+  "settings.setup.wifi":            "Wi-Fi",
+  "settings.setup.language":        "Language",
+  "settings.system":                "System",
+
+  "language.placeholder":           "Language…",
+  "language.system_default":        "System default",
+
+  "power.placeholder":      "Power…",
+  "power.action.lock":      "Lock",
+  "power.action.suspend":   "Suspend",
+  "power.action.logout":    "Logout",
+  "power.action.restart":   "Restart",
+  "power.action.shutdown":  "Shutdown",
+
+  "network.ethernet":     "Ethernet",
+  "network.disconnected": "Disconnected",
+  "network.ip":           "IP",
+  "network.gateway":      "Gateway",
+  "network.link":         "Link",
+  "network.duplex":       "duplex",
+
+  "stats.system": "System",
+  "stats.cpu":    "CPU",
+  "stats.memory": "Memory",
+  "stats.load":   "Load",
+
+  "weather.feels":    "FEELS",
+  "weather.wind":     "WIND",
+  "weather.humid":    "HUMID",
+  "weather.fetching": "Fetching forecast…",
+
+  "lock.password":     "Password",
+  "lock.bad_password": "Wrong password"
+}

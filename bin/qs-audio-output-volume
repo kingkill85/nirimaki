@@ -1,0 +1,63 @@
+#!/bin/bash
+# qs-audio-output-volume — adjust the default sink and pop up the OSD.
+# Port of Omarchy's `omarchy-audio-output-volume`.
+#
+# PATH is forced because niri's spawn-inherited PATH does not include
+# ~/.local/bin, so a bare `qs-osd` lookup at the end of this script would
+# silently fail (volume changes audibly, but no bezel appears).
+export PATH="$HOME/.local/bin:$PATH"
+#
+# Usage:
+#   qs-audio-output-volume raise        # +5%
+#   qs-audio-output-volume lower        # -5%
+#   qs-audio-output-volume mute-toggle  # toggle mute (debounced 250ms)
+#   qs-audio-output-volume +N | -N      # ±N percentage points
+
+action="${1:-}"
+
+if [[ -z $action ]]; then
+  echo "Usage: qs-audio-output-volume <raise|lower|mute-toggle|+N|-N>" >&2
+  exit 1
+fi
+
+volume_state()   { wpctl get-volume @DEFAULT_AUDIO_SINK@; }
+volume_percent() { volume_state | awk '{ for (i=1; i<=NF; i++) if ($i ~ /^[0-9.]+$/) print int($i * 100) }'; }
+volume_muted()   { volume_state | grep -q MUTED; }
+
+case "$action" in
+  raise) action="+5" ;;
+  lower) action="-5" ;;
+esac
+
+if [[ $action == "mute-toggle" ]]; then
+  # Debounce duplicate key events from XF86AudioMute / mic-mute LED toggles.
+  runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
+  debounce_file="$runtime_dir/qs-audio-output-volume-mute-toggle.last"
+  now=$(date +%s%3N)
+  last=0
+  [[ -r $debounce_file ]] && read -r last < "$debounce_file" || true
+  if (( now - last < 250 )); then
+    exit 0
+  fi
+  printf '%s\n' "$now" > "$debounce_file"
+
+  wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle >/dev/null
+elif [[ $action == +* ]]; then
+  step="${action#+}"
+  wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ "${step}%+"
+elif [[ $action == -* ]]; then
+  step="${action#-}"
+  wpctl set-volume @DEFAULT_AUDIO_SINK@ "${step}%-"
+else
+  echo "qs-audio-output-volume: unknown action: $action" >&2
+  exit 1
+fi
+
+percent=$(volume_percent)
+if volume_muted || (( percent == 0 )); then
+  icon="volume-muted"
+else
+  icon="volume-high"
+fi
+
+qs-osd -i "$icon" -p "$percent"

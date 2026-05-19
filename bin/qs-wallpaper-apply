@@ -1,0 +1,52 @@
+#!/bin/bash
+# qs-wallpaper-apply — start swaybg on the user's currently-chosen
+# background image (if any), otherwise the active theme's first
+# image, otherwise a solid colour. Called from niri's spawn-at-
+# startup, from qs-theme-set, and from BackgroundPicker.
+#
+# Resolution order:
+#   1. ~/.config/theme/current/wallpaper      symlink to a specific
+#                                             image. Set by the
+#                                             background picker (E7).
+#   2. first sorted image in
+#      ~/.config/theme/current/backgrounds/   theme default.
+#   3. solid fallback colour                  empty themes (`default`).
+#
+# Themes can curate ordering by prefixing filenames with digits
+# (Omarchy convention: 1-foo.jpg, 2-bar.jpg, …).
+
+set -euo pipefail
+
+THEME_DIR="$HOME/.config/theme/current"
+BG_DIR="$THEME_DIR/backgrounds"
+PICK="$THEME_DIR/wallpaper"
+FALLBACK_COLOR="#101315"
+
+# Kill any existing swaybg cleanly. -x matches by exact name so we
+# catch instances spawned with any arguments.
+pkill -x swaybg 2>/dev/null || true
+
+img=""
+
+# 1. User-picked wallpaper symlink, if it resolves to a real file.
+if [[ -L $PICK ]] && [[ -f $PICK ]]; then
+  img=$(readlink -f "$PICK" 2>/dev/null || true)
+fi
+
+# 2. First image in the theme's backgrounds/.
+if [[ -z $img && -d $BG_DIR ]]; then
+  shopt -s nullglob
+  files=("$BG_DIR"/*)
+  shopt -u nullglob
+  for f in "${files[@]}"; do
+    case "${f,,}" in
+      *.jpg|*.jpeg|*.png|*.webp) img="$f"; break ;;
+    esac
+  done
+fi
+
+if [[ -n $img && -f $img ]]; then
+  exec swaybg -i "$img" -m fill
+else
+  exec swaybg -c "$FALLBACK_COLOR"
+fi

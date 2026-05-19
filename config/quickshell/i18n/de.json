@@ -1,0 +1,57 @@
+{
+  "launcher.placeholder": "Anwendungen suchen…",
+
+  "theme.placeholder":      "Theme…",
+  "background.placeholder": "Hintergrund…",
+
+  "emoji.placeholder":  "Emojis suchen…",
+  "emoji.no_matches":   "Keine Treffer für „{0}“",
+
+  "clipboard.placeholder": "Zwischenablage durchsuchen…",
+  "clipboard.empty":       "Zwischenablage ist leer",
+  "clipboard.image":       "Bild",
+
+  "keybinds.placeholder":   "Tastenkürzel — tippen zum Filtern",
+
+  "settings.placeholder":           "Einstellungen",
+  "settings.style":                 "Erscheinungsbild",
+  "settings.style.theme":           "Theme",
+  "settings.style.background":      "Hintergrund",
+  "settings.style.keybinds":        "Tastenkürzel",
+  "settings.setup":                 "System",
+  "settings.setup.audio":           "Audio",
+  "settings.setup.bluetooth":       "Bluetooth",
+  "settings.setup.wifi":            "WLAN",
+  "settings.setup.language":        "Sprache",
+  "settings.system":                "Energie",
+
+  "language.placeholder":           "Sprache…",
+  "language.system_default":        "Systemstandard",
+
+  "power.placeholder":      "Energie…",
+  "power.action.lock":      "Sperren",
+  "power.action.suspend":   "Energie sparen",
+  "power.action.logout":    "Abmelden",
+  "power.action.restart":   "Neu starten",
+  "power.action.shutdown":  "Herunterfahren",
+
+  "network.ethernet":     "Ethernet",
+  "network.disconnected": "Nicht verbunden",
+  "network.ip":           "IP",
+  "network.gateway":      "Gateway",
+  "network.link":         "Verbindung",
+  "network.duplex":       "Duplex",
+
+  "stats.system": "System",
+  "stats.cpu":    "CPU",
+  "stats.memory": "Speicher",
+  "stats.load":   "Last",
+
+  "weather.feels":    "GEFÜHLT",
+  "weather.wind":     "WIND",
+  "weather.humid":    "FEUCHTE",
+  "weather.fetching": "Vorhersage wird geladen…",
+
+  "lock.password":     "Passwort",
+  "lock.bad_password": "Falsches Passwort"
+}

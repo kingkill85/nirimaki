@@ -1,0 +1,4 @@
+singleton Theme 1.0 Theme.qml
+singleton I18n 1.0 I18n.qml
+LockContext 1.0 LockContext.qml
+LockSurface 1.0 LockSurface.qml

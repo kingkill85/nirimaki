@@ -1,0 +1,54 @@
+#!/bin/bash
+# qs-screenrecord — toggle a wf-recorder session.
+# Inspired by omarchy-capture-screenrecording, stripped to what wf-recorder
+# (wlroots-native) actually needs. No webcam overlay, no ffmpeg post-pass.
+#
+# Idle  → slurp picker for region → wf-recorder writes
+#         $XDG_VIDEOS_DIR/screenrecording-<date>.mp4 in the background.
+# Busy  → SIGINT to wf-recorder; wait up to 5s; SIGKILL if it didn't flush.
+#         notify-send links the saved file.
+#
+# Trigger: niri Mod+Shift+R.
+
+set -euo pipefail
+export PATH="$HOME/.local/bin:$PATH"
+
+[[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
+OUTPUT_DIR="${XDG_VIDEOS_DIR:-$HOME/Videos}"
+mkdir -p "$OUTPUT_DIR"
+
+LAST_FILE_PTR="${XDG_RUNTIME_DIR:-/tmp}/qs-screenrecord.last"
+
+if pgrep -x wf-recorder >/dev/null; then
+    # ----- Stop branch -----
+    pkill -SIGINT -x wf-recorder
+    for _ in $(seq 1 50); do
+        pgrep -x wf-recorder >/dev/null || break
+        sleep 0.1
+    done
+    if pgrep -x wf-recorder >/dev/null; then
+        pkill -9 -x wf-recorder
+        notify-send "Screen recording error" \
+            "wf-recorder had to be force-killed; the file may be incomplete." \
+            -u critical -t 5000
+        exit 1
+    fi
+
+    last_file=$(cat "$LAST_FILE_PTR" 2>/dev/null || true)
+    rm -f "$LAST_FILE_PTR"
+    if [[ -n $last_file && -f $last_file ]]; then
+        notify-send "Screen recording saved" "$last_file" -t 5000
+    fi
+    exit 0
+fi
+
+# ----- Start branch -----
+region=$(slurp -o -d 2>/dev/null) || exit 1
+filename="$OUTPUT_DIR/screenrecording-$(date '+%Y-%m-%d_%H-%M-%S').mp4"
+
+# `-g` accepts slurp's "X,Y WxH" output verbatim.
+wf-recorder -g "$region" -f "$filename" >/dev/null 2>&1 &
+disown
+echo "$filename" >"$LAST_FILE_PTR"
+
+notify-send "Screen recording started" "→ $filename" -t 2000

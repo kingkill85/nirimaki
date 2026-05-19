@@ -1,0 +1,226 @@
+#!/bin/bash
+# qs-theme-set — switch the active theme by name.
+#
+#   ~/.config/theme/themes/<name>/    sources (colors.toml, shell.toml,
+#                                     btop.theme, etc.)
+#   ~/.config/theme/templates/*.tpl   per-app templates (kitty, btop,
+#                                     swaylock, …). {{ key }} / {{
+#                                     key_strip }} / {{ key_rgb }}
+#                                     placeholders substituted from
+#                                     colors.toml.
+#   ~/.config/theme/current/          active theme files (overwritten in
+#                                     place — preserves inotify watches).
+
+set -euo pipefail
+
+if [[ -z ${1:-} ]]; then
+  echo "Usage: qs-theme-set <theme-name>" >&2
+  echo "       qs-theme-list to see what's available" >&2
+  exit 1
+fi
+
+THEMES_DIR="$HOME/.config/theme/themes"
+TEMPLATES_DIR="$HOME/.config/theme/templates"
+CURRENT_DIR="$HOME/.config/theme/current"
+
+name="$1"
+src="$THEMES_DIR/$name"
+
+if [[ ! -d $src ]]; then
+  echo "qs-theme-set: theme '$name' not found in $THEMES_DIR" >&2
+  exit 1
+fi
+if [[ ! -f $src/colors.toml ]]; then
+  echo "qs-theme-set: $src/colors.toml is missing (required)" >&2
+  exit 1
+fi
+
+mkdir -p "$CURRENT_DIR"
+
+# ===== Install theme contents into current/ =====
+# Files: cp -f in place so per-file inodes survive (Quickshell
+# FileView inotify watches stay valid).
+# Directories (backgrounds/, logos/, …): symlinked rather than copied
+# — they're binary assets with no FileView watches and swap is cheap
+# regardless of MB size.
+shopt -s nullglob
+declare -A keep=([theme.name]=1)
+for entry in "$src"/*; do
+  keep["$(basename "$entry")"]=1
+done
+
+# Sweep stale entries first; rm -rf so we handle both files and symlinks.
+for existing in "$CURRENT_DIR"/*; do
+  base=$(basename "$existing")
+  # Don't sweep template outputs — those are regenerated below.
+  case "$base" in
+    kitty.conf|qt-colors.conf) continue ;;
+  esac
+  if [[ -z ${keep[$base]+x} ]]; then
+    rm -rf "$existing"
+  fi
+done
+
+# Install each source entry.
+for entry in "$src"/*; do
+  base=$(basename "$entry")
+  dest="$CURRENT_DIR/$base"
+  if [[ -d $entry ]]; then
+    rm -rf "$dest"
+    ln -s "$entry" "$dest"
+  else
+    cp -f "$entry" "$dest"
+  fi
+done
+printf '%s\n' "$name" >"$CURRENT_DIR/theme.name"
+
+# ===== Render templates =====
+# Build a sed script of {{ key }} → value substitutions from
+# current/colors.toml. Three variants per colour:
+#   {{ accent }}        →  #cacccc        (raw hex with hash)
+#   {{ accent_strip }}  →  cacccc         (hash stripped — swaylock etc.)
+#   {{ accent_rgb }}    →  202,204,204    (decimal RGB tuple)
+hex_to_rgb() {
+  local h="${1#\#}"
+  printf "%d,%d,%d" "0x${h:0:2}" "0x${h:2:2}" "0x${h:4:2}"
+}
+
+if [[ -d $TEMPLATES_DIR ]]; then
+  sed_script=$(mktemp)
+  while IFS= read -r line; do
+    [[ -z $line || $line == \#* || $line == \[* ]] && continue
+    # Split on first '='. Strip whitespace from key; extract first quoted
+    # token from value (handles trailing whitespace, comments, etc.).
+    key=$(printf '%s' "$line" | sed -E 's/^[[:space:]]*([A-Za-z0-9_]+)[[:space:]]*=.*$/\1/')
+    val=$(printf '%s' "$line" | sed -E 's/^[^=]*=[[:space:]]*"([^"]*)".*$/\1/')
+    [[ -z $key || -z $val || $key == "$line" ]] && continue
+    printf 's|{{ %s }}|%s|g\n'        "$key" "$val"        >>"$sed_script"
+    printf 's|{{ %s_strip }}|%s|g\n'  "$key" "${val#\#}"   >>"$sed_script"
+    if [[ $val =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+      printf 's|{{ %s_rgb }}|%s|g\n' "$key" "$(hex_to_rgb "$val")" >>"$sed_script"
+    fi
+  done <"$CURRENT_DIR/colors.toml"
+
+  for tpl in "$TEMPLATES_DIR"/*.tpl; do
+    base=$(basename "$tpl" .tpl)
+    case "$base" in
+      btop.theme)
+        # btop only looks in fixed theme dirs by filename; install
+        # directly under the named "qs" slot.
+        mkdir -p "$HOME/.config/btop/themes"
+        out="$HOME/.config/btop/themes/qs.theme"
+        ;;
+      *)
+        out="$CURRENT_DIR/$base"
+        ;;
+    esac
+    sed -f "$sed_script" "$tpl" >"$out"
+  done
+
+  rm -f "$sed_script"
+fi
+
+# ===== GTK / icon / color-scheme via gsettings =====
+# Same convention as basecamp/omarchy@bin/omarchy-theme-set-gnome:
+#   ~/.config/theme/current/light.mode   present  →  light theme
+#                                        absent   →  dark theme  (default)
+#   ~/.config/theme/current/icons.theme  text file with the icon theme
+#                                        name (e.g. "Yaru-magenta")
+if [[ -f $CURRENT_DIR/light.mode ]]; then
+  color_scheme="prefer-light"; prefer_dark="false"
+else
+  color_scheme="prefer-dark";  prefer_dark="true"
+fi
+# Modern GTK3+: Adwaita ships ONE theme (light) and dark is selected via
+# the `prefer-dark-theme` flag + freedesktop color-scheme. The legacy
+# `Adwaita-dark` theme name only exists if `gnome-themes-extra` is
+# installed — without that package GTK silently falls back to light.
+# Keep the name as `Adwaita` and let the flag drive light/dark.
+gtk_theme="Adwaita"
+
+icon_theme=""
+[[ -f $CURRENT_DIR/icons.theme ]] && icon_theme=$(< "$CURRENT_DIR/icons.theme")
+icon_theme="${icon_theme//[[:space:]]/}"
+[[ -z $icon_theme ]] && icon_theme="Yaru-blue"
+
+if command -v gsettings >/dev/null 2>&1; then
+  gsettings set org.gnome.desktop.interface color-scheme "$color_scheme"
+  gsettings set org.gnome.desktop.interface gtk-theme    "$gtk_theme"
+  gsettings set org.gnome.desktop.interface icon-theme   "$icon_theme"
+fi
+
+# Mirror to settings.ini so non-portal-aware GTK apps still see dark.
+for gtk in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.ini"; do
+  [[ -f $gtk ]] || continue
+  sed -i \
+    -e "s|^gtk-application-prefer-dark-theme=.*|gtk-application-prefer-dark-theme=$prefer_dark|" \
+    -e "s|^gtk-theme-name=.*|gtk-theme-name=$gtk_theme|" \
+    -e "s|^gtk-icon-theme-name=.*|gtk-icon-theme-name=$icon_theme|" \
+    "$gtk"
+done
+
+# ===== Remmina =====
+# Remmina has its own `dark_theme` toggle in remmina.pref that
+# overrides the host GTK theme. We flip it to mirror `light.mode`.
+remmina_pref="$HOME/.config/remmina/remmina.pref"
+if [[ -f $remmina_pref ]]; then
+  remmina_dark="true"
+  [[ -f $CURRENT_DIR/light.mode ]] && remmina_dark="false"
+  sed -i "s|^dark_theme=.*|dark_theme=$remmina_dark|" "$remmina_pref"
+fi
+
+# ===== Qt 5/6 — qt5ct / qt6ct =====
+# qt-colors.conf.tpl rendered above into current/qt-colors.conf; qt5ct
+# + qt6ct main configs reference that absolute path via
+# `color_scheme_path` so they pick up the new palette on app launch.
+# Only the icon_theme line needs an in-place tweak per swap.
+for qtc in "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt5ct/qt5ct.conf"; do
+  [[ -f $qtc ]] || continue
+  sed -i "s|^icon_theme=.*|icon_theme=$icon_theme|" "$qtc"
+done
+
+# ===== Reload running apps =====
+# Kitty: SIGUSR1 → re-read every included config file in every running
+# instance. Cheap and complete.
+if pgrep -x kitty >/dev/null 2>&1; then
+  pkill -SIGUSR1 -x kitty 2>/dev/null || true
+fi
+
+# Quickshell: explicit IPC reload — see niri-setup/phase-d-theming.md
+# (D2) for why we don't rely on FileView inotify.
+quickshell ipc call -- theme reload >/dev/null 2>&1 || true
+
+# niri: re-read config (which pulls current/niri-theme.kdl via include).
+# niri also has a config-file watcher, but it watches the main file —
+# not the included one — so an explicit reload is required.
+if command -v niri >/dev/null 2>&1; then
+  niri msg action load-config-file >/dev/null 2>&1 || true
+fi
+
+# Wallpaper: repoint `current/wallpaper` at the new theme's first
+# image. Always keeping the symlink valid matters because the lock
+# screen's Image reads that path directly — a missing symlink would
+# leave the locker on a solid-colour fallback after every theme
+# swap. BackgroundPicker can still rewrite the symlink later.
+shopt -s nullglob
+first_bg=""
+for f in "$CURRENT_DIR/backgrounds"/*; do
+  case "${f,,}" in
+    *.jpg|*.jpeg|*.png|*.webp) first_bg="$f"; break ;;
+  esac
+done
+shopt -u nullglob
+if [[ -n $first_bg ]]; then
+  ln -sfn "$first_bg" "$CURRENT_DIR/wallpaper"
+else
+  rm -f "$CURRENT_DIR/wallpaper"   # theme ships no images
+fi
+
+if [[ -x $HOME/.local/bin/qs-wallpaper-apply ]]; then
+  setsid -f "$HOME/.local/bin/qs-wallpaper-apply" >/dev/null 2>&1 || true
+fi
+
+# btop: no live reload mechanism; running btop keeps its old theme until
+# closed and reopened. Acceptable since btop is rarely long-running.
+
+echo "qs-theme-set: now using '$name'"
