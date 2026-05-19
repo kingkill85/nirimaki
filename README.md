@@ -1,56 +1,166 @@
-# Nirimaki
+<div align="center">
 
-An Omarchy-style desktop built on Arch Linux + [niri][niri] +
-[Quickshell][qs]. Name = **niri + maki** (rolled sushi), parallel
-to **Omarchy = omakase + Arch**.
+<img src="assets/logo-amber.png" alt="Nirimaki" width="640">
 
-[niri]: https://github.com/YaLTeR/niri
-[qs]:   https://quickshell.outfoxxed.me/
+**Niri + Maki.** An Omarchy-style desktop for Arch Linux, built on [niri] and [Quickshell].
 
-## What's inside
+![License](https://img.shields.io/badge/license-MIT-e0af68?style=flat-square)
+![niri](https://img.shields.io/badge/niri-26.04+-e0af68?style=flat-square)
+![Quickshell](https://img.shields.io/badge/Quickshell-0.3-e0af68?style=flat-square)
+![Status](https://img.shields.io/badge/status-self--hosting-e0af68?style=flat-square)
 
-- `config/niri/` — niri compositor config (`config.kdl`,
-  `keybinds.kdl`). Lays out outputs, window rules, transparency,
-  per-app opacity, screen-capture blocking for password managers.
-- `config/quickshell/` — the entire shell: bar widgets,
-  `DialogShell` (scrim + dialog two-surface pattern), Launcher,
-  PowerMenu, all the pickers, lock screen, i18n.
-- `config/theme/` — theme system. `themes/<name>/` contains
-  `colors.toml` per theme; `templates/*.tpl` are per-app templates
-  that `qs-theme-set` renders into `~/.config/theme/current/`.
-- `bin/` — `qs-theme-set`, `qs-wallpaper-apply`, `qs-osd`, audio /
-  brightness helpers. Installed into `~/.local/bin/`.
-- `docs/phase-*.md` — incremental build log. Each phase document
-  has an `### Outcome` section describing the actual end state.
-- `assets/` — branding (ASCII logo source, coloured PNG variants,
-  splash bitmap, plymouth assets).
+</div>
 
-## Live development
+[niri]:      https://github.com/YaLTeR/niri
+[Quickshell]: https://quickshell.outfoxxed.me/
+
+---
+
+## What it is
+
+[Omarchy] is **omakase** (chef's choice) + **Arch** — a curated, opinionated
+Arch desktop on top of Hyprland. Nirimaki is the same idea, retold for niri's
+scrolling-column world: **niri + maki**, the rolled sushi answer to Omarchy's
+plate. Same opinionated baseline (themes, dialogs, lock screen, picker
+overlays, sane keybinds), different compositor underneath.
+
+[Omarchy]: https://omarchy.org
+
+It's a single repo you can drop on a fresh Arch install and end up with a
+working, themed, multi-monitor desktop — without hand-stitching ten dotfile
+sources together first.
+
+---
+
+## What you get
+
+- **Compositor**: niri 26.04+ tuned for scrolling-column workflow,
+  variable-refresh-rate outputs, German keymap, focus-follows-mouse.
+- **Shell**: Quickshell. Top bar with workspaces, active-window title,
+  audio, network, bluetooth, weather, system stats, calendar, tray,
+  updates. Notification stack. OSD bezel for volume / brightness.
+- **Dialog overlays** (Omarchy walker-style, all behind one
+  [`DialogShell`](config/quickshell/DialogShell.qml) component): app
+  launcher, power menu, theme picker, background picker, language
+  picker, clipboard history, emoji picker, settings drilldown,
+  keybind cheat-sheet.
+- **22 themes** under `config/theme/themes/` — imported from Omarchy
+  plus custom additions (`catppuccin`, `gruvbox`, `tokyo-night`,
+  `nord`, `rose-pine`, `kanagawa`, `everforest`, `solitude`,
+  `hackerman`, `retro-82`, …). One `qs-theme-set <name>` re-skins
+  niri / Quickshell / kitty / btop / Qt apps atomically.
+- **Wallpaper per theme**: each theme ships its own backgrounds;
+  swap follows the theme.
+- **Lock screen**: PAM-backed, i18n, wallpaper-aware backdrop.
+- **i18n**: `en` + `de` translations, runtime locale switcher via the
+  Language picker.
+- **Transparency** dialed to Omarchy parity (per-app opacity rules,
+  always-opaque media tools, screen-capture blocking on password
+  managers).
+- **Branded boot**: UKI splash + Plymouth assets in `assets/`.
+
+---
+
+## Quick start (live dev mode)
 
 ```bash
 git clone https://github.com/kingkill85/nirimaki.git ~/Projekte/kingkill85/nirimaki
 cd ~/Projekte/kingkill85/nirimaki
-./dev-link.sh           # replaces ~/.config/{niri,quickshell,theme/{templates,themes}}
-                        # + ~/.local/bin/qs-* with symlinks back to the repo
+./dev-link.sh
 ```
 
-After `dev-link.sh`, edits in the repo immediately reach the live
-session — `Edit` a QML file and quickshell hot-reloads, `Edit`
-`config/niri/config.kdl` and niri picks it up.
+`dev-link.sh` replaces
 
-`dev-link.sh` is idempotent and safe to re-run after pulling.
+```
+~/.config/niri/                 →  this repo's config/niri/
+~/.config/quickshell/           →                config/quickshell/
+~/.config/theme/templates/      →                config/theme/templates/
+~/.config/theme/themes/         →                config/theme/themes/
+~/.local/bin/qs-*               →                bin/qs-*
+```
 
-## Fresh install on blank Arch (planned)
+with symlinks back into the repo. Anything you already had at those
+paths is moved to `<path>.pre-link` first as a backup. Idempotent;
+re-runnable after `git pull`.
 
-`install.sh` will:
-1. Install packages from `packages.txt` (pacman + AUR).
-2. Copy `config/*` into `~/.config/`, `bin/*` into `~/.local/bin/`.
-3. Enable the systemd units (swayidle, niri-session …).
-4. Run `qs-theme-set default` to materialise the active theme.
+After linking, edit any file in the repo and it's live: niri
+auto-reloads, Quickshell needs a quick:
 
-Not implemented yet — see `docs/` for the manual phase-by-phase
-build log in the meantime.
+```bash
+quickshell list --all 2>&1 | grep "Process ID" | awk '{print $3}' | xargs -r kill
+quickshell -p ~/.config/quickshell/shell.qml &
+```
+
+---
+
+## Fresh-install on blank Arch (planned, not yet shipped)
+
+The end goal — `./install.sh` on a barebones Arch install gives you a
+themed, working Nirimaki desktop in one go:
+
+1. `pacman` + AUR install from `packages.txt`.
+2. Copy (not symlink) `config/*` → `~/.config/`, `bin/*` → `~/.local/bin/`.
+3. Template `keybinds.kdl` spawn paths to the user's `$HOME`.
+4. Enable systemd units (`swayidle`, `niri-session.target`, …).
+5. `qs-theme-set default` → materialise the active theme.
+
+Until then, the manual install path is documented phase-by-phase
+under [`docs/`](docs/) — start with
+[`phase-a-foundations.md`](docs/phase-a-foundations.md).
+
+---
+
+## Repo layout
+
+```
+config/
+  niri/         compositor config (config.kdl, keybinds.kdl)
+  quickshell/   bar, DialogShell, dialogs, lock screen, i18n,
+                services (Niri/Notification/Updates/PopupBus)
+  theme/
+    templates/  per-app .tpl rendered by qs-theme-set
+    themes/    22 themes (colors.toml + backgrounds + previews)
+bin/            qs-theme-set, qs-wallpaper-apply, qs-osd,
+                audio + brightness + screenrecord helpers
+docs/           phase-a-foundations.md … phase-g-settings.md
+                — the actual build log
+assets/         logo (ASCII source + 11 coloured PNG variants),
+                splash.bmp, plymouth/
+scripts/        ascii2png.sh (logo rendering pipeline)
+dev-link.sh     ↑ described above
+```
+
+---
+
+## Docs
+
+Each phase under [`docs/`](docs/) has an `### Outcome` section
+describing the actual end state — not the original plan, but what
+shipped. Read those first if you want to know **why** something is
+the way it is.
+
+| Phase | What |
+|------:|------|
+| A | Foundations — niri install, kdl basics, outputs |
+| B | Shell — Quickshell bar, widgets, services |
+| C | Polish — popups, animations, hotkey overlay |
+| D | Theming — palette generator, templates pipeline, Plymouth + UKI branding |
+| E | Consistency — Omarchy themes import, blur, transparency, single-popup bus |
+| F | i18n + keybinds — I18n singleton, `keybinds.kdl`, KeybindSheet, lock-screen i18n |
+| G | Settings dialogs — drilldown, pickers, runtime locale switcher |
+
+Phase H (terminal stuff) and `install.sh` are the next big pieces.
+
+---
 
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [`LICENSE`](LICENSE).
+
+<div align="center">
+
+<img src="assets/logo-palette.png" alt="Nirimaki palette variants" width="640">
+
+*Eleven recoloured logo variants ship in `assets/`. Pick your accent.*
+
+</div>
