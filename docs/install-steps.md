@@ -224,14 +224,29 @@ That single call:
 - IPCs Quickshell, niri, and every running nvim socket to
   hot-reload themes
 
-## 10. Quake terminal first-run prep (optional)
+## 10. Plymouth boot splash
+
+```bash
+# Copy the qs-minimal theme into Plymouth's theme dir.
+sudo install -d /usr/share/plymouth/themes/qs-minimal
+sudo install -m 644 assets/plymouth/* /usr/share/plymouth/themes/qs-minimal/
+
+# Activate + bake into the UKI / initramfs.
+sudo plymouth-set-default-theme qs-minimal
+sudo mkinitcpio -P
+```
+
+Requires `mkinitcpio.conf` HOOKS already include `plymouth` after
+`systemd` (set up in Phase D7).
+
+## 11. Quake terminal first-run prep (optional)
 
 The quake terminal launches into a persistent `tmux new-session -A
 -s quake`. Nothing to install ahead of time — `tmux` (step 1b)
 plus the `qs-quake-toggle` script (symlinked via step 3) are
 enough. First `Mod+grave` press creates the session.
 
-## 11. Verification checklist
+## 12. Verification checklist
 
 ```bash
 # Login shell

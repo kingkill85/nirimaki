@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=qs-minimal
+Description=Nirimaki minimal boot splash — Nirimaki logo + progress bar
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/qs-minimal
+ScriptFile=/usr/share/plymouth/themes/qs-minimal/qs-minimal.script

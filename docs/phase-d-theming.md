@@ -533,8 +533,15 @@ logo, no lock icon, no progress bar. Just:
 
 Files live under `/usr/share/plymouth/themes/qs-minimal/`:
 - `qs-minimal.plymouth` — manifest pointing at the script.
-- `qs-minimal.script` — show/hide logic + bullet placement.
-- `entry.png`, `bullet.png` — visual assets.
+- `qs-minimal.script` — show/hide logic + progress bar placement.
+- `logo.png` — Nirimaki amber-accent logo (canonical accent
+  `#e0af68`; Plymouth runs pre-decryption so colours are fixed).
+- `progress_bar.png`, `progress_box.png` — progress bar visuals
+  ported from Omarchy's plymouth assets. (D9 superseded the
+  original entry.png / bullet.png approach with the Nirimaki logo
+  + progress bar combo.)
+
+Source-of-truth in the repo: `assets/plymouth/`.
 
 Activated via `sudo plymouth-set-default-theme qs-minimal && sudo
 mkinitcpio -P` so the theme is baked into the UKI.
