@@ -1,0 +1,15 @@
+tt.*
+.tests
+doc/tags
+debug
+.repro
+foo.*
+*.log
+data
+
+# Nirimaki additions — per-machine runtime state, not configuration.
+lazy-lock.json
+.luarc.json
+# lazyvim.json IS tracked — it pins which LazyVim Extras are enabled
+# (we want everyone to land with the neo-tree extra). Per-user state
+# in this file is minimal.

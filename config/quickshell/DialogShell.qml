@@ -97,9 +97,13 @@ Item {
             border.width: shell.cardBorderWidth
             radius: shell.cardRadius
 
-            // Swallow clicks on the card body so they don't fall
-            // through to the scrim's click-to-close MouseArea.
-            MouseArea { anchors.fill: parent }
+            // No click-blocking MouseArea here. The scrim and the
+            // dialog are separate WlrLayershell surfaces — Wayland
+            // delivers each click to exactly one of them based on the
+            // pointer position, so clicks inside the card never reach
+            // the scrim's click-to-close handler. Adding a MouseArea
+            // here historically broke wheel-scrolling of inner
+            // ListViews because MouseArea consumes wheel events too.
 
             Item {
                 id: cardContents

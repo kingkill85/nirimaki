@@ -110,6 +110,31 @@ if [[ -d $TEMPLATES_DIR ]]; then
         mkdir -p "$HOME/.config/btop/themes"
         out="$HOME/.config/btop/themes/qs.theme"
         ;;
+      starship.toml)
+        # starship looks at ~/.config/starship.toml only; render
+        # straight there. Starship rereads on every prompt redraw so
+        # no signal / IPC is needed after a swap.
+        out="$HOME/.config/starship.toml"
+        ;;
+      lazygit.yml)
+        # lazygit reads ~/.config/lazygit/config.yml at startup. Render
+        # straight there so the next lazygit launch picks up new accent.
+        mkdir -p "$HOME/.config/lazygit"
+        out="$HOME/.config/lazygit/config.yml"
+        ;;
+      bat-theme.tmTheme)
+        # bat 0.26+ only loads .tmTheme files from ~/.config/bat/themes/
+        # (.sublime-color-scheme JSON is silently ignored despite docs).
+        # `bat cache --build` after the template loop activates it.
+        mkdir -p "$HOME/.config/bat/themes"
+        out="$HOME/.config/bat/themes/nirimaki.tmTheme"
+        ;;
+      yazi-theme.toml)
+        # yazi reads ~/.config/yazi/theme.toml at startup. Same pattern
+        # as lazygit — render straight there, next launch picks it up.
+        mkdir -p "$HOME/.config/yazi"
+        out="$HOME/.config/yazi/theme.toml"
+        ;;
       *)
         out="$CURRENT_DIR/$base"
         ;;
@@ -195,6 +220,38 @@ quickshell ipc call -- theme reload >/dev/null 2>&1 || true
 # not the included one — so an explicit reload is required.
 if command -v niri >/dev/null 2>&1; then
   niri msg action load-config-file >/dev/null 2>&1 || true
+fi
+
+# fish: re-source fish-colors.fish (which sets `set -U` universal
+# variables, so changes propagate to every running fish instance
+# instantly without needing a per-shell signal).
+if command -v fish >/dev/null 2>&1 && [[ -f $CURRENT_DIR/fish-colors.fish ]]; then
+  fish -c "source $CURRENT_DIR/fish-colors.fish" >/dev/null 2>&1 || true
+fi
+
+# bat: rebuild cache so the freshly-rendered nirimaki.tmTheme becomes
+# the active theme. BAT_THEME=nirimaki is set in fish/bash env.
+if command -v bat >/dev/null 2>&1 && [[ -f $HOME/.config/bat/themes/nirimaki.tmTheme ]]; then
+  bat cache --build >/dev/null 2>&1 || true
+fi
+
+# nvim: hot-swap theme on every running instance by calling the
+# NirimakiReloadTheme() helper from plugins/nirimaki-theme-hotreload.lua.
+# The helper re-dofile()s current/neovim.lua, unloads the old theme's
+# lua modules, clears highlights, loads the new colorscheme plugin via
+# lazy.core.loader, applies it, and re-sources transparency.lua.
+#
+# Plain `:colorscheme <name>` would work for the trivial themes but not
+# for ristretto/last-horizon, which need their config() to run setup()
+# with custom filter/colors before the colorscheme call.
+if command -v nvim >/dev/null 2>&1; then
+  nvim_runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+  shopt -s nullglob
+  for sock in "$nvim_runtime"/nvim.*.0; do
+    [[ -S $sock ]] || continue
+    nvim --server "$sock" --remote-expr "execute('lua NirimakiReloadTheme()')" >/dev/null 2>&1 || true
+  done
+  shopt -u nullglob
 fi
 
 # Wallpaper: repoint `current/wallpaper` at the new theme's first

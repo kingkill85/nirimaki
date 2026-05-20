@@ -36,6 +36,23 @@ Item {
 
     function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a); }
 
+    // Translate-or-fall-back helper. Builds a slug key under
+    // `keybind.<prefix>.<slug>`, returns the translated string if a
+    // dictionary entry exists, otherwise the original. So
+    // keybinds.kdl can stay in English and we only need to add
+    // translations for the locales we ship.
+    function _slug(s) {
+        return String(s || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+    }
+    function tr(prefix, original) {
+        const key = "keybind." + prefix + "." + _slug(original);
+        const t = I18n.t(key);
+        return t === key ? original : t;
+    }
+
     function open() {
         opened = true;
         filterText = "";
@@ -210,22 +227,45 @@ Item {
             id: keyCatcher
             anchors.fill: parent
             focus: true
-                Keys.priority: Keys.BeforeItem
-                Keys.onPressed: (event) => {
-                    if (event.key === Qt.Key_Escape) {
-                        if (root.filterText) root.setFilter("");
-                        else root.closeMenu();
-                        event.accepted = true;
-                    } else if (event.key === Qt.Key_Backspace) {
-                        if (root.filterText.length > 0)
-                            root.setFilter(root.filterText.slice(0, -1));
-                        event.accepted = true;
-                    } else if (event.text && event.text.length === 1 &&
-                               event.text.charCodeAt(0) >= 32 &&
-                               event.text.charCodeAt(0) !== 127) {
-                        root.setFilter(root.filterText + event.text);
-                        event.accepted = true;
-                    }
+            Keys.priority: Keys.BeforeItem
+            Keys.onPressed: (event) => {
+                if (event.key === Qt.Key_Escape) {
+                    if (root.filterText) root.setFilter("");
+                    else root.closeMenu();
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Backspace) {
+                    if (root.filterText.length > 0)
+                        root.setFilter(root.filterText.slice(0, -1));
+                    event.accepted = true;
+                // Keyboard scroll. Single arrow = one row (26 px); PgUp/Dn
+                // = 90% of viewport; Home/End jump to the ends.
+                } else if (event.key === Qt.Key_Down) {
+                    list.contentY = Math.min(
+                        Math.max(0, list.contentHeight - list.height),
+                        list.contentY + 26);
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Up) {
+                    list.contentY = Math.max(0, list.contentY - 26);
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_PageDown) {
+                    list.contentY = Math.min(
+                        Math.max(0, list.contentHeight - list.height),
+                        list.contentY + list.height * 0.9);
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_PageUp) {
+                    list.contentY = Math.max(0, list.contentY - list.height * 0.9);
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_Home) {
+                    list.contentY = 0;
+                    event.accepted = true;
+                } else if (event.key === Qt.Key_End) {
+                    list.contentY = Math.max(0, list.contentHeight - list.height);
+                    event.accepted = true;
+                } else if (event.text && event.text.length === 1 &&
+                           event.text.charCodeAt(0) >= 32 &&
+                           event.text.charCodeAt(0) !== 127) {
+                    root.setFilter(root.filterText + event.text);
+                    event.accepted = true;
                 }
             }
 
@@ -262,6 +302,20 @@ Item {
                     spacing: 2
                     boundsBehavior: Flickable.StopAtBounds
 
+                    // Explicit wheel handler. QML 6's MouseArea + sibling
+                    // anchor.fill items don't always route wheel events
+                    // to the inner Flickable; this PointerHandler claims
+                    // wheel events on the list area directly.
+                    WheelHandler {
+                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                        onWheel: function(event) {
+                            const step = event.angleDelta.y / 120 * 26 * 3;  // ~3 rows per notch
+                            list.contentY = Math.min(
+                                Math.max(0, list.contentHeight - list.height),
+                                Math.max(0, list.contentY - step));
+                        }
+                    }
+
                     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
                     delegate: Item {
@@ -281,7 +335,7 @@ Item {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.topMargin: 10
-                            text: row.section
+                            text: root.tr("section", row.section)
                             color: root.accent
                             font.family: root.fontFamily
                             font.pixelSize: Theme.fontPx
@@ -305,7 +359,7 @@ Item {
                             Text {
                                 width: parent.width - root.chordColumnWidth - 12
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: row.label
+                                text: root.tr("title", row.label)
                                 color: root.foregroundDim
                                 font.family: root.fontFamily
                                 font.pixelSize: Theme.fontPx
@@ -317,3 +371,4 @@ Item {
             }
         }
     }
+}

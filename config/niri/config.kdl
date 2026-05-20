@@ -359,6 +359,17 @@ window-rule {
     default-window-height { fixed 640; }
 }
 
+// Quake-style drop-down terminal (Phase H6). qs-quake-toggle spawns a
+// single kitty with --class=qs-quake-term; this rule pins it floating
+// at a wider 1400×720, larger than the TUI rule above for a roomier
+// drop-down feel.
+window-rule {
+    match app-id="qs-quake-term"
+    open-floating true
+    default-column-width { fixed 1400; }
+    default-window-height { fixed 720; }
+}
+
 // Block password managers from screen capture — matches Omarchy
 // `apps/1password.conf` + `apps/bitwarden.conf` which set
 // `no_screen_share on` for these classes. niri's

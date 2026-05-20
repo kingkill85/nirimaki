@@ -49,9 +49,15 @@ binds {
     Mod+F9 allow-when-locked=false hotkey-overlay-title="Toggle dictation" { spawn "voxtype" "record" "toggle"; }
 
     // ===== System actions =====
-    // Lock — Ctrl+Alt+L. Super+Alt+L would alias to Mod+Alt+L which
-    // is now monitor-focus-right (HJKL family).
-    Ctrl+Alt+L hotkey-overlay-title="Lock the screen" { spawn "quickshell" "-p" "/home/michael/.config/quickshell/lock/shell.qml"; }
+    // Lock — Mod+Shift+L. Moved off Ctrl+Alt+L (Phase H) so the
+    // terminal can use Ctrl+Alt+L for fzf.fish git-log picker.
+    // Super+Alt+L would alias to Mod+Alt+L which is monitor-focus-right
+    // (HJKL family), hence Mod+Shift+L.
+    Mod+Shift+L hotkey-overlay-title="Lock the screen" { spawn "quickshell" "-p" "/home/michael/.config/quickshell/lock/shell.qml"; }
+
+    // Quake-style drop-down terminal — Mod+grave (`). Single floating
+    // kitty instance; toggle spawns / closes.
+    Mod+grave hotkey-overlay-title="Toggle drop-down terminal" { spawn "/home/michael/.local/bin/qs-quake-toggle"; }
     // Screen reader (orca). Allowed when locked.
     Super+Alt+S allow-when-locked=true hotkey-overlay-title="Toggle screen reader" { spawn-sh "pkill orca || exec orca"; }
     Mod+Shift+P hotkey-overlay-title="Power off monitors"                          { power-off-monitors; }

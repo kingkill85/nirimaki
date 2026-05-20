@@ -8,6 +8,10 @@
 # What it links:
 #   ~/.config/niri/                  → repo/config/niri/
 #   ~/.config/quickshell/            → repo/config/quickshell/
+#   ~/.config/fish/                  → repo/config/fish/
+#   ~/.config/kitty/                 → repo/config/kitty/
+#   ~/.config/tmux/                  → repo/config/tmux/
+#   ~/.config/nvim/                  → repo/config/nvim/
 #   ~/.config/theme/templates/       → repo/config/theme/templates/
 #   ~/.config/theme/themes/          → repo/config/theme/themes/
 #   ~/.local/bin/qs-<each>           → repo/bin/qs-<each>
@@ -19,6 +23,8 @@
 #                                       anyway, but it sits outside the
 #                                       directory we link)
 #   ~/.config/quickshell/locale      — user's chosen UI language
+#   ~/.local/share/fish/             — fish's runtime state (history,
+#                                       universal variables); per-machine
 #
 # If any of the target paths already exists as a regular file or
 # directory (not a symlink to the repo), it is moved to <path>.pre-link
@@ -71,6 +77,10 @@ link_path() {
 echo "== Linking config dirs =="
 link_path "$REPO_DIR/config/niri"            "$HOME/.config/niri"
 link_path "$REPO_DIR/config/quickshell"      "$HOME/.config/quickshell"
+link_path "$REPO_DIR/config/fish"            "$HOME/.config/fish"
+link_path "$REPO_DIR/config/kitty"           "$HOME/.config/kitty"
+link_path "$REPO_DIR/config/tmux"            "$HOME/.config/tmux"
+link_path "$REPO_DIR/config/nvim"            "$HOME/.config/nvim"
 mkdir -p "$HOME/.config/theme"
 link_path "$REPO_DIR/config/theme/templates" "$HOME/.config/theme/templates"
 link_path "$REPO_DIR/config/theme/themes"    "$HOME/.config/theme/themes"

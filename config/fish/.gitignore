@@ -1,0 +1,36 @@
+# fisher-managed plugin files land in this dir via the dev-link
+# symlink. We track only the plugin LIST (fish_plugins) and our
+# hand-authored configs — not the plugin code itself, which fisher
+# re-fetches on a fresh setup.
+
+# Ignore everything in functions/ + completions/ EXCEPT the files we
+# author ourselves (whitelist).
+/functions/*
+!/functions/bm.fish
+!/functions/tdl.fish
+!/functions/tds.fish
+!/functions/tdlm.fish
+!/functions/tsl.fish
+!/functions/t.fish
+!/functions/n.fish
+!/functions/ff.fish
+!/functions/eff.fish
+!/functions/oc.fish
+!/functions/cc.fish
+!/functions/io.fish
+!/functions/ic.fish
+!/functions/ioc.fish
+/completions/
+
+# In conf.d/, ignore everything BY DEFAULT, then whitelist only the
+# files we authored.
+/conf.d/*
+!/conf.d/abbreviations.fish
+!/conf.d/greeting.fish
+!/conf.d/tools.fish
+
+# Fisher's own state file (per-user history of installs)
+/fish_history
+
+# fish_variables — universal-variables file, per-machine state
+/fish_variables

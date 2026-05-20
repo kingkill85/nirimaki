@@ -1,0 +1,42 @@
+#!/bin/bash
+# qs-quake-toggle — drop-down kitty toggle (Quake-style), tmux-backed.
+#
+# A single floating kitty instance with app-id "qs-quake-term", running
+# `tmux new-session -A -s quake`. niri's window-rule (config.kdl) pins
+# it floating + sized + centred. Bound to Mod+grave (`) in keybinds.kdl.
+#
+# Toggle behaviour:
+#   - Window doesn't exist     → spawn it, attach to (or create) the
+#                                "quake" tmux session
+#   - Window exists (any state) → close the kitty; the tmux server keeps
+#                                running, so the session and all its
+#                                panes survive until the next toggle.
+#
+# If tmux is not installed the script falls back to plain kitty so the
+# binding still works on a partial install.
+
+set -euo pipefail
+
+WIN_APP_ID="qs-quake-term"
+TMUX_SESSION="quake"
+
+for cmd in niri jq kitty; do
+  command -v "$cmd" >/dev/null 2>&1 || {
+    echo "qs-quake-toggle: missing required command: $cmd" >&2
+    exit 1
+  }
+done
+
+id=$(niri msg --json windows | jq -r --arg app "$WIN_APP_ID" \
+       '[.[] | select(.app_id==$app) | .id][0] // empty')
+
+if [[ -n $id ]]; then
+  niri msg action focus-window --id "$id" >/dev/null 2>&1
+  niri msg action close-window         >/dev/null 2>&1
+else
+  if command -v tmux >/dev/null 2>&1; then
+    setsid -f kitty --class="$WIN_APP_ID" -e tmux new-session -A -s "$TMUX_SESSION" >/dev/null 2>&1
+  else
+    setsid -f kitty --class="$WIN_APP_ID" >/dev/null 2>&1
+  fi
+fi

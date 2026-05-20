@@ -120,8 +120,8 @@ it. The repo only owns `templates/` and `themes/` (the sources).
 - **No `git config --global` on this machine.** For commits, pass
   identity inline:
   ```bash
-  GIT_AUTHOR_NAME="kingkill85" GIT_AUTHOR_EMAIL="kusche@nupis.de" \
-  GIT_COMMITTER_NAME="kingkill85" GIT_COMMITTER_EMAIL="kusche@nupis.de" \
+  GIT_AUTHOR_NAME="kingkill85" GIT_AUTHOR_EMAIL="michaelkusche@live.de" \
+  GIT_COMMITTER_NAME="kingkill85" GIT_COMMITTER_EMAIL="michaelkusche@live.de" \
   git commit -m "..."
   ```
 - Remote: `https://github.com/kingkill85/nirimaki.git`, branch `main`.

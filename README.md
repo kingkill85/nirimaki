@@ -58,6 +58,11 @@ sources together first.
   always-opaque media tools, screen-capture blocking on password
   managers).
 - **Branded boot**: UKI splash + Plymouth assets in `assets/`.
+- **Terminal stack**: fish (chsh'd) + starship + eza/bat/fzf/zoxide/
+  ripgrep/fd/delta/lazygit/tmux/yazi/nvim (LazyVim). Quake terminal
+  on `Mod+grave`. Theme swap re-skins bat, delta, fish syntax, yazi,
+  lazygit, starship, kitty, tmux, and every running nvim instance
+  live.
 
 ---
 
@@ -74,6 +79,10 @@ cd ~/Projekte/kingkill85/nirimaki
 ```
 ~/.config/niri/                 →  this repo's config/niri/
 ~/.config/quickshell/           →                config/quickshell/
+~/.config/fish/                 →                config/fish/
+~/.config/kitty/                →                config/kitty/
+~/.config/tmux/                 →                config/tmux/
+~/.config/nvim/                 →                config/nvim/
 ~/.config/theme/templates/      →                config/theme/templates/
 ~/.config/theme/themes/         →                config/theme/themes/
 ~/.local/bin/qs-*               →                bin/qs-*
@@ -104,8 +113,10 @@ themed, working Nirimaki desktop in one go:
 4. Enable systemd units (`swayidle`, `niri-session.target`, …).
 5. `qs-theme-set default` → materialise the active theme.
 
-Until then, the manual install path is documented phase-by-phase
-under [`docs/`](docs/) — start with
+The canonical install sequence is recorded in
+[`docs/install-steps.md`](docs/install-steps.md). Until `install.sh`
+ships, the manual install path is documented phase-by-phase under
+[`docs/`](docs/) — start with
 [`phase-a-foundations.md`](docs/phase-a-foundations.md).
 
 ---
@@ -117,13 +128,17 @@ config/
   niri/         compositor config (config.kdl, keybinds.kdl)
   quickshell/   bar, DialogShell, dialogs, lock screen, i18n,
                 services (Niri/Notification/Updates/PopupBus)
+  fish/         config.fish + conf.d/ + functions/ (bm, tdl, …)
+  kitty/        kitty.conf (font, padding, tab bar, IPC)
+  tmux/         tmux.conf (Omarchy port — C-Space prefix, vi-mode)
+  nvim/         LazyVim starter + Nirimaki theme hot-reload glue
   theme/
     templates/  per-app .tpl rendered by qs-theme-set
     themes/    22 themes (colors.toml + backgrounds + previews)
-bin/            qs-theme-set, qs-wallpaper-apply, qs-osd,
-                audio + brightness + screenrecord helpers
-docs/           phase-a-foundations.md … phase-g-settings.md
-                — the actual build log
+bin/            qs-theme-set, qs-quake-toggle, qs-wallpaper-apply,
+                qs-osd, audio + brightness + screenrecord helpers
+docs/           phase-a-foundations.md … phase-h-terminal.md
+                + install-steps.md — the actual build log
 assets/         logo (ASCII source + 11 coloured PNG variants),
                 splash.bmp, plymouth/
 scripts/        ascii2png.sh (logo rendering pipeline)
@@ -148,8 +163,9 @@ the way it is.
 | E | Consistency — Omarchy themes import, blur, transparency, single-popup bus |
 | F | i18n + keybinds — I18n singleton, `keybinds.kdl`, KeybindSheet, lock-screen i18n |
 | G | Settings dialogs — drilldown, pickers, runtime locale switcher |
+| H | Terminal — fish + starship + modern CLI toolkit + tmux + LazyVim, all theme-aware |
 
-Phase H (terminal stuff) and `install.sh` are the next big pieces.
+`install.sh` is the remaining big piece.
 
 ---
 

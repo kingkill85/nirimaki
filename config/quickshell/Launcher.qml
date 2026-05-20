@@ -58,7 +58,17 @@ Item {
     function launchSelected() {
         const e = filtered[list.currentIndex];
         if (!e) return;
-        e.execute();
+        // .desktop entries with `Terminal=true` (nvim, htop, btop, etc.)
+        // expect to be launched inside a terminal emulator. Quickshell's
+        // built-in `execute()` runs the Exec line as-is, which for these
+        // means "spawn nvim with no TTY" → exits instantly. Wrap in kitty
+        // when runInTerminal is set; tiled kitty windows are the
+        // appropriate Nirimaki host for TUI apps.
+        if (e.runInTerminal && e.command && e.command.length > 0) {
+            Quickshell.execDetached(["kitty", "-e", ...e.command]);
+        } else {
+            e.execute();
+        }
         root.opened = false;
     }
 
