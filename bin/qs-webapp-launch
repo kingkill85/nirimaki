@@ -1,0 +1,56 @@
+#!/bin/bash
+# qs-webapp-launch — open a URL as a standalone chromium webapp.
+#
+# Usage: qs-webapp-launch <slug> <url> [extra-chromium-args...]
+#
+# - <slug> is a short ASCII identifier (a-z0-9-). It becomes:
+#   * the wayland app-id: `qs-webapp-<slug>` (so niri's window-rule
+#     can match; opacity 1.0, no terminal-style translucency).
+#   * the chromium user-data-dir leaf: ~/.cache/qs-webapps/<slug>/
+#     — per-app isolation so cookies / logged-in sessions don't
+#     cross between webapps (different Google accounts for Gmail
+#     vs Calendar, for instance).
+#
+# Always uses /usr/bin/chromium regardless of the default-browser
+# setting, because (a) live theme reload only works on chromium
+# via the managed-policy + --refresh-platform-policy path
+# (firefox / zen have no equivalent), and (b) `chromium --app=URL`
+# is the only stable "site-specific browser" mode in 2026.
+
+set -euo pipefail
+
+if [[ $# -lt 2 ]]; then
+  echo "Usage: $(basename "$0") <slug> <url> [chromium-args...]" >&2
+  exit 1
+fi
+
+slug="$1"
+url="$2"
+shift 2
+
+if [[ ! $slug =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "qs-webapp-launch: slug must match [a-z0-9-], got '$slug'" >&2
+  exit 1
+fi
+
+if ! command -v chromium >/dev/null 2>&1; then
+  echo "qs-webapp-launch: chromium not installed (pacman -S chromium)" >&2
+  exit 1
+fi
+
+user_data_dir="$HOME/.cache/qs-webapps/$slug"
+mkdir -p "$user_data_dir"
+
+# --ozone-platform-hint=auto: prefer wayland, fall back to x11 (so
+#   the binding still works under XWayland sessions).
+# --no-first-run / --no-default-browser-check: skip onboarding
+#   prompts that would otherwise appear on the first launch per
+#   user-data-dir.
+exec chromium \
+  --ozone-platform-hint=auto \
+  --user-data-dir="$user_data_dir" \
+  --class="qs-webapp-$slug" \
+  --app="$url" \
+  --no-first-run \
+  --no-default-browser-check \
+  "$@"

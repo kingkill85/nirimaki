@@ -208,6 +208,15 @@ for qtc in "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt5ct/qt5ct.conf"; do
 done
 
 # ===== Reload running apps =====
+# Parse colors.toml once into THEMEC[key]=#rrggbb for everyone below
+# (foot OSC + chromium policy + anything else added later).
+declare -A THEMEC=()
+while IFS= read -r line; do
+  if [[ $line =~ ^[[:space:]]*([A-Za-z0-9_]+)[[:space:]]*=[[:space:]]*\"(#[0-9A-Fa-f]{6})\" ]]; then
+    THEMEC[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+  fi
+done < "$CURRENT_DIR/colors.toml"
+
 # foot: no disk reload signal. Foot's SIGUSR1 only toggles the
 # in-memory [colors-dark] / [colors-light] palette pair that was
 # loaded at startup — it does NOT re-read the config file, so a
@@ -222,23 +231,16 @@ done
 # disk on launch as normal — the OSC pass is for the existing ones.
 if pgrep -x foot >/dev/null 2>&1; then
   ESC=$'\e'; BEL=$'\a'
-  declare -A FOOTC=()
-  while IFS= read -r line; do
-    if [[ $line =~ ^[[:space:]]*([A-Za-z0-9_]+)[[:space:]]*=[[:space:]]*\"(#[0-9A-Fa-f]{6})\" ]]; then
-      FOOTC[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
-    fi
-  done < "$CURRENT_DIR/colors.toml"
-
   foot_osc=""
   for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-    c=${FOOTC[color$i]:-}
+    c=${THEMEC[color$i]:-}
     [[ -n $c ]] && foot_osc+="${ESC}]4;${i};${c}${BEL}"
   done
-  [[ -n ${FOOTC[foreground]:-} ]]           && foot_osc+="${ESC}]10;${FOOTC[foreground]}${BEL}"
-  [[ -n ${FOOTC[background]:-} ]]           && foot_osc+="${ESC}]11;${FOOTC[background]}${BEL}"
-  [[ -n ${FOOTC[cursor]:-} ]]               && foot_osc+="${ESC}]12;${FOOTC[cursor]}${BEL}"
-  [[ -n ${FOOTC[selection_background]:-} ]] && foot_osc+="${ESC}]17;${FOOTC[selection_background]}${BEL}"
-  [[ -n ${FOOTC[selection_foreground]:-} ]] && foot_osc+="${ESC}]19;${FOOTC[selection_foreground]}${BEL}"
+  [[ -n ${THEMEC[foreground]:-} ]]           && foot_osc+="${ESC}]10;${THEMEC[foreground]}${BEL}"
+  [[ -n ${THEMEC[background]:-} ]]           && foot_osc+="${ESC}]11;${THEMEC[background]}${BEL}"
+  [[ -n ${THEMEC[cursor]:-} ]]               && foot_osc+="${ESC}]12;${THEMEC[cursor]}${BEL}"
+  [[ -n ${THEMEC[selection_background]:-} ]] && foot_osc+="${ESC}]17;${THEMEC[selection_background]}${BEL}"
+  [[ -n ${THEMEC[selection_foreground]:-} ]] && foot_osc+="${ESC}]19;${THEMEC[selection_foreground]}${BEL}"
 
   if [[ -n $foot_osc ]]; then
     for foot_pid in $(pgrep -x foot); do
@@ -247,6 +249,37 @@ if pgrep -x foot >/dev/null 2>&1; then
         [[ $tty == /dev/pts/* && -w $tty ]] && printf '%s' "$foot_osc" > "$tty" 2>/dev/null || true
       done
     done
+  fi
+fi
+
+# Chromium: live-recolour browser chrome + every running webapp by
+# writing a managed-policy file and asking chromium to refresh
+# platform policy. Mainline chromium 148+ implements this; the
+# omarchy-chromium fork that originally added it was archived
+# 2026-05-07 when upstream caught up.
+#
+# Permissions: /etc/chromium/policies/managed/ is set to a+rw at
+# install time (one-time sudo); qs-theme-set itself never elevates.
+# Skip silently if the dir isn't writable — chromium just won't
+# get the live update on that machine.
+chromium_policy_dir="/etc/chromium/policies/managed"
+if [[ -w $chromium_policy_dir ]] && [[ -n ${THEMEC[background]:-} ]]; then
+  # BrowserThemeColor uses the theme's BACKGROUND, not the accent.
+  # Omarchy parity: their default/themed/chromium.theme.tpl is just
+  # `{{ background_rgb }}`. Using `accent` tints the chrome (blue
+  # for tokyo-night, orange for matte-black, etc.) which doesn't
+  # match the desktop. Background gives chromium a chrome backdrop
+  # that matches every other surface (bar, dialogs, foot).
+  #
+  # BrowserColorScheme=device keeps chromium following the freedesktop
+  # color-scheme preference (which gsettings above already flipped),
+  # so light-mode themes don't get a dark chrome painted on a light bg.
+  bg_hex="${THEMEC[background]}"
+  printf '{"BrowserThemeColor":"%s","BrowserColorScheme":"device"}\n' \
+    "$bg_hex" > "$chromium_policy_dir/nirimaki.json"
+  if command -v chromium >/dev/null 2>&1 && pgrep -x chromium >/dev/null 2>&1; then
+    chromium --refresh-platform-policy --no-startup-window >/dev/null 2>&1 &
+    disown 2>/dev/null || true
   fi
 fi
 

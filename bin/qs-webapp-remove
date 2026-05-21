@@ -1,0 +1,73 @@
+#!/bin/bash
+# qs-webapp-remove — interactively delete an installed Nirimaki webapp.
+#
+# fzf-picks over the qs-webapp-*.desktop entries in
+# ~/.local/share/applications/, then removes:
+#   - the .desktop file
+#   - the per-app icon under .../icons/
+#   - the per-app chromium user-data-dir under ~/.cache/qs-webapps/
+#
+# Cookies / logged-in sessions go with the user-data-dir wipe;
+# that's the same as uninstalling a PWA in Chrome's UI. The repo's
+# webapp definitions (if any) live in this script's source — the
+# user-installed ones are pure runtime state, no repo edit needed.
+
+set -euo pipefail
+
+APPS_DIR="$HOME/.local/share/applications"
+ICONS_DIR="$APPS_DIR/icons"
+DATA_ROOT="$HOME/.cache/qs-webapps"
+
+if ! command -v fzf >/dev/null 2>&1; then
+  echo "qs-webapp-remove: fzf not installed" >&2
+  exit 1
+fi
+
+shopt -s nullglob
+desktops=("$APPS_DIR"/qs-webapp-*.desktop)
+shopt -u nullglob
+
+if [[ ${#desktops[@]} -eq 0 ]]; then
+  echo "no webapps installed"
+  exit 0
+fi
+
+# Build a "Display Name | <file>" list for fzf.
+mapfile -t entries < <(
+  for f in "${desktops[@]}"; do
+    name=$(awk -F= '/^Name=/{print $2; exit}' "$f")
+    printf '%s\t%s\n' "${name:-$(basename "$f")}" "$f"
+  done
+)
+
+choice=$(printf '%s\n' "${entries[@]}" \
+  | fzf --prompt='remove webapp> ' --with-nth=1 --delimiter='\t' --no-multi)
+
+[[ -z $choice ]] && { echo "abort"; exit 0; }
+
+desktop_file=$(printf '%s' "$choice" | cut -f2)
+desktop_id=$(basename "$desktop_file" .desktop)
+slug="${desktop_id#qs-webapp-}"
+
+echo "will remove:"
+echo "  .desktop:        $desktop_file"
+echo "  icon:            $ICONS_DIR/${desktop_id}.png"
+echo "  user-data-dir:   $DATA_ROOT/$slug"
+echo
+read -r -p "confirm? (y/N) " ans
+[[ ${ans,,} == y* ]] || { echo "abort"; exit 0; }
+
+rm -f -- "$desktop_file" "$ICONS_DIR/${desktop_id}.png"
+rm -rf -- "$DATA_ROOT/$slug"
+
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+fi
+
+echo "  ✓ removed $slug"
+
+# See qs-webapp-install for the rationale: keep the foot window open
+# long enough to read the confirmation when launched from the
+# apps-menu (Terminal=true) path.
+echo
+read -r -p "Press Enter to close… " _ || true

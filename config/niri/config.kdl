@@ -289,6 +289,16 @@ window-rule {
     opacity 1.0
 }
 
+// Chromium webapps (qs-webapp-* app-id) — fully opaque. Webapp
+// content is browser content; translucency would degrade text
+// rendering and the BrowserThemeColor accent stripe. The chrome
+// itself recolours live on theme swap via the managed-policy
+// path in qs-theme-set.
+window-rule {
+    match app-id=r#"^qs-webapp-"#
+    opacity 1.0
+}
+
 // Layer-rule blur scoped to Quickshell dialog surfaces only.
 //   - `quickshell` matches the Bar's default namespace.
 //   - `qs-*` matches each dialog's own layer surface (Launcher,

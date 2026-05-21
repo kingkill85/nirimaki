@@ -1,0 +1,166 @@
+#!/bin/bash
+# qs-webapp-install — interactively register a URL as a Nirimaki webapp.
+#
+# Mirrors Omarchy's `omarchy-webapp-install` flow without the gum
+# dependency: plain `read` prompts, auto-fetches a 128px favicon
+# from google.com/s2/favicons (with a manual fallback URL prompt
+# if that 404s), and drops:
+#
+#   ~/.local/share/applications/qs-webapp-<slug>.desktop
+#   ~/.local/share/applications/icons/qs-webapp-<slug>.png
+#
+# The .desktop's Exec= invokes qs-webapp-launch, which runs
+# chromium --app=URL with a per-webapp --user-data-dir (so each
+# webapp has its own session, cookies, logged-in state). The
+# wayland app-id is qs-webapp-<slug>, matched by niri's window
+# rule (opacity 1.0, no terminal translucency).
+#
+# Quickshell's Launcher picks the .desktop up automatically — no
+# IPC poke needed; it watches ~/.local/share/applications/.
+
+set -euo pipefail
+
+APPS_DIR="$HOME/.local/share/applications"
+ICONS_DIR="$APPS_DIR/icons"
+
+prompt() {
+  # prompt "<label>" <var-name> [<default>]
+  local label="$1" var="$2" default="${3:-}" value
+  if [[ -n $default ]]; then
+    read -r -p "$label [$default]: " value
+    value="${value:-$default}"
+  else
+    read -r -p "$label: " value
+  fi
+  printf -v "$var" '%s' "$value"
+}
+
+slugify() {
+  # name → kebab-case ASCII slug. Falls back to "webapp" if nothing
+  # survives the filter.
+  local s="$1"
+  s="${s,,}"
+  s=$(printf '%s' "$s" | iconv -f UTF-8 -t ASCII//TRANSLIT 2>/dev/null || printf '%s' "$s")
+  s=$(printf '%s' "$s" | tr -c 'a-z0-9' '-' | tr -s '-')
+  s="${s#-}"; s="${s%-}"
+  [[ -z $s ]] && s="webapp"
+  printf '%s' "$s"
+}
+
+domain_of() {
+  # https://github.com/foo → github.com
+  local u="$1"
+  u="${u#http://}"; u="${u#https://}"
+  u="${u%%/*}"
+  printf '%s' "$u"
+}
+
+fetch_favicon() {
+  # Args: domain  dest-png-path
+  # Returns 0 on success (file written + non-empty), 1 otherwise.
+  local domain="$1" dest="$2"
+  local svc="https://www.google.com/s2/favicons?domain=${domain}&sz=128"
+  if curl -sSfL --max-time 10 -o "$dest" "$svc" 2>/dev/null && [[ -s $dest ]]; then
+    return 0
+  fi
+  rm -f "$dest"
+  return 1
+}
+
+echo "== Nirimaki webapp install =="
+prompt "Name (display, e.g. 'GitHub')" name
+[[ -z ${name// } ]] && { echo "abort: empty name" >&2; exit 1; }
+
+prompt "URL" url
+case $url in
+  http://*|https://*) ;;
+  *) url="https://$url" ;;
+esac
+
+slug=$(slugify "$name")
+desktop_id="qs-webapp-$slug"
+desktop_file="$APPS_DIR/${desktop_id}.desktop"
+icon_file="$ICONS_DIR/${desktop_id}.png"
+
+if [[ -e $desktop_file ]]; then
+  prompt "Webapp '$slug' already exists — overwrite? (y/N)" overwrite "N"
+  [[ ${overwrite,,} == y* ]] || { echo "abort: kept existing"; exit 0; }
+fi
+
+mkdir -p "$APPS_DIR" "$ICONS_DIR"
+
+# --- icon ---
+domain=$(domain_of "$url")
+echo "fetching favicon for $domain …"
+if fetch_favicon "$domain" "$icon_file"; then
+  echo "  ok  $icon_file"
+else
+  echo "  no favicon at $domain — supply one manually"
+  prompt "Icon URL or local path (blank = chromium default)" icon_src
+  if [[ -n $icon_src ]]; then
+    case $icon_src in
+      http://*|https://*)
+        if curl -sSfL --max-time 30 -o "$icon_file" "$icon_src" && [[ -s $icon_file ]]; then
+          echo "  ok  $icon_file"
+        else
+          echo "  download failed — leaving icon blank"
+          rm -f "$icon_file"
+        fi
+        ;;
+      *)
+        if [[ -f $icon_src ]]; then
+          cp -f "$icon_src" "$icon_file"
+          echo "  ok  $icon_file"
+        else
+          echo "  not a file: $icon_src — leaving icon blank"
+        fi
+        ;;
+    esac
+  fi
+fi
+
+# --- .desktop ---
+exec_path="$HOME/.local/bin/qs-webapp-launch"
+
+# Escape single quotes in name/url for the desktop file.
+esc() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
+name_esc=$(esc "$name")
+url_esc=$(esc "$url")
+
+icon_line=""
+[[ -f $icon_file ]] && icon_line="Icon=$icon_file"
+
+cat >"$desktop_file" <<EOF
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=$name_esc
+Comment=$name_esc — Nirimaki webapp
+Exec=$exec_path $slug '$url_esc'
+Terminal=false
+StartupNotify=true
+StartupWMClass=qs-webapp-$slug
+${icon_line}
+Categories=Network;WebBrowser;
+EOF
+
+chmod +x "$desktop_file"
+
+# Force the freedesktop apps cache to reindex so launchers pick it up
+# instantly (otherwise some implementations wait for inotify or restart).
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+fi
+
+echo
+echo "  ✓ installed: $desktop_file"
+[[ -f $icon_file ]] && echo "  ✓ icon:      $icon_file"
+echo "  → launch from the apps menu (Mod+Space) or:"
+echo "      qs-webapp-launch $slug '$url'"
+
+# When launched from the Quickshell Launcher (Terminal=true wraps us
+# in foot), the window closes the instant we exit. Pause so the user
+# can read the result. Hitting Enter from a normal interactive
+# terminal just exits cleanly.
+echo
+read -r -p "Press Enter to close… " _ || true

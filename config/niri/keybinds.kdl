@@ -29,7 +29,7 @@ binds {
     // Omarchy convention: Mod+Return / Mod+Space / Mod+Shift+<letter>.
     Mod+Return       hotkey-overlay-title="Terminal: foot"         { spawn "foot"; }
     Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "launcher" "toggle"; }
-    Mod+Shift+B      hotkey-overlay-title="Browser: Zen"           { spawn "zen-browser"; }
+    Mod+Shift+B      hotkey-overlay-title="Browser"                { spawn "/home/michael/.local/bin/qs-browser-launch"; }
     Mod+Shift+E      hotkey-overlay-title="File explorer: nautilus" { spawn "nautilus"; }
 
     // ===== Pickers =====

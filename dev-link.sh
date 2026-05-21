@@ -93,6 +93,18 @@ for tool in "$REPO_DIR"/bin/qs-*; do
   link_path "$tool" "$HOME/.local/bin/$(basename "$tool")"
 done
 
+# .desktop launchers for repo-owned entries (Install Web App / Remove
+# Web App / future Nirimaki menu items). Linked per-file rather than
+# linking the whole dir because user-installed webapps' .desktops live
+# in the same ~/.local/share/applications/ alongside these.
+echo "== Linking ~/.local/share/applications/*.desktop =="
+mkdir -p "$HOME/.local/share/applications"
+shopt -s nullglob
+for desktop in "$REPO_DIR"/config/applications/*.desktop; do
+  link_path "$desktop" "$HOME/.local/share/applications/$(basename "$desktop")"
+done
+shopt -u nullglob
+
 echo
 echo "Done."
 echo "  - .pre-link backups: $(find "$HOME"/.config "$HOME"/.local/bin -maxdepth 4 -name '*.pre-link*' 2>/dev/null | wc -l) file(s)"

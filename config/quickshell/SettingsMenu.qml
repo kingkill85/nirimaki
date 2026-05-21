@@ -59,7 +59,7 @@ Item {
     }
 
     readonly property var tree: ({
-        "":         { children: ["style", "setup", "system"] },
+        "":         { children: ["style", "setup", "install", "remove", "system"] },
         "style":    { icon: "󰸌", labelKey: "settings.style",
                       children: ["style.theme", "style.background", "style.keybinds"] },
         "style.theme":      { icon: "󰸌", labelKey: "settings.style.theme",
@@ -70,7 +70,8 @@ Item {
                               action: () => root._ipc("keybind-sheet") },
 
         "setup":    { icon: "󰒓", labelKey: "settings.setup",
-                      children: ["setup.audio", "setup.bluetooth", "setup.wifi", "setup.language"] },
+                      children: ["setup.audio", "setup.bluetooth", "setup.wifi",
+                                 "setup.browser", "setup.language"] },
         "setup.audio":     { icon: "󰓃", labelKey: "settings.setup.audio",
                              action: () => root._spawnTui("wiremix", "wiremix") },
         "setup.bluetooth": { icon: "󰂯", labelKey: "settings.setup.bluetooth",
@@ -79,8 +80,40 @@ Item {
         "setup.wifi":      { icon: "󰖩", labelKey: "settings.setup.wifi",
                              action: () => Quickshell.execDetached(["sh", "-lc",
                                  "rfkill unblock wifi 2>/dev/null; foot --app-id=tui-impala impala"]) },
+        "setup.browser":   { icon: "󰖟", labelKey: "settings.setup.browser",
+                             children: ["setup.browser.zen", "setup.browser.firefox",
+                                        "setup.browser.chromium"] },
+        "setup.browser.zen":      { icon: "󰖟", labelKey: "settings.setup.browser.zen",
+                                    action: () => Quickshell.execDetached([
+                                        Quickshell.env("HOME") + "/.local/bin/qs-default-browser-set", "zen"]) },
+        "setup.browser.firefox":  { icon: "󰈹", labelKey: "settings.setup.browser.firefox",
+                                    action: () => Quickshell.execDetached([
+                                        Quickshell.env("HOME") + "/.local/bin/qs-default-browser-set", "firefox"]) },
+        "setup.browser.chromium": { icon: "󰊯", labelKey: "settings.setup.browser.chromium",
+                                    action: () => Quickshell.execDetached([
+                                        Quickshell.env("HOME") + "/.local/bin/qs-default-browser-set", "chromium"]) },
         "setup.language":  { icon: "󰗊", labelKey: "settings.setup.language",
                              action: () => root._ipc("language-picker") },
+
+        // Install / Remove: Omarchy parity. Their omarchy-menu surfaces
+        // these as top-level branches; webapp install/remove are the
+        // first leaves under each. Spawned in a floating foot (same
+        // app-id pattern as the audio/bluetooth/wifi TUI launches
+        // above) so the CLI walker is a one-shot dialog, not a
+        // persistent terminal.
+        "install":  { icon: "󰏗", labelKey: "settings.install",
+                      children: ["install.webapp"] },
+        "install.webapp": { icon: "󰖟", labelKey: "settings.install.webapp",
+                            action: () => Quickshell.execDetached([
+                                "foot", "--app-id=tui-qs-webapp-install",
+                                Quickshell.env("HOME") + "/.local/bin/qs-webapp-install"]) },
+
+        "remove":   { icon: "󰗨", labelKey: "settings.remove",
+                      children: ["remove.webapp"] },
+        "remove.webapp":  { icon: "󰖟", labelKey: "settings.remove.webapp",
+                            action: () => Quickshell.execDetached([
+                                "foot", "--app-id=tui-qs-webapp-remove",
+                                Quickshell.env("HOME") + "/.local/bin/qs-webapp-remove"]) },
 
         "system":   { icon: "󰐥", labelKey: "settings.system",
                       children: ["system.lock", "system.suspend", "system.logout",

@@ -144,9 +144,10 @@ it. The repo only owns `templates/` and `themes/` (the sources).
 - **`install.sh` + `packages.txt`**: blank-Arch → Nirimaki. Has to
   template the `/home/michael/` paths in `keybinds.kdl` to the
   target user's `$HOME` at install time. Copy (not symlink) so a
-  later `git pull` doesn't clobber a user's tweaks.
-- **Phase H — terminal stuff**: scope TBD; user flagged it as the
-  next phase at the close of the previous session.
+  later `git pull` doesn't clobber a user's tweaks. Per-phase
+  install requirements are documented at the bottom of each phase
+  doc — see `docs/phase-i-webapps.md` for chromium policy-dir
+  chmod and the `xdg-settings` initial default-browser step.
 
 ## What NOT to do
 
