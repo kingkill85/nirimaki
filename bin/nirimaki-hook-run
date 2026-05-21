@@ -32,28 +32,33 @@ if [[ -z $event ]]; then
 fi
 shift || true
 
+# Run user-supplied hooks (if any). The hook directory is optional —
+# nothing to do if the user hasn't dropped any scripts in there. State
+# refresh below is independent of whether hooks ran.
 hook_dir="${XDG_CONFIG_HOME:-$HOME/.config}/nirimaki/hooks/${event}.d"
-[[ -d $hook_dir ]] || exit 0
+if [[ -d $hook_dir ]]; then
+  shopt -s nullglob
+  mapfile -t hooks < <(printf '%s\n' "$hook_dir"/* | LC_ALL=C sort)
+  shopt -u nullglob
 
-shopt -s nullglob
-mapfile -t hooks < <(printf '%s\n' "$hook_dir"/* | LC_ALL=C sort)
-shopt -u nullglob
-
-for hook in "${hooks[@]}"; do
-  base=$(basename -- "$hook")
-  # Skip sample / inactive templates.
-  case "$base" in
-    *.sample|*.disabled|.*) continue ;;
-  esac
-  [[ -x $hook ]] || continue
-  "$hook" "$@" || \
-    printf 'nirimaki-hook-run: %s exited %d (ignored)\n' "$base" "$?" >&2
-done
+  for hook in "${hooks[@]}"; do
+    base=$(basename -- "$hook")
+    # Skip sample / inactive templates.
+    case "$base" in
+      *.sample|*.disabled|.*) continue ;;
+    esac
+    [[ -x $hook ]] || continue
+    "$hook" "$@" || \
+      printf 'nirimaki-hook-run: %s exited %d (ignored)\n' "$base" "$?" >&2
+  done
+fi
 
 # After install/remove events, refresh ~/.cache/nirimaki/state.json so
-# the SettingsMenu picks up the new state on its next open. Skipped
-# for unrelated events (theme-set etc.) — only the events that change
-# what's installed need it.
+# the SettingsMenu picks up the new state on its next open. Runs
+# unconditionally on install/remove events regardless of whether the
+# user has any custom hooks in the .d directory above — that's a bug
+# we hit in Phase J: state.json went stale because the early exit
+# above skipped this block.
 case "$event" in
   *-installed|*-removed)
     [[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
