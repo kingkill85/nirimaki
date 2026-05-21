@@ -1,0 +1,38 @@
+#!/bin/bash
+# nirimaki:group=docker
+# nirimaki:summary=Remove Docker (stops daemon, removes packages, leaves group membership alone)
+# nirimaki:requires-sudo=true
+#
+# Doesn't auto-remove the user from the docker group — that's
+# reversible only via `gpasswd -d $USER docker` and the user might
+# want to keep the membership for a future reinstall.
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Docker" "Remove"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker isn't installed — nothing to remove."
+  nirimaki_pause
+  exit 0
+fi
+
+nirimaki_sudo_prime
+
+echo "Stopping + disabling docker.service…"
+sudo systemctl disable --now docker.service 2>/dev/null || true
+sudo systemctl disable --now docker.socket 2>/dev/null || true
+
+echo
+echo "Removing Docker packages…"
+sudo pacman -Rs --noconfirm docker docker-buildx docker-compose lazydocker 2>/dev/null || true
+
+echo
+echo "User $USER is still in the docker group (no-op for now)."
+echo "Remove manually with: sudo gpasswd -d \"$USER\" docker"
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null
+
+nirimaki_pause

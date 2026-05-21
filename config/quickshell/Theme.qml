@@ -85,9 +85,30 @@ QtObject {
     readonly property int menuIconPx:        fontPxLarge + 2  // 20
 
     // ===== Fonts =====
-    readonly property string monoFamily: "JetBrainsMono Nerd Font"
-    readonly property string sansFamily: "JetBrainsMono Nerd Font"
-    readonly property string iconFamily: "JetBrainsMono Nerd Font"
+    // Family resolves from ~/.config/nirimaki/font (one family name per
+    // line, written by `nirimaki font set`). Default JetBrainsMono Nerd
+    // Font when the file is missing or empty. FileView watches the file
+    // so font changes apply live without restarting Quickshell.
+    property string monoFamily: "JetBrainsMono Nerd Font"
+    property string sansFamily: "JetBrainsMono Nerd Font"
+    property string iconFamily: "JetBrainsMono Nerd Font"
+
+    function _applyFont(raw) {
+        const family = String(raw || "").trim().split("\n")[0];
+        const f = family || "JetBrainsMono Nerd Font";
+        monoFamily = f;
+        sansFamily = f;
+        iconFamily = f;
+    }
+
+    property FileView _fontFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/nirimaki/font"
+        watchChanges: true
+        printErrors: false
+        onLoaded:      root._applyFont(text())
+        onFileChanged: reload()
+        onLoadFailed:  root._applyFont("")
+    }
 
     // Tiny TOML-ish parser. We only need string values for
     //   key = "#rrggbb"   (foundational palette)

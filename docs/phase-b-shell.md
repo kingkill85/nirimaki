@@ -206,7 +206,7 @@ spawn-at-startup "swaybg" "-c" "#101315"
 For an image instead:
 
 ```kdl
-spawn-at-startup "swaybg" "-i" "/home/michael/Bilder/wallpaper.jpg" "-m" "fill"
+spawn-sh-at-startup "swaybg -i $HOME/Bilder/wallpaper.jpg -m fill"
 ```
 
 To start now without restarting niri: `swaybg -c "#101315" &` in any terminal.

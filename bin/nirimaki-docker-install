@@ -1,0 +1,91 @@
+#!/bin/bash
+# nirimaki:group=docker
+# nirimaki:summary=Install Docker + compose + buildx + lazydocker
+# nirimaki:requires-sudo=true
+#
+# Pulls the standard Arch Docker stack (docker engine, compose v2 plugin,
+# buildx plugin) plus lazydocker for a TUI control panel. Enables the
+# docker.service unit and adds the user to the docker group so the
+# socket is reachable without sudo.
+#
+# Group membership only takes effect on next login / niri session, so
+# we notify-send the warning at the end.
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Docker" "Install"
+
+if command -v docker >/dev/null 2>&1; then
+  echo "Docker already installed at $(command -v docker) — refreshing config only."
+fi
+
+nirimaki_sudo_prime
+
+if command -v paru >/dev/null 2>&1; then
+  paru -S --needed --noconfirm docker docker-buildx docker-compose lazydocker
+else
+  sudo pacman -S --needed --noconfirm docker docker-buildx docker-compose
+  echo "Note: lazydocker is AUR-only; install paru to add it."
+fi
+
+echo
+echo "──────────────────────────────────────────────────────────────────"
+echo "  Heads up: first-boot docker.service init takes 30-90 seconds"
+echo "  (overlay storage, iptables, bridge network). It's not hung —"
+echo "  systemctl is just waiting for active state."
+echo "──────────────────────────────────────────────────────────────────"
+echo
+echo "Enabling + starting docker.service (async)…"
+# --no-block: return as soon as systemd accepts the request, don't wait
+# for the service to reach 'active'. Otherwise this hangs the install
+# window for up to a minute on a cold docker init (storage driver +
+# overlay fs + iptables rules + bridge network all bring-up).
+sudo systemctl enable --no-block --now docker.service
+
+# Poll briefly (up to 10s) so we can print a status, but don't block
+# the whole install on a slow start.
+for _ in {1..10}; do
+  if systemctl is-active --quiet docker.service; then
+    echo "  ✓ docker.service active"
+    break
+  fi
+  sleep 1
+done
+if ! systemctl is-active --quiet docker.service; then
+  echo "  · docker.service still starting in the background."
+  echo "    Check 'systemctl status docker' later if 'docker info' fails."
+fi
+
+if ! id -nG "$USER" | grep -qw docker; then
+  echo
+  echo "Adding $USER to the docker group…"
+  sudo usermod -aG docker "$USER"
+  notify-send -u normal "Nirimaki — Docker" \
+    "Log out + back in to apply the docker group. Until then use 'sudo docker' or 'newgrp docker'." \
+    2>/dev/null || true
+fi
+
+echo
+echo "──────────────────────────────────────────────────────────────────"
+echo "  Group membership note"
+echo "──────────────────────────────────────────────────────────────────"
+echo "  '$USER' is now in the docker group BUT existing login sessions"
+echo "  (this terminal, your niri session, every running app) won't see"
+echo "  the change until you start a new session. Until then, 'docker'"
+echo "  commands hit:"
+echo
+echo "      permission denied while trying to connect to the docker"
+echo "      API at unix:///var/run/docker.sock"
+echo
+echo "  Three ways to fix:"
+echo "    1. Log out of niri and back in       — applies everywhere."
+echo "    2. Reboot                            — same effect, cleaner."
+echo "    3. Run 'newgrp docker' in a shell    — applies in that shell"
+echo "                                           only (sub-shell trick)."
+echo "──────────────────────────────────────────────────────────────────"
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null
+
+nirimaki_pause

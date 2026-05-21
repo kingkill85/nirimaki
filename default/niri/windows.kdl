@@ -1,0 +1,157 @@
+// Nirimaki — default window + layer rules.
+//
+// Lives at ~/.local/share/nirimaki/default/niri/. Loaded BEFORE
+// ~/.config/niri/windows.kdl; window-rules are ADDITIVE (every
+// matching rule's properties merge, last-wins for conflicts), so the
+// user file extends rather than replaces.
+
+// ===== Global window defaults =====
+// Three things in one rule:
+//   - blur + xray:false: real apps blur behind (Omarchy / Hyprland
+//     parity; xray-mode would only blur the wallpaper). Caveat per
+//     niri wiki: non-xray blur briefly disappears during open/close
+//     animations and tile drags.
+//   - opacity 0.97: active default — Omarchy's
+//     `o.window(".*", { opacity = "0.97 0.9" })`.
+//   - draw-border-with-background false (niri#1823 fix): default niri
+//     renders focus-ring / border as a solid background rectangle
+//     BEHIND the window; on translucent windows the accent colour
+//     bleeds through and tints the interior.
+window-rule {
+    opacity 0.97
+    draw-border-with-background false
+    background-effect {
+        blur true
+        xray false
+    }
+}
+
+// Inactive default opacity — 90 %, Omarchy parity.
+window-rule {
+    match is-active=false
+    opacity 0.9
+}
+
+// ===== Browsers =====
+// Omarchy `apps/browser.conf` overrides default-opacity with
+// `opacity 1.0 0.97`: fully opaque when focused, 97 % when not.
+// Translucency on web content is more distracting than on terminals.
+window-rule {
+    match app-id=r#"^((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)$"#
+    match app-id=r#"^(firefox|zen|librewolf)$"#
+    match app-id=r#"^(org\.mozilla\.firefox|app\.zen_browser\.zen|io\.gitlab\.librewolf-community)$"#
+    opacity 1.0
+}
+window-rule {
+    match app-id=r#"^((google-)?[cC]hrom(e|ium)|[bB]rave-browser|[mM]icrosoft-edge|Vivaldi-stable|helium)$"# is-active=false
+    match app-id=r#"^(firefox|zen|librewolf)$"# is-active=false
+    match app-id=r#"^(org\.mozilla\.firefox|app\.zen_browser\.zen|io\.gitlab\.librewolf-community)$"# is-active=false
+    opacity 0.97
+}
+
+// ===== Always-opaque apps (media / capture / image viewers) =====
+// Omarchy `apps/system.conf` forces `opacity 1 1` so the desktop
+// doesn't bleed through onto media being shown.
+window-rule {
+    match app-id=r#"^(zoom|vlc|mpv|org\.kde\.kdenlive|com\.obsproject\.Studio|com\.github\.PintaProject\.Pinta|imv|org\.gnome\.NautilusPreviewer)$"#
+    opacity 1.0
+}
+
+// Chromium webapps (nirimaki-webapp-* app-id) — fully opaque.
+window-rule {
+    match app-id=r#"^nirimaki-webapp-"#
+    opacity 1.0
+}
+
+// ===== Layer-rule blur scope =====
+// Limit blur to Quickshell dialog surfaces. The dim scrim sits on a
+// separate `dialog-scrim` namespace so it stays unblurred.
+layer-rule {
+    match namespace=r#"^(quickshell|nirimaki-.*)$"#
+    background-effect {
+        blur true
+        xray false
+    }
+}
+
+// ===== Per-app fixes =====
+// WezTerm initial configure bug — empty default-column-width.
+window-rule {
+    match app-id=r#"^org\.wezfurlong\.wezterm$"#
+    default-column-width {}
+}
+
+// Zen Browser — force niri's tile size on first frame.
+window-rule {
+    match app-id=r#"^zen$"#
+    tiled-state true
+    clip-to-geometry true
+}
+
+// Picture-in-picture players — Omarchy `apps/pip.conf` parity.
+window-rule {
+    match title="(?i)picture.?in.?picture"
+    open-floating true
+    opacity 1.0
+    default-floating-position x=40 y=40 relative-to="top-right"
+    default-column-width { fixed 600; }
+    default-window-height { fixed 338; }
+}
+
+// Floating TUI / utility windows: foot TUIs (app-id "tui-<name>") and
+// satty (screenshot annotator). 1000×640 logical pixels.
+window-rule {
+    match app-id=r#"^tui-"#
+    match app-id="com.gabm.satty"
+    open-floating true
+    default-column-width { fixed 1000; }
+    default-window-height { fixed 640; }
+}
+
+// Quake-style drop-down terminal — single floating foot at 1400×720.
+window-rule {
+    match app-id="nirimaki-quake-term"
+    open-floating true
+    default-column-width { fixed 1400; }
+    default-window-height { fixed 720; }
+}
+
+// ===== Password managers — screen-capture block =====
+// niri's `block-out-from "screen-capture"` replaces every covered
+// pixel with the focus-ring colour in screencast / screenshot output.
+window-rule {
+    match app-id=r#"^1[pP]assword$"#
+    match app-id=r#"^Bitwarden$"#
+    match app-id=r#"^chrome-nngceckbapebfimnlniiiahkandclblb-Default$"#
+    match app-id=r#"^org\.keepassxc\.KeePassXC$"#
+    match app-id=r#"^org\.gnome\.World\.Secrets$"#
+
+    block-out-from "screen-capture"
+}
+
+// Bitwarden — float by default. Screen-capture block is on the rule
+// above (Bitwarden is in that match list).
+window-rule {
+    match app-id=r#"^Bitwarden$"#
+    match app-id=r#"^chrome-nngceckbapebfimnlniiiahkandclblb-Default$"#
+    open-floating true
+}
+
+// ===== Steam =====
+// Omarchy `apps/steam.lua` parity: opacity 1.0, floats by default,
+// main window 1100×700, Friends List 460×800.
+window-rule {
+    match app-id=r#"^steam$"#
+    opacity 1.0
+    open-floating true
+}
+window-rule {
+    match app-id="steam" title="^Steam$"
+    default-column-width { fixed 1100; }
+    default-window-height { fixed 700; }
+}
+window-rule {
+    match app-id="steam" title="^Friends List$"
+    default-column-width { fixed 460; }
+    default-window-height { fixed 800; }
+}

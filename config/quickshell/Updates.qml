@@ -55,11 +55,13 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            // The pacman.log FileView in UpdatesService refreshes the
-            // count automatically when paru finishes, so no manual refresh
-            // here — Qt.callLater used to fire it before paru even ran.
-            onClicked: NiriService.launchTui("updates", "bash", "-lc",
-                "paru -Syu; echo; echo 'Done. Press Enter to close.'; read")
+            // Runs the same wrapped flow as Settings → Update → Nirimaki:
+            // banner + sudo-prime + git pull + paru -Syu + feature-state
+            // refresh + niri reload + pause. UpdatesService's pacman.log
+            // FileView refreshes the count automatically when paru
+            // finishes, so no manual refresh here.
+            onClicked: NiriService.launchTui("nirimaki-update", "bash", "-lc",
+                Quickshell.env("HOME") + "/.local/bin/nirimaki-update")
         }
     }
 }

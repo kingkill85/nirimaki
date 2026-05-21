@@ -1,0 +1,52 @@
+// Nirimaki — default autostart + environment.
+//
+// Lives at ~/.local/share/nirimaki/default/niri/. Loaded before
+// ~/.config/niri/autostart.kdl. Add user spawns in the user file —
+// they run alongside these (spawn-at-startup is additive, not
+// last-wins).
+
+// Locale for niri-spawned children. niri's environment when launched
+// by the display manager / TTY login doesn't include LANG, so children
+// would otherwise inherit the C locale and Quickshell's Calendar /
+// Weather widgets would render English month / weekday names.
+environment {
+    LANG "de_DE.UTF-8"
+    LC_TIME "de_DE.UTF-8"
+
+    // Qt apps look up QT_QPA_PLATFORMTHEME to pick their platform-theme
+    // module; qt6ct then renders the palette in
+    // ~/.config/theme/current/qt-colors.conf and uses the icon_theme
+    // line in qt6ct.conf — both rewritten by nirimaki-theme-set.
+    QT_QPA_PLATFORMTHEME "qt6ct"
+}
+
+// Quickshell is the bar/shell.
+spawn-at-startup "quickshell"
+
+// Wallpaper — nirimaki-wallpaper-apply starts swaybg on the first image
+// under ~/.config/theme/current/backgrounds/, with a solid-colour
+// fallback if the theme ships no images. Same script runs from
+// nirimaki-theme-set after every swap so the wallpaper follows the theme.
+spawn-sh-at-startup "$HOME/.local/bin/nirimaki-wallpaper-apply"
+
+// Feature-state snapshot — drives the SettingsMenu's install/remove
+// filter so already-installed apps don't appear under Install, and
+// missing apps don't appear under Remove. Refreshed by nirimaki-hook-run
+// after every install/remove event; this initial pass seeds the cache
+// for the menu's first open.
+spawn-sh-at-startup "$HOME/.local/bin/nirimaki-feature-state"
+
+// Style→Font menu fragment — one leaf per installed monospace font.
+// Refreshed by nirimaki-font-install after every install; this initial
+// pass picks up fonts the user installed outside of Nirimaki.
+spawn-sh-at-startup "$HOME/.local/bin/nirimaki-font-menu-refresh"
+
+// Idle: lock after 5 min, power off displays after 10 min, lock
+// before suspend. Niri auto-powers monitors back on at any input —
+// no `resume` action needed.
+spawn-sh-at-startup "swayidle -w timeout 300 'quickshell -p $HOME/.config/quickshell/lock/shell.qml' timeout 600 'niri msg action power-off-monitors' before-sleep 'quickshell -p $HOME/.config/quickshell/lock/shell.qml'"
+
+// Clipboard history daemon for the Quickshell ClipboardPicker
+// (Mod+Period). `wl-paste --watch` runs cliphist forever, recording
+// every wl-clipboard selection. Needs `cliphist` + `wl-clipboard`.
+spawn-sh-at-startup "wl-paste --watch cliphist store"

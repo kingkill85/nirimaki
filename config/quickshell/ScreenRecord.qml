@@ -74,7 +74,7 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-                Quickshell.execDetached(["/home/michael/.local/bin/nirimaki-screenrecord"]);
+                Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/nirimaki-screenrecord"]);
                 Qt.callLater(() => root.refresh());
             }
         }

@@ -1,0 +1,78 @@
+#!/bin/bash
+# nirimaki:group=dev
+# nirimaki:summary=Remove a development environment (uninstalls the mise-managed tool)
+# nirimaki:args=<key>
+#
+# For mise-managed envs, runs `mise uninstall` for the whole tool +
+# unsets the global pin. For envs we installed via upstream scripts
+# (rust → rustup, ocaml → opam) we just print the upstream removal
+# command rather than ripping out arbitrary state.
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+key="${1:-}"
+[[ -z $key ]] && { echo "Usage: nirimaki dev remove <key>" >&2; exit 1; }
+
+nirimaki_banner "Dev env: $key" "Remove"
+
+mise_drop() {
+  local tool="$1"
+  if ! command -v mise >/dev/null 2>&1; then
+    echo "mise not installed — nothing to remove."
+    return
+  fi
+  if ! mise ls --installed "$tool" 2>/dev/null | grep -q .; then
+    echo "$tool is not installed via mise — nothing to remove."
+    return
+  fi
+  echo "=> mise unuse --global $tool"
+  mise unuse --global "$tool" || true
+  echo "=> mise uninstall $tool --all"
+  mise uninstall "$tool" --all || true
+  echo
+  echo "$tool removed."
+}
+
+case "$key" in
+  ruby)    mise_drop ruby ;;
+  node)    mise_drop node ;;
+  bun)     mise_drop bun ;;
+  deno)    mise_drop deno ;;
+  go)      mise_drop go ;;
+  php)
+    echo "Removing PHP package set…"
+    nirimaki_sudo_prime
+    sudo pacman -Rs --noconfirm php composer php-sqlite xdebug 2>/dev/null || true
+    ;;
+  laravel|symfony)
+    echo "Drops Laravel/Symfony installer (PHP itself stays — remove via 'nirimaki dev remove php')."
+    composer global remove laravel/installer 2>/dev/null || true
+    if [[ $key == symfony ]]; then
+      nirimaki_sudo_prime
+      sudo pacman -Rs --noconfirm symfony-cli 2>/dev/null || true
+    fi
+    ;;
+  python)  mise_drop python ;;
+  elixir)  mise_drop elixir; mise_drop erlang ;;
+  phoenix) mise_drop elixir; mise_drop erlang ;;
+  rust)
+    echo "Rust was installed via rustup. Run 'rustup self uninstall' to remove."
+    ;;
+  java)    mise_drop java ;;
+  zig)     mise_drop zls; mise_drop zig ;;
+  ocaml)
+    echo "OCaml was installed via opam. Run 'opam clean -ar' + remove ~/.opam to uninstall."
+    ;;
+  dotnet)  mise_drop dotnet ;;
+  clojure) mise_drop clojure ;;
+  scala)   mise_drop scala-cli; mise_drop scala; mise_drop java ;;
+  *)
+    echo "Unknown dev-env key: '$key'" >&2
+    exit 1 ;;
+esac
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null
+
+nirimaki_pause

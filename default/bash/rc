@@ -1,0 +1,50 @@
+# Nirimaki — default bash setup.
+#
+# This file lives at ~/.local/share/nirimaki/default/bash/rc and is
+# upgrade-tracked. Sourced near the top of your ~/.bashrc via the
+# one-liner that install.sh / dev-link.sh seeds:
+#
+#   source ~/.local/share/nirimaki/default/bash/rc
+#
+# Don't edit this file directly. Your own ~/.bashrc is the user
+# surface — anything you put below the source line runs AFTER these
+# defaults and wins. Same shape as fish: conf.d/00-nirimaki-init.fish
+# loads first, ~/.config/fish/config.fish loads last and wins.
+
+# Interactive-only setup — bail early for non-interactive shells so
+# `bash -c '...'` invocations stay fast.
+[[ $- != *i* ]] && return
+
+# ~/.local/bin holds the nirimaki-* helpers (linked by dev-link.sh /
+# install.sh). Add it to PATH if Arch's default bash path doesn't
+# already include it.
+if [[ -d $HOME/.local/bin && ":$PATH:" != *:"$HOME/.local/bin":* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Starship prompt — same TOML as fish, theme switches in lockstep
+# with `nirimaki theme set`. Guarded so a starship-less install boots
+# cleanly.
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init bash)"
+fi
+
+# mise — version manager for the Install → Development menu's dev
+# envs (ruby/node/go/python/dotnet/…). `mise activate` prepends its
+# shim dir to PATH so the installed tools resolve. Guarded so a
+# mise-less install boots cleanly.
+if command -v mise >/dev/null 2>&1; then
+    eval "$(mise activate bash)"
+fi
+
+# bat theme — set so existing fish/bash sessions share the colour
+# scheme rendered by nirimaki-theme-set.
+export BAT_THEME=nirimaki
+
+# Editor preference — written by `nirimaki editor default <name>`
+# into a single-line file for cross-shell readability.
+if [[ -f $HOME/.config/nirimaki/editor && -s $HOME/.config/nirimaki/editor ]]; then
+    EDITOR=$(head -n1 "$HOME/.config/nirimaki/editor")
+    export EDITOR
+    export VISUAL="$EDITOR"
+fi

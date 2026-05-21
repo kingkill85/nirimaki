@@ -1,0 +1,4 @@
+#!/bin/bash
+# nirimaki:group=edit
+# nirimaki:summary=Edit ~/.config/niri/windows.kdl (window-rule additions)
+exec "$(dirname -- "${BASH_SOURCE[0]}")/nirimaki-edit" windows "$@"

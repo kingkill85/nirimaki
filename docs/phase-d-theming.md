@@ -228,8 +228,8 @@ niri keybinds use the explicit path form so the locker survives the
 config discovery:
 
 ```kdl
-spawn-sh-at-startup "swayidle -w … 'quickshell -p /home/michael/.config/quickshell/lock/shell.qml' …"
-Super+Alt+L { spawn "quickshell" "-p" "/home/michael/.config/quickshell/lock/shell.qml"; }
+spawn-sh-at-startup "swayidle -w … 'quickshell -p $HOME/.config/quickshell/lock/shell.qml' …"
+Super+Alt+L { spawn-sh "quickshell -p $HOME/.config/quickshell/lock/shell.qml"; }
 ```
 
 `PowerMenu.qml` Lock entry takes the same argv.
@@ -360,7 +360,9 @@ extra). `yaru-icon-theme` from D5 covers the icon side.
 
 **Static configs** (written once):
 - `~/.config/qt6ct/qt6ct.conf` — `style=Fusion`, `custom_palette=true`,
-  `color_scheme_path=/home/michael/.config/theme/current/qt-colors.conf`,
+  `color_scheme_path=<user-home>/.config/theme/current/qt-colors.conf`
+  (qt5ct/qt6ct don't expand `~` or `$HOME` in INI values, so install.sh
+  has to template this line for the target user),
   `icon_theme=Yaru-blue` (rewritten by nirimaki-theme-set on each swap).
 - `~/.config/qt5ct/qt5ct.conf` — identical, separate path.
 

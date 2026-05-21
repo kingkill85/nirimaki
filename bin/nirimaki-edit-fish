@@ -1,0 +1,4 @@
+#!/bin/bash
+# nirimaki:group=edit
+# nirimaki:summary=Edit ~/.config/fish/config.fish (PATH, abbrs, prompt — user-owned)
+exec "$(dirname -- "${BASH_SOURCE[0]}")/nirimaki-edit" fish "$@"

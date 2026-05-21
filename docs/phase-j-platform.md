@@ -267,20 +267,35 @@ the same `nirimaki_sudo_prime`, and `nirimaki_pause` at the end.
 ## User-facing abstraction map
 
 Future Claude: when a user asks "where do I customise X?" the answer
-is one of these four:
+is one of these:
 
-| User wants to…                                    | Where to drop a file                                 |
-|---------------------------------------------------|------------------------------------------------------|
-| React to a theme change                           | `~/.config/nirimaki/hooks/theme-set.d/<name>` (+x)   |
-| Add a SettingsMenu entry                          | `~/.config/nirimaki/extensions/menu.json`            |
-| Override how an app gets themed                   | `~/.config/nirimaki/themed/<base>.tpl`               |
-| Anything else (font size, etc.)                   | … not yet a settings surface — case-by-case          |
+| User wants to…                                    | Where to edit                                           |
+|---------------------------------------------------|---------------------------------------------------------|
+| Configure monitors                                | `~/.config/niri/monitors.kdl`                           |
+| Add / override / unbind a niri keybind            | `~/.config/niri/bindings.kdl` (unbind = rebind to `spawn-sh "true"`) |
+| Override niri input (keyboard layout, touchpad…)  | `~/.config/niri/input.kdl`                              |
+| Add a window-rule                                 | `~/.config/niri/windows.kdl`                            |
+| Add a spawn-at-startup                            | `~/.config/niri/autostart.kdl`                          |
+| Customise foot (font, keybinds, padding)          | `~/.config/foot/foot.ini` (theme stays auto-tracked)    |
+| Customise tmux                                    | `~/.config/tmux/tmux.conf`                              |
+| Customise fish (PATH, abbrs, prompt…)             | `~/.config/fish/config.fish`                            |
+| React to a theme change                           | `~/.config/nirimaki/hooks/theme-set.d/<name>` (+x)      |
+| Add a SettingsMenu entry                          | `~/.config/nirimaki/extensions/menu.json`               |
+| Override how an app gets themed                   | `~/.config/nirimaki/themed/<base>.tpl`                  |
 
-Implementation details (the `bin/nirimaki-*` scripts, the menu's
-QML, niri's window-rules, …) are **not** user-touchable. Editing
-them works in this dev install (where the repo is symlinked in
-place) but breaks the upgrade path on an `install.sh`-managed
-machine.
+The niri + fish user files are **seeded once** (copy, not symlink) by
+`dev-link.sh` / `install.sh` and never overwritten on upgrade. The
+upgrade-tracked defaults that they `include` live at
+`~/.local/share/nirimaki/default/` (symlinked into the repo in dev,
+copied by install.sh). Editing the defaults under
+`~/.local/share/nirimaki/default/` survives this dev session but
+breaks the upgrade path on an install.sh-managed machine — that's
+why we have the include-and-override split.
+
+Implementation details (the `bin/nirimaki-*` scripts, the menu's QML,
+niri's window-rules under `default/niri/windows.kdl`, …) are **not**
+user-touchable in the upgrade-safe sense. The user's `windows.kdl`
+adds rules; the default's `windows.kdl` is repo-owned.
 
 ## Sources
 

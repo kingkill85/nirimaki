@@ -1,0 +1,39 @@
+// Nirimaki — default input config.
+//
+// This file lives at ~/.local/share/nirimaki/default/niri/ and is
+// loaded BEFORE the user's ~/.config/niri/input.kdl. Override by
+// re-declaring the input block in the user file (last-wins).
+//
+// Wiki: https://niri-wm.github.io/niri/Configuration:-Input
+
+input {
+    keyboard {
+        xkb {
+            // If this section is empty, niri fetches xkb settings from
+            // org.freedesktop.locale1. Override via the user file:
+            //   layout "us,ru"
+            //   options "grp:win_space_toggle,compose:ralt,ctrl:nocaps"
+        }
+
+        // Enable numlock on startup.
+        numlock
+    }
+
+    touchpad {
+        tap
+        natural-scroll
+    }
+
+    mouse {
+        // Stock defaults — override in ~/.config/niri/input.kdl.
+    }
+
+    trackpoint {
+        // Stock defaults — override in ~/.config/niri/input.kdl.
+    }
+
+    // Focus windows and outputs automatically when moving the mouse
+    // into them. max-scroll-amount="0%" makes it work only on
+    // windows already fully on screen.
+    focus-follows-mouse max-scroll-amount="0%"
+}

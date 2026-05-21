@@ -1,0 +1,24 @@
+// Your monitor / output configuration. niri only auto-arranges if you
+// leave this empty — most setups want explicit positions, scales, and
+// modes.
+//
+// Discover your outputs: `niri msg outputs`
+// Wiki:                  https://niri-wm.github.io/niri/Configuration:-Outputs
+//
+// Example (laptop + external):
+//
+//     output "eDP-1" {
+//         mode "2880x1800@60"
+//         scale 1.5
+//         position x=0 y=0
+//     }
+//     output "DP-1" {
+//         mode "2560x1440@144"
+//         scale 1
+//         position x=1920 y=0
+//         variable-refresh-rate
+//     }
+//
+// Portrait monitor: `transform "90"` (CCW) or `"270"` (CW). On a
+// portrait screen you may also want a per-output `layout { … }` so
+// new columns open wider than the default 50 %.

@@ -1,0 +1,4 @@
+#!/bin/bash
+# nirimaki:group=edit
+# nirimaki:summary=Edit ~/.config/niri/monitors.kdl (output positions, modes, scales)
+exec "$(dirname -- "${BASH_SOURCE[0]}")/nirimaki-edit" monitors "$@"

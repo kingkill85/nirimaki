@@ -1,0 +1,19 @@
+// Your window-rule additions. window-rule is ADDITIVE — every matching
+// rule's properties merge, last-wins for conflicts. You don't need to
+// re-declare our defaults to add your own.
+//
+// Wiki: https://niri-wm.github.io/niri/Configuration:-Window-Rules
+//
+// Example:
+//
+//     // Pin Slack to workspace 5.
+//     window-rule {
+//         match app-id=r#"^Slack$"#
+//         open-on-workspace 5
+//     }
+//
+//     // Force a specific app fully opaque.
+//     window-rule {
+//         match app-id=r#"^my-special-editor$"#
+//         opacity 1.0
+//     }

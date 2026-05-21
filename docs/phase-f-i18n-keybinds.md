@@ -201,7 +201,7 @@ what was actually loaded.
    Mod+Shift+/ overlay groups them sensibly.
 3. `~/.config/niri/config.kdl` replaces its in-place `binds { … }`
    block with
-   `include "/home/michael/.config/niri/keybinds.kdl"`.
+   `include "~/.config/niri/keybinds.kdl"`.
 4. `niri validate` after every save.
 
 **Risk:** broken bind syntax during the move → no input. Mitigated
@@ -222,7 +222,7 @@ dictation, system actions, screenshot / recording, volume, media,
 brightness, overview, focus, move, monitor, workspace, by-index,
 mouse wheel, layout, universal clipboard). `config.kdl` lost its
 in-line binds block and gained
-`include "/home/michael/.config/niri/keybinds.kdl"` plus a backup
+`include "~/.config/niri/keybinds.kdl"` plus a backup
 at `config.kdl.bak`. Every XF86 / brightness bind got a
 `hotkey-overlay-title` so they show up labelled in Mod+Shift+/.
 

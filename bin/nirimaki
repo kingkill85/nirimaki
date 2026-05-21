@@ -115,9 +115,12 @@ dispatch() {
 }
 
 # --- main ---
+# Bare `nirimaki` lists every subcommand grouped by category — same as
+# `nirimaki help`. The terser `usage()` is kept for the error path
+# below where a wrong subcommand was typed.
 if [[ $# -eq 0 ]]; then
-  usage
-  exit 1
+  show_help
+  exit 0
 fi
 
 case "$1" in

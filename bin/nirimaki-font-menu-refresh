@@ -1,0 +1,66 @@
+#!/bin/bash
+# nirimaki:group=font
+# nirimaki:summary=Regenerate the Style→Font menu fragment from installed fonts
+# nirimaki:hidden=true
+#
+# Writes a JSON snippet that SettingsMenu.qml merges on top of the
+# repo-shipped menu tree. `style.font` becomes a branch with one leaf
+# per installed monospace font; each leaf calls `nirimaki font set`.
+#
+# Re-run after installing or removing fonts to keep the menu in sync.
+# nirimaki-font-install calls this automatically; an autostart entry
+# in default/niri/autostart.kdl runs it once per session for fonts
+# installed outside the menu.
+
+set -e
+
+cache_dir="$HOME/.cache/nirimaki"
+out="$cache_dir/menu-fonts.json"
+mkdir -p "$cache_dir"
+
+# Stable slug from a font family name (lowercase, alphanumerics + dash).
+slug() {
+  printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]\+/-/g; s/^-\|-$//g'
+}
+
+families=()
+while IFS= read -r line; do
+  [[ -n $line ]] && families+=("$line")
+done < <("$HOME/.local/bin/nirimaki-font-list")
+
+{
+  echo '{'
+  # Build the children id list first
+  echo '  "style.font": {'
+  echo '    "icon": "󰛖",'
+  echo '    "labelKey": "settings.style.font",'
+  printf '    "children": ['
+  first=1
+  for fam in "${families[@]}"; do
+    s=$(slug "$fam")
+    [[ -z $s ]] && continue
+    if (( first )); then
+      printf '"style.font.%s"' "$s"
+      first=0
+    else
+      printf ', "style.font.%s"' "$s"
+    fi
+  done
+  echo ']'
+  echo '  }'
+
+  for fam in "${families[@]}"; do
+    s=$(slug "$fam")
+    [[ -z $s ]] && continue
+    # Escape backslashes + double quotes for JSON string safety
+    esc=$(printf '%s' "$fam" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    echo ','
+    printf '  "style.font.%s": { "icon": "󰛖", "label": "%s", "action": { "type": "exec", "cmd": ["%s/.local/bin/nirimaki-font-set", "%s"] } }' \
+      "$s" "$esc" "$HOME" "$esc"
+  done
+  echo
+  echo '}'
+} > "$out.tmp"
+
+# Atomic swap so Quickshell's FileView never reads a half-written file.
+mv "$out.tmp" "$out"

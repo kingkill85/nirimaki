@@ -1,0 +1,10 @@
+#!/bin/bash
+# nirimaki:group=font
+# nirimaki:summary=List installed monospace font families
+#
+# Filters fc-list to monospace-spaced fonts (spacing=100), one family
+# per line, deduplicated. Same approach Omarchy uses.
+
+fc-list :spacing=100 -f "%{family[0]}\n" 2>/dev/null \
+  | grep -v -iE 'emoji|signwriting' \
+  | sort -u

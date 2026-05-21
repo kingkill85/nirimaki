@@ -1,0 +1,49 @@
+// Nirimaki — default look-and-feel (layout, CSD, animations, blur,
+// hotkey overlay, screenshot path).
+//
+// Lives at ~/.local/share/nirimaki/default/niri/. Loaded BEFORE
+// ~/.config/niri/<anything>; user overrides win via last-wins for
+// keyed nodes (animations, blur, hotkey-overlay, prefer-no-csd,
+// screenshot-path).
+
+// Layout (gaps, focus-ring / border colours, shadow, struts) lives in
+// a generated include so `nirimaki-theme-set` can flip the focused-
+// window border colour with the rest of the theme.
+// Template: ~/.config/theme/templates/niri-theme.kdl.tpl
+include "~/.config/theme/current/niri-theme.kdl"
+
+hotkey-overlay {
+    // Don't show the "Important Hotkeys" sheet on session start.
+    // The overlay is still available on demand via Mod+Shift+/.
+    skip-at-startup
+}
+
+// Ask clients to drop their client-side decorations. Apps that
+// specifically need CSD (Nautilus header bar etc.) get it via the
+// `prefer-no-csd false` window-rule in windows.kdl. This also makes
+// niri's 2 px border draw cleanly around the actual content rectangle
+// instead of behind translucent CSD shadows.
+prefer-no-csd
+
+// Screenshot path used by niri's built-in screenshot-window /
+// screenshot-screen actions (the Mod+Shift+S bind uses its own grim+
+// satty pipeline). niri only does ~ expansion + strftime here — no
+// env vars / shell — so the German locale dir is hardcoded. If you
+// change XDG_PICTURES_DIR, override in ~/.config/niri/input.kdl.
+screenshot-path "~/Bilder/Screenshots/Screenshot from %Y-%m-%d %H-%M-%S.png"
+
+animations {
+    // Override in user file to disable / slow down.
+    // off
+    // slowdown 3.0
+}
+
+// Global blur tuning — moderate dual-kawase pass count, matches
+// Hyprland's `decoration.blur { size=2; passes=2; }`. niri's defaults
+// (passes 3, offset 3) lean blurrier than Omarchy. `saturation 1.0`
+// neutralises niri's punchy default of 1.5.
+blur {
+    passes 2
+    offset 2
+    saturation 1.0
+}

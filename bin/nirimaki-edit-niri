@@ -1,0 +1,4 @@
+#!/bin/bash
+# nirimaki:group=edit
+# nirimaki:summary=Edit ~/.config/niri/config.kdl (niri entry-point — rarely needed)
+exec "$(dirname -- "${BASH_SOURCE[0]}")/nirimaki-edit" niri "$@"

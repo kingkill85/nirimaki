@@ -1,0 +1,10 @@
+#!/bin/bash
+# nirimaki:group=font
+# nirimaki:summary=Show the currently-set monospace font family
+
+state="$HOME/.config/nirimaki/font"
+if [[ -f $state && -s $state ]]; then
+  head -n1 "$state"
+else
+  echo "JetBrainsMono Nerd Font"
+fi

@@ -1,0 +1,4 @@
+#!/bin/bash
+# nirimaki:group=edit
+# nirimaki:summary=Edit ~/.config/foot/foot.ini (terminal font, keybinds, padding)
+exec "$(dirname -- "${BASH_SOURCE[0]}")/nirimaki-edit" foot "$@"

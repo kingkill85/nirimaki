@@ -1,0 +1,13 @@
+# Nirimaki base package list — Arch official repos (extra/core/multilib).
+# Each non-blank, non-comment line is one pacman package. install.sh
+# (deferred) will feed this to pacman -S --needed --noconfirm.
+#
+# Standard tools the user always gets, no menu entry:
+#   - mise:     version manager for the Install → Development menu
+#   - opencode: AI coding assistant (Arch extra)
+#
+# Compositor / shell / theme packages are NOT listed here yet —
+# install.sh ships them separately when it's written.
+
+mise
+opencode

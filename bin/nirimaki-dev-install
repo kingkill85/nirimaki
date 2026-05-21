@@ -1,0 +1,201 @@
+#!/bin/bash
+# nirimaki:group=dev
+# nirimaki:summary=Install a development environment (Ruby, Node, Rust, Go, …) via mise
+# nirimaki:args=<key>
+# nirimaki:requires-sudo=true
+#
+# Ported from Omarchy's omarchy-install-dev-env. Keys mirror their set
+# exactly, so muscle memory carries. mise is the version manager for
+# most envs; a few use upstream installers (rust → rustup, ocaml →
+# opam, uv for python).
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+key="${1:-}"
+if [[ -z $key ]]; then
+  cat >&2 <<'EOF'
+Usage: nirimaki dev install <key>
+
+Keys:
+  ruby      Ruby on Rails (+ bundler, rails gem)
+  node      Node.js (via mise)
+  bun       Bun (via mise)
+  deno      Deno (via mise)
+  go        Go (via mise)
+  php       PHP + composer + xdebug + sqlite/mysql PDO
+  laravel   PHP + Node + Laravel installer
+  symfony   PHP + symfony-cli
+  python    Python + uv (Astral installer)
+  elixir    Erlang + Elixir + hex
+  phoenix   Erlang + Elixir + Phoenix
+  rust      Rust via rustup
+  java      Java (via mise)
+  zig       Zig + zls (via mise)
+  ocaml     OCaml + opam + lsp + format + utop
+  dotnet    .NET (via mise)
+  clojure   Clojure + rlwrap
+  scala     Java + Scala + scala-cli (via mise)
+EOF
+  exit 1
+fi
+
+# Common helpers --------------------------------------------------------
+
+pkg_add() {
+  # paru first (handles AUR), pacman fallback (some envs are in extra).
+  if command -v paru >/dev/null 2>&1; then
+    paru -S --needed --noconfirm "$@"
+  else
+    sudo pacman -S --needed --noconfirm "$@"
+  fi
+}
+
+ensure_mise() {
+  if ! command -v mise >/dev/null 2>&1; then
+    echo "mise not found — installing it first…"
+    pkg_add mise
+  fi
+}
+
+install_php() {
+  pkg_add php composer php-sqlite xdebug
+
+  # Composer global bin on PATH (idempotent block in ~/.bashrc).
+  if ! grep -q 'composer/vendor/bin' "$HOME/.bashrc" 2>/dev/null; then
+    {
+      echo
+      echo '# Composer global bin (added by nirimaki dev install php)'
+      echo 'export PATH="$HOME/.config/composer/vendor/bin:$PATH"'
+    } >> "$HOME/.bashrc"
+  fi
+
+  # PHP extensions + xdebug.
+  local php_ini="/etc/php/php.ini"
+  for ext in bcmath intl iconv openssl pdo_sqlite pdo_mysql; do
+    sudo sed -i "s/^;extension=${ext}/extension=${ext}/" "$php_ini"
+  done
+  if [[ -f /etc/php/conf.d/xdebug.ini ]]; then
+    sudo sed -i \
+      -e 's/^;zend_extension=xdebug.so/zend_extension=xdebug.so/' \
+      -e 's/^;xdebug.mode=debug/xdebug.mode=debug/' \
+      /etc/php/conf.d/xdebug.ini
+  fi
+}
+
+# Dispatch --------------------------------------------------------------
+
+nirimaki_banner "Dev env: $key" "Install"
+nirimaki_sudo_prime
+
+case "$key" in
+  ruby)
+    ensure_mise
+    pkg_add libyaml
+    mise settings add ruby.compile false || true
+    mise settings add idiomatic_version_file_enable_tools ruby || true
+    mise use --global ruby@latest
+    echo "gem: --no-document" > "$HOME/.gemrc"
+    mise x ruby -- gem install rails --no-document
+    echo
+    echo "Done. Try: rails new myproject"
+    ;;
+  node)
+    ensure_mise
+    mise use --global node
+    ;;
+  bun)
+    ensure_mise
+    mise use -g bun@latest
+    ;;
+  deno)
+    ensure_mise
+    mise use -g deno@latest
+    ;;
+  go)
+    ensure_mise
+    mise use --global go@latest
+    ;;
+  php)
+    install_php
+    ;;
+  laravel)
+    install_php
+    ensure_mise
+    mise use --global node
+    composer global require laravel/installer
+    echo
+    echo "Done. Try: laravel new myproject"
+    ;;
+  symfony)
+    install_php
+    pkg_add symfony-cli
+    echo
+    echo "Done. Try: symfony new --webapp myproject"
+    ;;
+  python)
+    ensure_mise
+    mise use --global python@latest
+    echo "Installing uv (Astral)…"
+    curl -fsSL https://astral.sh/uv/install.sh | sh
+    ;;
+  elixir)
+    ensure_mise
+    mise use --global erlang@latest
+    mise use --global elixir@latest
+    mise x elixir -- mix local.hex --force
+    ;;
+  phoenix)
+    ensure_mise
+    mise use --global erlang@latest
+    mise use --global elixir@latest
+    mise x elixir -- mix local.hex --force
+    mise x elixir -- mix local.rebar --force
+    mise x elixir -- mix archive.install hex phx_new --force
+    echo
+    echo "Done. Try: mix phx.new my_app"
+    ;;
+  rust)
+    bash -c "$(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs)" -- -y
+    ;;
+  java)
+    ensure_mise
+    mise use --global java@latest
+    ;;
+  zig)
+    ensure_mise
+    mise use --global zig@latest
+    mise use -g zls@latest
+    ;;
+  ocaml)
+    bash -c "$(curl -fsSL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh)"
+    opam init --yes
+    eval "$(opam env)"
+    opam install ocaml-lsp-server odoc ocamlformat utop --yes
+    ;;
+  dotnet)
+    ensure_mise
+    mise use --global dotnet@latest
+    ;;
+  clojure)
+    ensure_mise
+    pkg_add rlwrap
+    mise use --global clojure@latest
+    ;;
+  scala)
+    ensure_mise
+    mise use --global java@latest
+    mise use --global scala@latest
+    mise use --global scala-cli@latest
+    ;;
+  *)
+    echo "Unknown dev-env key: '$key'" >&2
+    echo "Run 'nirimaki dev install' (no args) for the list." >&2
+    exit 1 ;;
+esac
+
+# Refresh feature state so the Install/Remove menus update.
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null
+
+nirimaki_pause

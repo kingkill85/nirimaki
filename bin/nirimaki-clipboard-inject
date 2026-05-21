@@ -1,0 +1,49 @@
+#!/bin/bash
+# nirimaki:group=clipboard
+# nirimaki:summary=Inject copy/paste/cut keys, dispatching by focused app
+# nirimaki:args=<copy|paste|cut>
+#
+# Wired to Mod+C / Mod+V / Mod+X in default/niri/bindings.kdl.
+#
+# Why dispatch: terminals (foot) bind Ctrl+C to SIGINT, so we can't
+# send the universal Ctrl+C/V/X everywhere. Foot honours Ctrl+Insert /
+# Shift+Insert for clipboard (per its key-bindings stanza in foot.ini).
+# Most other apps — browsers especially Firefox/Zen on Wayland — DO
+# NOT reliably honour Ctrl+Insert, but do honour the plain Ctrl+C/V/X.
+# So:
+#   terminal-class window  → Ctrl+Insert / Shift+Insert / Ctrl+X
+#   anything else          → Ctrl+C       / Ctrl+V       / Ctrl+X
+
+set -e
+
+op="${1:-}"
+case "$op" in
+  copy|paste|cut) ;;
+  *) echo "Usage: nirimaki clipboard inject <copy|paste|cut>" >&2; exit 1 ;;
+esac
+
+# Resolve focused window's app-id. `niri msg` outputs human-readable
+# lines like "App ID: zen". No --json so we don't need jq.
+app_id=$(niri msg focused-window 2>/dev/null \
+         | sed -nE 's/^[[:space:]]*App ID: *"?([^"]+)"?$/\1/p' \
+         | head -n1)
+
+is_terminal=0
+case "$app_id" in
+  foot|nirimaki-quake-term|tui-*|com.mitchellh.ghostty|kitty|alacritty|wezterm|Alacritty)
+    is_terminal=1 ;;
+esac
+
+if (( is_terminal )); then
+  case "$op" in
+    copy)  exec wtype -M ctrl  -k Insert -m ctrl ;;
+    paste) exec wtype -M shift -k Insert -m shift ;;
+    cut)   exec wtype -M ctrl  -k x      -m ctrl ;;
+  esac
+else
+  case "$op" in
+    copy)  exec wtype -M ctrl -k c -m ctrl ;;
+    paste) exec wtype -M ctrl -k v -m ctrl ;;
+    cut)   exec wtype -M ctrl -k x -m ctrl ;;
+  esac
+fi

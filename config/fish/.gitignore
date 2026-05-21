@@ -17,6 +17,7 @@
 !/functions/eff.fish
 !/functions/oc.fish
 !/functions/cc.fish
+!/functions/cx.fish
 !/functions/io.fish
 !/functions/ic.fish
 !/functions/ioc.fish
@@ -25,6 +26,7 @@
 # In conf.d/, ignore everything BY DEFAULT, then whitelist only the
 # files we authored.
 /conf.d/*
+!/conf.d/00-nirimaki-init.fish
 !/conf.d/abbreviations.fish
 !/conf.d/greeting.fish
 !/conf.d/tools.fish

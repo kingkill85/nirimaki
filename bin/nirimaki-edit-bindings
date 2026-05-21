@@ -1,0 +1,4 @@
+#!/bin/bash
+# nirimaki:group=edit
+# nirimaki:summary=Edit ~/.config/niri/bindings.kdl (keybinds — override / add / no-op-unbind)
+exec "$(dirname -- "${BASH_SOURCE[0]}")/nirimaki-edit" bindings "$@"

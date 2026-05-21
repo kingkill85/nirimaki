@@ -1,0 +1,41 @@
+#!/bin/bash
+# nirimaki:summary=Pick a monospace font via fzf and apply it
+#
+# Launched from Settings → Style → Font (exec-in-foot). Lists every
+# installed monospace family, pre-selects the current one, applies
+# the choice via `nirimaki font set`. Cancel with Esc.
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Font" "Select"
+
+current=$("$HOME/.local/bin/nirimaki-font-current")
+families=$("$HOME/.local/bin/nirimaki-font-list")
+
+if [[ -z $families ]]; then
+  echo "No monospace fonts found. Install one with 'paru -S ttf-jetbrains-mono-nerd' or similar."
+  nirimaki_pause
+  exit 1
+fi
+
+# fzf with the current font highlighted via --query.
+choice=$(printf '%s\n' "$families" | fzf \
+    --prompt="Font » " \
+    --header="Current: $current   (Esc to cancel)" \
+    --query="$current" \
+    --select-1 --exit-0) || {
+  echo "Cancelled."
+  nirimaki_pause
+  exit 0
+}
+
+if [[ -n $choice && $choice != "$current" ]]; then
+  "$HOME/.local/bin/nirimaki-font-set" "$choice"
+  echo
+  echo "Set. Existing foot windows keep their old font — restart them to see the change."
+else
+  echo "No change."
+fi
+
+nirimaki_pause

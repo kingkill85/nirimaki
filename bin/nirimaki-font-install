@@ -1,0 +1,71 @@
+#!/bin/bash
+# nirimaki:group=font
+# nirimaki:summary=Install a curated Nerd Font and set it as the default
+# nirimaki:args=<key>
+# nirimaki:requires-sudo=true
+#
+# Same 6 curated picks Omarchy ships. Each key maps to (AUR package,
+# fc-family-name). Installs the package, rebuilds the font cache, then
+# applies the font live via `nirimaki font set`.
+#
+# Keys:
+#   cascadia    ttf-cascadia-mono-nerd        CaskaydiaMono Nerd Font
+#   meslo       ttf-meslo-nerd                MesloLGL Nerd Font
+#   firacode    ttf-firacode-nerd             FiraCode Nerd Font
+#   victor      ttf-victor-mono-nerd          VictorMono Nerd Font
+#   bitstream   ttf-bitstream-vera-mono-nerd  BitstromWera Nerd Font
+#   iosevka     ttf-iosevka-nerd              Iosevka Nerd Font Mono
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+key="${1:-}"
+case "$key" in
+  cascadia)  pkg="ttf-cascadia-mono-nerd";       family="CaskaydiaMono Nerd Font";    label="Cascadia Mono" ;;
+  meslo)     pkg="ttf-meslo-nerd";               family="MesloLGL Nerd Font";         label="Meslo LG Mono" ;;
+  firacode)  pkg="ttf-firacode-nerd";            family="FiraCode Nerd Font";         label="Fira Code" ;;
+  victor)    pkg="ttf-victor-mono-nerd";         family="VictorMono Nerd Font";       label="Victor Mono" ;;
+  bitstream) pkg="ttf-bitstream-vera-mono-nerd"; family="BitstromWera Nerd Font";     label="Bitstream Vera" ;;
+  iosevka)   pkg="ttf-iosevka-nerd";             family="Iosevka Nerd Font Mono";     label="Iosevka" ;;
+  "")
+    cat >&2 <<'EOF'
+Usage: nirimaki font install <key>
+
+Keys:
+  cascadia    Cascadia Mono   (ttf-cascadia-mono-nerd)
+  meslo       Meslo LG Mono   (ttf-meslo-nerd)
+  firacode    Fira Code       (ttf-firacode-nerd)
+  victor      Victor Mono     (ttf-victor-mono-nerd)
+  bitstream   Bitstream Vera  (ttf-bitstream-vera-mono-nerd)
+  iosevka     Iosevka         (ttf-iosevka-nerd)
+EOF
+    exit 1 ;;
+  *)
+    echo "Unknown font key: '$key'" >&2
+    echo "Run 'nirimaki font install' for the list." >&2
+    exit 1 ;;
+esac
+
+nirimaki_banner "$label" "Install"
+
+if fc-list | grep -iqF "$family"; then
+  echo "$family is already installed — switching the default font only."
+else
+  nirimaki_sudo_prime
+  if command -v paru >/dev/null 2>&1; then
+    paru -S --needed --noconfirm "$pkg"
+  else
+    sudo pacman -S --needed --noconfirm "$pkg"
+  fi
+  fc-cache -f >/dev/null
+fi
+
+echo
+"$HOME/.local/bin/nirimaki-font-set" "$family"
+
+# Regenerate the Style→Font menu fragment so the new font shows up
+# under Settings → Style → Font without a restart.
+"$HOME/.local/bin/nirimaki-font-menu-refresh"
+echo
+
+nirimaki_pause

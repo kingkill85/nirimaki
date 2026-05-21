@@ -1,0 +1,77 @@
+#!/bin/bash
+# nirimaki:group=edit
+# nirimaki:summary=Internal — resolves $EDITOR and opens <target>'s file
+# nirimaki:args=<target>
+# nirimaki:hidden=true
+#
+# Target → file map:
+#   monitors / bindings / input / windows / autostart / niri
+#                                          → ~/.config/niri/<target>.kdl (niri = config.kdl)
+#   foot                                   → ~/.config/foot/foot.ini
+#   tmux                                   → ~/.config/tmux/tmux.conf
+#   fish                                   → ~/.config/fish/config.fish
+#
+# Editor resolution order:
+#   1. $EDITOR (if set + on PATH)
+#   2. ~/.config/nirimaki/editor (written by nirimaki-editor-default)
+#   3. nvim (last-resort fallback)
+#
+# TUI editors (nvim/vim/nano/micro/hx/helix) launch in a floating foot
+# window — `tui-edit` matches the `tui-*` rule in
+# default/niri/windows.kdl (open-floating 1000×640). GUI editors get
+# spawned detached.
+
+set -e
+
+target="${1:-}"
+case "$target" in
+  monitors|bindings|input|windows|autostart)
+    file="$HOME/.config/niri/${target}.kdl" ;;
+  niri)
+    file="$HOME/.config/niri/config.kdl" ;;
+  foot)
+    file="$HOME/.config/foot/foot.ini" ;;
+  tmux)
+    file="$HOME/.config/tmux/tmux.conf" ;;
+  fish)
+    file="$HOME/.config/fish/config.fish" ;;
+  "")
+    cat >&2 <<'EOF'
+Usage: nirimaki edit <target>
+
+Targets:
+  niri        ~/.config/niri/config.kdl       (entry-point, rarely edited)
+  monitors    ~/.config/niri/monitors.kdl
+  bindings    ~/.config/niri/bindings.kdl
+  input       ~/.config/niri/input.kdl
+  windows     ~/.config/niri/windows.kdl
+  autostart   ~/.config/niri/autostart.kdl
+  foot        ~/.config/foot/foot.ini
+  tmux        ~/.config/tmux/tmux.conf
+  fish        ~/.config/fish/config.fish
+EOF
+    exit 1 ;;
+  *)
+    echo "nirimaki edit: unknown target '$target'" >&2
+    echo "  Run 'nirimaki edit' with no args to list targets." >&2
+    exit 1 ;;
+esac
+
+# When launched from Quickshell, the parent process inherits niri's
+# minimal env (no fish conf.d sourced, $EDITOR likely unset). Read
+# the cross-shell state file as a fallback — same file default/bash/rc
+# sources.
+editor="${EDITOR:-}"
+if [[ -z $editor || ! -x "$(command -v "$editor" 2>/dev/null)" ]]; then
+  if [[ -f $HOME/.config/nirimaki/editor && -s $HOME/.config/nirimaki/editor ]]; then
+    editor=$(head -n1 "$HOME/.config/nirimaki/editor")
+  fi
+fi
+[[ -z $editor ]] && editor=nvim
+
+case "$editor" in
+  nvim|vim|nano|micro|hx|helix)
+    exec foot --app-id=tui-edit "$editor" "$file" ;;
+  *)
+    exec setsid "$editor" "$file" </dev/null >/dev/null 2>&1 ;;
+esac

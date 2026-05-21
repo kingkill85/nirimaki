@@ -1,52 +1,88 @@
-# Install steps — source of truth for a future `install.sh`
+# Install steps — canonical spec for `install.sh`
 
-A blow-by-blow record of what gets installed on a fresh Arch box to
-reach the current Nirimaki state, ordered so a script can replay it.
-The previous phases (A–G) describe individual feature work; this doc
-is the **integration layer** for a future `install.sh`.
+This is the **integration layer** between the per-phase work and a
+future `install.sh` that takes a blank Arch box to a working
+Nirimaki desktop. Phase docs (A–K) record what shipped + why per
+feature; this doc records the global recipe.
 
-This file should be updated whenever a phase adds a new package, a
-new external tool, or a new manual step the installer needs to
-replay.
+When a phase changes the package list, the seed contract, or a manual
+step, update **this file** as well as the phase doc.
+
+---
 
 ## 0. Assumptions about the target host
 
 - Arch Linux, base + base-devel + git already present.
-- Wayland-capable: niri 26.04+ (`extra/`).
-- An AUR helper available (`paru` is what we use here; `yay` works
-  too).
-- User account exists; commands run as that user with `sudo` for
-  pacman / chsh / `/etc/shells` edits.
+- Wayland-capable hardware.
+- niri 26.04+ available in `extra/` (required for the `~` include
+  expansion this layout uses).
+- `paru` (or another AUR helper) installed for AUR packages.
+- A user account exists; install.sh runs as that user and prompts
+  once for `sudo` (PAM auth).
 - The Nirimaki repo is cloned somewhere stable (typical:
-  `~/Projekte/kingkill85/nirimaki`).
+  `~/Projekte/kingkill85/nirimaki`) **OR** `install.sh` clones it
+  to `~/.local/share/nirimaki/`.
 
-## 1. Packages
+---
 
-Two pacman calls + one AUR call cover the whole stack.
+## 1. Repo location
 
-### 1a. Compositor + shell + GUI baseline
+End-user install layout (post-install.sh):
 
-```bash
-sudo pacman -S \
-  niri quickshell \
-  swaybg swayidle \
-  kitty \
-  wiremix bluetui impala \
-  ddcutil wf-recorder cliphist \
-  pavucontrol blueman-manager \
-  qt5ct qt6ct gnome-themes-extra \
-  yaru-icon-theme \
-  fontconfig ttf-jetbrains-mono-nerd \
-  plymouth
+```
+~/.local/share/nirimaki/        ← the clone
+  default/                       ← repo-owned, upgrade-tracked
+    niri/{input,looknfeel,autostart,windows,bindings}.kdl
+    bash/rc
+  bin/                           ← all nirimaki-* helpers
+  config/                        ← user-side seed templates
+  install/                       ← THIS spec's helpers
+  …
 ```
 
-(Some of these are already covered by phases A–G; listed here for
-the install.sh which has to handle a blank machine.)
+`install.sh` either clones the repo there itself or asks the user to
+clone it there before running.
 
-### 1b. Terminal toolkit (Phase H)
+---
+
+## 2. Packages
+
+### 2a. `install/base.packages` (pacman, from `extra`/`core`/`multilib`)
+
+Source of truth: `install/base.packages` in the repo. The list is
+kept short — only items the user always gets without a menu. Run:
 
 ```bash
-sudo pacman -S \
+sudo pacman -S --needed --noconfirm $(grep -v '^[[:space:]]*\(#\|$\)' install/base.packages)
+```
+
+As of phase L (this consolidation):
+
+- `mise` — version manager for the Install → Development menu's
+  dev envs (ruby/node/go/python/dotnet/…)
+- `opencode` — Anthropic-style AI coding assistant (one of the
+  always-on standard tools)
+
+### 2b. Compositor + shell + GUI baseline (pacman)
+
+```bash
+sudo pacman -S --needed \
+  niri quickshell \
+  swaybg swayidle \
+  foot \
+  wiremix bluetui impala \
+  ddcutil wf-recorder cliphist wl-clipboard \
+  pavucontrol blueman-manager \
+  qt5ct qt6ct gnome-themes-extra yaru-icon-theme \
+  fontconfig ttf-jetbrains-mono-nerd \
+  plymouth \
+  wtype
+```
+
+### 2c. Terminal toolkit (Phase H)
+
+```bash
+sudo pacman -S --needed \
   fish starship \
   eza bat fzf zoxide ripgrep fd git-delta \
   lazygit tealdeer sd ouch dust duf procs xh hyperfine tokei \
@@ -56,77 +92,133 @@ sudo pacman -S \
   jq
 ```
 
-### 1c. AUR
+### 2d. AUR (paru)
 
 ```bash
-paru -S pay-respects-bin    # pre-built binary; option 1 is a Rust source build that's slower
+paru -S --needed \
+  pay-respects-bin
 ```
 
-## 2. fish as login shell (Phase H1)
+### 2e. Standard tools NOT in pacman/AUR — `install/bootstrap-extras.sh`
 
 ```bash
-# Add fish to /etc/shells if it isn't there (Arch's fish package usually adds it,
-# but not always — be defensive).
-grep -qx /usr/bin/fish /etc/shells || echo /usr/bin/fish | sudo tee -a /etc/shells
+install/bootstrap-extras.sh
+```
 
-# Switch the user's interactive shell. bash stays as /bin/sh and script interpreter.
+Idempotent. Installs:
+
+- **claude-code** via Anthropic's official installer
+  (`curl -fsSL https://claude.ai/install.sh | bash`).
+- **pi** via the upstream installer at `https://pi.dev/install.sh`.
+
+Both land binaries under `~/.local/bin/` (or claude's installer
+default), no system-level state needed.
+
+### 2f. Browsers (Phase I)
+
+```bash
+sudo pacman -S --needed chromium firefox
+# Zen is AUR / external — left to the user.
+```
+
+After install:
+
+```bash
+# Chromium managed-policy dir — needed for live theme swap. Identical
+# to Omarchy install/config/theme.sh.
+sudo mkdir -p /etc/chromium/policies/managed
+sudo chmod a+rw /etc/chromium/policies/managed
+
+# Initial default browser — pick Zen if available, else Firefox.
+xdg-settings set default-web-browser zen-browser.desktop \
+  || xdg-settings set default-web-browser firefox.desktop
+```
+
+The chmod is the only privileged step at theme-swap runtime.
+`nirimaki-theme-set` never sudoes; if the dir isn't writable, it
+silently degrades to "no live chromium reload" (newly-spawned
+chromium instances still pick up theming on launch).
+
+---
+
+## 3. fish as the login shell (Phase H1)
+
+```bash
+grep -qx /usr/bin/fish /etc/shells || echo /usr/bin/fish | sudo tee -a /etc/shells
 chsh -s /usr/bin/fish
 ```
 
-User has to log out + back in after `chsh` (or open a fresh kitty
-once `shell /usr/bin/fish` is in `kitty.conf`, which the dev-link
-already provides).
+User has to log out + back in after `chsh`. bash stays as `/bin/sh`
+and the script interpreter.
 
-## 3. Link repo configs into ~/.config/
+---
+
+## 4. Config copy + symlink contract
+
+This is the heart of the install. Two flavours per surface:
+
+| Surface | Repo path | Live path | Strategy |
+|---|---|---|---|
+| niri defaults | `default/niri/` | `~/.local/share/nirimaki/default/niri/` | symlink (or already at that path if repo is cloned there) |
+| niri user files | `config/niri/*.kdl` | `~/.config/niri/*.kdl` | **copy if missing** — user-owned |
+| Quickshell | `config/quickshell/` | `~/.config/quickshell/` | dir-symlink (repo-owned) |
+| foot | `config/foot/foot.ini` | `~/.config/foot/foot.ini` | **copy if missing** — user-owned |
+| tmux | `config/tmux/tmux.conf` | `~/.config/tmux/tmux.conf` | **copy if missing** — user-owned |
+| fish init | `config/fish/conf.d/` | `~/.config/fish/conf.d/` | dir-symlink (repo-owned) |
+| fish config | `config/fish/config.fish` | `~/.config/fish/config.fish` | **copy if missing** — user-owned |
+| fish state | `config/fish/{completions,functions,themes,fish_plugins,fish_variables}` | matching `~/.config/fish/` | dir-symlink (managed by fisher) |
+| nvim | `config/nvim/` | `~/.config/nvim/` | dir-symlink (LazyVim manages lock file) |
+| theme templates | `config/theme/templates/` | `~/.config/theme/templates/` | dir-symlink (repo-owned) |
+| theme themes | `config/theme/themes/` | `~/.config/theme/themes/` | dir-symlink (repo-owned) |
+| bash defaults | `default/bash/rc` | `~/.local/share/nirimaki/default/bash/rc` | symlink (from #1 above) |
+| nirimaki samples | `config/nirimaki/<dir>/*.sample` | `~/.config/nirimaki/<dir>/*.sample` | per-file symlink — `.sample` files are tracked, user-added active files coexist |
+| Desktop launchers | `config/applications/*.desktop` | `~/.local/share/applications/*.desktop` | per-file symlink |
+| Helpers | `bin/nirimaki*` | `~/.local/bin/nirimaki-*` | per-file symlink |
+
+**Important: every "copy if missing" file is user-owned after the
+first install — never overwrite on upgrade.** This is why install.sh
+mirrors dev-link.sh's `seed_user_file` helper:
 
 ```bash
-cd /path/to/nirimaki
-./dev-link.sh
+seed_user_file() {
+  local src="$1" dest="$2"
+  if [[ -e $dest || -L $dest ]]; then return; fi
+  mkdir -p "$(dirname "$dest")"
+  cp "$src" "$dest"
+}
 ```
 
-Symlinks created:
-- `~/.config/niri/`            → `repo/config/niri/`
-- `~/.config/quickshell/`      → `repo/config/quickshell/`
-- `~/.config/fish/`            → `repo/config/fish/`
-- `~/.config/kitty/`           → `repo/config/kitty/`
-- `~/.config/tmux/`            → `repo/config/tmux/`
-- `~/.config/nvim/`            → `repo/config/nvim/`
-- `~/.config/theme/templates/` → `repo/config/theme/templates/`
-- `~/.config/theme/themes/`    → `repo/config/theme/themes/`
-- `~/.local/bin/nirimaki-<each>`     → `repo/bin/nirimaki-<each>`
+A simple way to do this in install.sh: just shell out to `dev-link.sh`
+itself. It already handles the whole contract and is idempotent.
 
-`install.sh` (deferred) will **copy** instead of symlink so a
-later `git pull` doesn't clobber user tweaks, and templatize the
-`/home/michael/` paths in `keybinds.kdl`.
+---
 
-## 4. ~/.bashrc additions
+## 5. `~/.bashrc`
 
-`~/.bashrc` is NOT symlinked (it's per-machine). Append the
-Nirimaki block manually or via install.sh:
+Same source-line pattern as fish's conf.d → config.fish: Nirimaki
+defaults load first via `default/bash/rc`, user's own `~/.bashrc`
+content sits below the source line and wins via evaluation order.
+
+`install.sh` prepends this block at the top of `~/.bashrc` (after
+any existing non-interactive guard) **only if it isn't there yet**:
 
 ```bash
-# --- Nirimaki ---------------------------------------------------------
-command -v starship >/dev/null 2>&1 && eval "$(starship init bash)"
-command -v zoxide   >/dev/null 2>&1 && eval "$(zoxide init bash --cmd cd)"
-
-if command -v fzf >/dev/null 2>&1; then
-    [[ -r /usr/share/fzf/key-bindings.bash ]] && . /usr/share/fzf/key-bindings.bash
-    [[ -r /usr/share/fzf/completion.bash    ]] && . /usr/share/fzf/completion.bash
-fi
-
-if command -v bat >/dev/null 2>&1; then
-    export PAGER=bat
-    export MANPAGER='sh -c "col -bx | bat -l man -p"'
-    export MANROFFOPT=-c
-    export BAT_THEME=nirimaki
-fi
-
-command -v pay-respects >/dev/null 2>&1 && eval "$(pay-respects bash --alias)"
+# Nirimaki — load shared bash defaults (starship, mise, $EDITOR).
+# This must stay near the top so anything below in your ~/.bashrc
+# runs AFTER and wins via bash's evaluation order.
+[[ -f $HOME/.local/share/nirimaki/default/bash/rc ]] && \
+  source "$HOME/.local/share/nirimaki/default/bash/rc"
 ```
 
-## 5. ~/.gitconfig delta block
+`default/bash/rc` handles: PATH (~/.local/bin), starship init, mise
+activate, `$EDITOR`/`$VISUAL` from `~/.config/nirimaki/editor`,
+`BAT_THEME=nirimaki`. All guarded so missing tools don't break boot.
 
-Same idea — per-machine, append the block:
+---
+
+## 6. `~/.gitconfig` delta block
+
+Per-machine; append (idempotently) if not present:
 
 ```ini
 [core]
@@ -142,11 +234,13 @@ Same idea — per-machine, append the block:
 	conflictstyle = zdiff3
 ```
 
-## 6. fisher + fish plugins
+---
 
-The fisher plugin list is committed at
-`config/fish/fish_plugins`. fisher reads that file as its source of
-truth, so:
+## 7. fisher + fish plugins
+
+`config/fish/fish_plugins` is fisher's source-of-truth file. After
+fisher bootstrap, a single `fisher update` reads it and pulls every
+listed plugin:
 
 ```bash
 fish -c '
@@ -156,97 +250,113 @@ fish -c '
 '
 ```
 
-The `fisher update` step is what reads the committed fish_plugins
-and pulls every listed plugin. As of Phase H5:
+Plugins as of Phase H5: fisher / fzf.fish / autopair.fish / done /
+sponge / puffer-fish. Repo's `config/fish/.gitignore` keeps the
+fetched plugin files out of git while tracking our authored files
+via an explicit whitelist.
 
-```
-jorgebucaran/fisher
-patrickf1/fzf.fish
-jorgebucaran/autopair.fish
-franciscolourenco/done
-meaningful-ooo/sponge
-nickeb96/puffer-fish
-```
+---
 
-Plugin files land in `~/.config/fish/{functions,completions,conf.d}/`
-(actually in `repo/config/fish/...` via the symlink). The repo's
-`config/fish/.gitignore` keeps the fetched plugin files out of git
-while tracking our authored files explicitly.
+## 8. LazyVim bootstrap
 
-## 7. LazyVim bootstrap
-
-LazyVim/starter is vendored into `config/nvim/` already. The
-plugin install is a one-time headless step:
+LazyVim/starter is vendored at `config/nvim/`. One-time headless
+sync:
 
 ```bash
 nvim --headless "+Lazy! sync" +qa
 ```
 
-Installs ~50 plugins including every colorscheme plugin Nirimaki's
-themes reference. Subsequent installs reuse the same plugin set;
-`lazy-lock.json` is gitignored so each user gets the latest at
-install time.
+`lazy-lock.json` is gitignored so each user gets fresh plugins.
 
-## 8. tldr cache
+---
+
+## 9. tldr cache
 
 ```bash
 tldr --update
 ```
 
-One-time, ~2 MB download. Builds the offline page cache used by
-the `tldr` / `help` fish abbreviation.
+One-time ~2 MB download for the offline page cache.
 
-## 9. Initial theme apply
+---
 
-The Nirimaki theme system (Phase D + H9) runs from `nirimaki-theme-set`.
-A fresh install ships `last-horizon` as the bundled default —
-trigger one swap so all template outputs are rendered:
+## 10. Initial theme apply
 
 ```bash
-nirimaki-theme-set last-horizon       # or any theme from `nirimaki-theme-list`
+nirimaki theme set last-horizon
 ```
 
-That single call:
+One call renders every `.tpl` → its destination (kitty.conf-equiv,
+btop, starship.toml, lazygit, bat tmTheme, yazi, fish-colors,
+niri-theme.kdl, qt-colors.conf, foot palette, ...), builds the bat
+cache, sources fish-colors, IPCs Quickshell + niri + nvim sockets to
+hot-reload.
 
-- copies the theme files into `~/.config/theme/current/`
-- renders every `.tpl` in `config/theme/templates/` → its
-  destination (kitty.conf in current/, btop theme in
-  `~/.config/btop/themes/qs.theme`, starship.toml in
-  `~/.config/starship.toml`, lazygit config in
-  `~/.config/lazygit/config.yml`, bat tmTheme in
-  `~/.config/bat/themes/nirimaki.tmTheme`, yazi theme.toml in
-  `~/.config/yazi/theme.toml`, fish colors universal-var script
-  in `~/.config/theme/current/fish-colors.fish`, niri-theme.kdl,
-  qt-colors.conf, …)
-- runs `bat cache --build` so the new tmTheme is picked up
-- sources `fish-colors.fish` (sets `set -U` universals →
-  propagates to all running fish instances)
-- IPCs Quickshell, niri, and every running nvim socket to
-  hot-reload themes
+---
 
-## 10. Plymouth boot splash
+## 11. Plymouth boot splash (Phase D9)
 
 ```bash
-# Copy the qs-minimal theme into Plymouth's theme dir.
 sudo install -d /usr/share/plymouth/themes/qs-minimal
 sudo install -m 644 assets/plymouth/* /usr/share/plymouth/themes/qs-minimal/
 
-# Activate + bake into the UKI / initramfs.
 sudo plymouth-set-default-theme qs-minimal
 sudo mkinitcpio -P
 ```
 
 Requires `mkinitcpio.conf` HOOKS already include `plymouth` after
-`systemd` (set up in Phase D7).
+`systemd` (Phase D7 step).
 
-## 11. Quake terminal first-run prep (optional)
+---
 
-The quake terminal launches into a persistent `tmux new-session -A
--s quake`. Nothing to install ahead of time — `tmux` (step 1b)
-plus the `nirimaki-quake-toggle` script (symlinked via step 3) are
-enough. First `Mod+grave` press creates the session.
+## 12. qt5ct / qt6ct color_scheme_path (deferred templating)
 
-## 12. Verification checklist
+The one remaining hardcoded path in the install. `qt5ct.conf` /
+`qt6ct.conf` reference `~/.config/theme/current/qt-colors.conf` via
+their `color_scheme_path=` directive. **qt5ct/qt6ct don't expand
+`~` or env vars in INI values**, so install.sh has to write the
+target user's literal home:
+
+```bash
+mkdir -p "$HOME/.config/qt6ct" "$HOME/.config/qt5ct"
+
+for qtc in "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt5ct/qt5ct.conf"; do
+  cat > "$qtc" <<EOF
+[Appearance]
+custom_palette=true
+color_scheme_path=$HOME/.config/theme/current/qt-colors.conf
+icon_theme=Yaru-blue
+style=Fusion
+EOF
+done
+```
+
+`nirimaki-theme-set` later mutates only the `icon_theme=` line per
+swap; the `color_scheme_path=` line stays the literal absolute path
+written here.
+
+---
+
+## 13. Auto-start helpers (covered by `default/niri/autostart.kdl`)
+
+Already wired in the niri defaults — install.sh doesn't need to do
+anything extra. For reference, the autostart entries are:
+
+- `quickshell` (the bar/shell)
+- `$HOME/.local/bin/nirimaki-wallpaper-apply`
+- `$HOME/.local/bin/nirimaki-feature-state` — seeds the install/remove
+  menu's "is X installed?" cache at session start
+- `$HOME/.local/bin/nirimaki-font-menu-refresh` — seeds the Style →
+  Font menu fragment so it's populated at first open
+- `swayidle` (lock + display power-off)
+- `wl-paste --watch cliphist store` (clipboard history)
+
+If install.sh decides to ship its own autostart on top, append to
+`~/.config/niri/autostart.kdl` (user-owned, additive).
+
+---
+
+## 14. Verification checklist
 
 ```bash
 # Login shell
@@ -255,24 +365,43 @@ getent passwd $USER | cut -d: -f7              # /usr/bin/fish
 # Core CLI
 for c in fish starship eza bat fzf zoxide rg fd delta lazygit tldr \
          pay-respects sd ouch dust duf procs xh hyperfine tokei \
-         tmux yazi nvim jq; do
+         tmux yazi nvim jq mise opencode claude pi; do
   command -v $c >/dev/null && echo "ok $c" || echo "MISS $c"
 done
 
-# Fish loaded right
-fish -c 'echo abbrs=(abbr -l | count); echo functions=(functions | tr "," "\n" | grep -E "^(t|n|ff|eff|oc|cc|io|ic|ioc|bm|tdl)$" | count)'
+# niri loads cleanly
+niri validate -c ~/.config/niri/config.kdl
 
-# Themes propagate
-nirimaki-theme-set tokyo-night && nirimaki-theme-set last-horizon
+# Quickshell IPC alive
+quickshell ipc call -- settings-menu ping
+
+# Theme apply
+nirimaki theme set tokyo-night && nirimaki theme set last-horizon
+
+# Feature state populated
+cat ~/.cache/nirimaki/state.json | python3 -m json.tool | head
 ```
+
+---
+
+## What's deferred to a later install.sh pass
+
+- **SDDM theme + autologin** — Phase 2 of the user-overrides arc.
+  Theme-tracking via polkit rule, autologin pre-seed, login screen
+  consistency. Scoped, not built yet.
+- **gh login**, **1Password CLI provisioning**, anything that needs
+  network credentials — left to the user post-install.
+- **Per-machine state** never shipped: `~/.local/share/fish/bookmarks`,
+  `~/.config/quickshell/locale`, `~/.config/theme/current/theme.name`,
+  `~/.config/nirimaki/{editor,font}`, `~/.bashrc.local` if used,
+  user-installed webapps under `~/.cache/nirimaki-webapps/`.
+
+---
 
 ## What this doc does NOT cover
 
-- The PRIOR phases (A–G) have their own outcomes; install.sh
-  also has to replay those (Plymouth boot logo, Phase D theme
-  switcher infrastructure, Quickshell dialog set, etc.). When
-  install.sh is written, **collapse the A–G phase outcomes into a
-  single packaging script** rather than duplicating their docs.
-- Personal data: `~/.local/share/fish/bookmarks`, `~/.config/quickshell/locale`,
-  and the active theme name in `~/.config/theme/current/theme.name`
-  are per-user state, NOT shipped.
+- The PRIOR phases (A–K) have their own outcomes; install.sh has
+  to replay those (Plymouth boot logo, theme switcher infra, the
+  full Quickshell dialog set, etc.). When install.sh is written,
+  **collapse the A–K phase outcomes into a single packaging
+  script** rather than duplicating their docs.

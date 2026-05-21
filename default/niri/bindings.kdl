@@ -1,6 +1,18 @@
-// niri keybinds — single source of truth.
-// Included from ~/.config/niri/config.kdl via:
-//   include "/home/michael/.config/niri/keybinds.kdl"
+// Nirimaki — default keybinds.
+//
+// Lives at ~/.local/share/nirimaki/default/niri/bindings.kdl. Loaded
+// before ~/.config/niri/bindings.kdl. Override or extend by writing
+// your own `binds { ... }` block in the user file (cross-include
+// last-wins).
+//
+// niri has no native "unbind" primitive. To disable one of these
+// defaults, rebind the key to a no-op in ~/.config/niri/bindings.kdl:
+//
+//     binds {
+//         Mod+Q { spawn-sh "true"; }
+//     }
+//
+// The key is consumed but the action does nothing.
 //
 // Design rules:
 //   1. One bind per action. No aliases.
@@ -29,7 +41,7 @@ binds {
     // Omarchy convention: Mod+Return / Mod+Space / Mod+Shift+<letter>.
     Mod+Return       hotkey-overlay-title="Terminal: foot"         { spawn "foot"; }
     Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "launcher" "toggle"; }
-    Mod+Shift+B      hotkey-overlay-title="Browser"                { spawn "/home/michael/.local/bin/nirimaki-browser-launch"; }
+    Mod+Shift+B      hotkey-overlay-title="Browser"                { spawn-sh "$HOME/.local/bin/nirimaki-browser-launch"; }
     Mod+Shift+E      hotkey-overlay-title="File explorer: nautilus" { spawn "nautilus"; }
 
     // ===== Pickers =====
@@ -53,11 +65,11 @@ binds {
     // terminal can use Ctrl+Alt+L for fzf.fish git-log picker.
     // Super+Alt+L would alias to Mod+Alt+L which is monitor-focus-right
     // (HJKL family), hence Mod+Shift+L.
-    Mod+Shift+L hotkey-overlay-title="Lock the screen" { spawn "quickshell" "-p" "/home/michael/.config/quickshell/lock/shell.qml"; }
+    Mod+Shift+L hotkey-overlay-title="Lock the screen" { spawn-sh "quickshell -p $HOME/.config/quickshell/lock/shell.qml"; }
 
     // Quake-style drop-down terminal — Mod+grave (`). Single floating
     // foot instance; toggle spawns / closes.
-    Mod+grave hotkey-overlay-title="Toggle drop-down terminal" { spawn "/home/michael/.local/bin/nirimaki-quake-toggle"; }
+    Mod+grave hotkey-overlay-title="Toggle drop-down terminal" { spawn-sh "$HOME/.local/bin/nirimaki-quake-toggle"; }
     // Screen reader (orca). Allowed when locked.
     Super+Alt+S allow-when-locked=true hotkey-overlay-title="Toggle screen reader" { spawn-sh "pkill orca || exec orca"; }
     Mod+Shift+P hotkey-overlay-title="Power off monitors"                          { power-off-monitors; }
@@ -71,29 +83,30 @@ binds {
         spawn-sh "DIR=\"$(xdg-user-dir PICTURES)/Screenshots\"; mkdir -p \"$DIR\"; grim -g \"$(slurp -o -d)\" - | satty --filename - --output-filename \"$DIR/Screenshot_$(date '+%Y-%m-%d_%H-%M-%S').png\" --early-exit --copy-command wl-copy"
     }
     Mod+Alt+R allow-when-locked=false hotkey-overlay-title="Toggle screen recording" {
-        spawn "/home/michael/.local/bin/nirimaki-screenrecord";
+        spawn-sh "$HOME/.local/bin/nirimaki-screenrecord";
     }
 
     // ===== Universal clipboard (Omarchy parity) =====
-    // wtype injects Ctrl+Insert / Shift+Insert / Ctrl+X into the
-    // focused window. Every sane app (browsers, GTK, vim, …) treats
-    // those as Copy / Paste / Cut. foot needs the matching
-    // `clipboard-copy=...Control+Insert` /
-    // `clipboard-paste=...Shift+Insert` binds in foot.ini so its
-    // default `primary-paste-selection` on Shift+Insert doesn't
-    // intercept the injected keys.
-    Mod+C hotkey-overlay-title="Copy (universal)"  { spawn "wtype" "-M" "ctrl"  "-P" "Insert" "-p" "Insert" "-m" "ctrl"; }
-    Mod+V hotkey-overlay-title="Paste (universal)" { spawn "wtype" "-M" "shift" "-P" "Insert" "-p" "Insert" "-m" "shift"; }
-    Mod+X hotkey-overlay-title="Cut (universal)"   { spawn "wtype" "-M" "ctrl"  "-P" "x"      "-p" "x"      "-m" "ctrl"; }
+    // nirimaki-clipboard-inject checks the focused window's app-id
+    // and routes to the right key combo:
+    //   terminals (foot, kitty, alacritty, tui-*) → Ctrl+Insert /
+    //     Shift+Insert / Ctrl+X — same as foot.ini's clipboard-copy /
+    //     clipboard-paste binds, avoids the Ctrl+C → SIGINT conflict
+    //   everything else → plain Ctrl+C / Ctrl+V / Ctrl+X — works in
+    //     Wayland Firefox/Zen which silently drops Ctrl+Insert.
+    Mod+C hotkey-overlay-title="Copy (universal)"  { spawn-sh "$HOME/.local/bin/nirimaki-clipboard-inject copy"; }
+    Mod+V hotkey-overlay-title="Paste (universal)" { spawn-sh "$HOME/.local/bin/nirimaki-clipboard-inject paste"; }
+    Mod+X hotkey-overlay-title="Cut (universal)"   { spawn-sh "$HOME/.local/bin/nirimaki-clipboard-inject cut"; }
 
     // ===== Volume / mute (XF86Audio*) =====
     // Wrappers in ~/.local/bin adjust the default sink/source via
-    // wpctl and pop the Quickshell OSD. Absolute paths — niri's
-    // PATH doesn't include ~/.local/bin.
-    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume up"   { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "raise"; }
-    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "lower"; }
-    XF86AudioMute        allow-when-locked=true hotkey-overlay-title="Mute output" { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "mute-toggle"; }
-    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="Mute mic"    { spawn "/home/michael/.local/bin/nirimaki-audio-input-mute"; }
+    // wpctl and pop the Quickshell OSD. Routed through spawn-sh so
+    // $HOME resolves at runtime — niri's PATH doesn't include
+    // ~/.local/bin, hence the absolute prefix.
+    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume up"   { spawn-sh "$HOME/.local/bin/nirimaki-audio-output-volume raise"; }
+    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume down" { spawn-sh "$HOME/.local/bin/nirimaki-audio-output-volume lower"; }
+    XF86AudioMute        allow-when-locked=true hotkey-overlay-title="Mute output" { spawn-sh "$HOME/.local/bin/nirimaki-audio-output-volume mute-toggle"; }
+    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="Mute mic"    { spawn-sh "$HOME/.local/bin/nirimaki-audio-input-mute"; }
 
     // ===== Media playback (MPRIS via playerctl) =====
     XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Play / pause" { spawn-sh "playerctl play-pause"; }
@@ -104,8 +117,8 @@ binds {
     // ===== External-monitor brightness (DDC/CI via ddcutil) =====
     // brightnessctl --class=backlight is a no-op here (no laptop
     // panel); nirimaki-brightness-display drives every external monitor.
-    XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="Brightness up"   { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "raise"; }
-    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness down" { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "lower"; }
+    XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="Brightness up"   { spawn-sh "$HOME/.local/bin/nirimaki-brightness-display raise"; }
+    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness down" { spawn-sh "$HOME/.local/bin/nirimaki-brightness-display lower"; }
 
     // ===== Overview + close =====
     Mod+O repeat=false { toggle-overview; }

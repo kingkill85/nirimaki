@@ -1,0 +1,28 @@
+// Your keybindings. Defaults loaded from
+// ~/.local/share/nirimaki/default/niri/bindings.kdl — this file
+// extends or overrides them via last-wins (cross-include).
+//
+// To ADD a bind, drop it inside the binds block below.
+// To OVERRIDE one of our defaults, redeclare the same key here.
+// To "UNBIND" one of our defaults (niri has no native unbind):
+//
+//     binds {
+//         Mod+Q { spawn-sh "true"; }
+//     }
+//
+// The key is consumed but the action does nothing.
+//
+// Examples:
+//
+//     binds {
+//         // Add: launch your editor on Mod+Shift+E (overrides the
+//         // default "File explorer: nautilus" mapping).
+//         Mod+Shift+E hotkey-overlay-title="Editor" { spawn-sh "$EDITOR"; }
+//
+//         // Unbind: make Mod+Q a no-op (default closes the window).
+//         Mod+Q { spawn-sh "true"; }
+//     }
+
+binds {
+    // Add your binds here.
+}

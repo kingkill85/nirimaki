@@ -1,0 +1,8 @@
+// Your autostart additions. spawn-at-startup is ADDITIVE — your
+// entries run alongside the Nirimaki defaults (Quickshell, wallpaper,
+// feature-state, swayidle, cliphist), not instead of them.
+//
+// Example:
+//
+//     spawn-at-startup "nm-applet"
+//     spawn-sh-at-startup "$HOME/.local/bin/my-startup-script.sh"

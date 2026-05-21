@@ -23,15 +23,49 @@ back into this repo**, so editing in the repo == editing the live
 session:
 
 ```
-~/.config/niri/                  -> config/niri/
+~/.local/share/nirimaki/default/ -> default/                  (upgrade-tracked
+                                                              niri defaults)
+~/.config/niri/                  COPIED from config/niri/    (USER-OWNED;
+                                                              seeded once, never
+                                                              overwritten)
+~/.config/foot/foot.ini          COPIED from config/foot/foot.ini (user-owned;
+                                                              theme tracks via
+                                                              internal include=)
+~/.config/tmux/tmux.conf         COPIED from config/tmux/tmux.conf (user-owned)
 ~/.config/quickshell/            -> config/quickshell/
+~/.config/fish/config.fish       COPIED from config/fish/config.fish (user-owned)
+~/.config/fish/{conf.d,functions,…} -> config/fish/{…}
 ~/.config/theme/templates/       -> config/theme/templates/
 ~/.config/theme/themes/          -> config/theme/themes/
-~/.local/bin/nirimaki-<each>           -> bin/nirimaki-<each>     (one symlink per helper)
+~/.local/bin/nirimaki-<each>     -> bin/nirimaki-<each>      (one symlink per helper)
 ```
 
 So when you edit `config/quickshell/Bar.qml` in this repo, you're
-also editing `~/.config/quickshell/Bar.qml`.
+also editing `~/.config/quickshell/Bar.qml`. **But:** the niri files
+under `~/.config/niri/*.kdl` are COPIES of the seed files in
+`config/niri/`, not symlinks — they're user state once seeded, so
+edits there do NOT write back to the repo. Edit `default/niri/*.kdl`
+instead to change the upgrade-tracked defaults.
+
+### The niri layout — defaults vs user files
+
+Two camps, Omarchy-style:
+
+- **`default/niri/*.kdl`** in this repo → reachable at
+  `~/.local/share/nirimaki/default/niri/` via a dir-symlink. Upgrade-
+  tracked, owned by Nirimaki. Five files: `input.kdl`, `looknfeel.kdl`,
+  `autostart.kdl`, `windows.kdl`, `bindings.kdl`.
+- **`~/.config/niri/*.kdl`** → real files seeded from `config/niri/`
+  once, never overwritten. Six files: `config.kdl` (the entry-point
+  that `include`s the defaults + the rest of these), `monitors.kdl`,
+  `input.kdl`, `windows.kdl`, `bindings.kdl`, `autostart.kdl`. The
+  entry-point loads defaults first, then user files — niri does
+  last-wins for keyed nodes (output, environment, individual binds)
+  so user files override defaults.
+
+niri has **no native unbind**. To disable one of the default binds,
+drop the key into `~/.config/niri/bindings.kdl` rebound to
+`spawn-sh "true"` — the key is consumed but does nothing.
 
 ### Reloading after edits
 
@@ -52,7 +86,13 @@ also editing `~/.config/quickshell/Bar.qml`.
 ## Repo layout
 
 ```
-config/niri/        config.kdl + keybinds.kdl
+default/niri/       Upgrade-tracked niri defaults (input, looknfeel,
+                    autostart, windows, bindings). Symlinked into
+                    ~/.local/share/nirimaki/default/niri/ by dev-link.sh.
+config/niri/        User-side seeds — copied (not symlinked) to
+                    ~/.config/niri/ on first run. config.kdl is the
+                    entry-point; monitors.kdl + the four override files
+                    ship as comment-only stubs.
 config/quickshell/  Bar.qml, DialogShell.qml, the 9 dialogs,
                     services (NiriService, NotificationService,
                     UpdatesService, PopupBus, I18n), Theme.qml,
@@ -81,10 +121,18 @@ it. The repo only owns `templates/` and `themes/` (the sources).
 ## Gotchas worth knowing
 
 1. **niri's PATH excludes `~/.local/bin/`.** Plain `spawn "..."` calls
-   in `keybinds.kdl` need absolute paths to the `nirimaki-*` helpers.
-   `spawn-sh "..."` goes through a shell so `$HOME` expands there.
-   The plain-spawn paths in `keybinds.kdl` still hard-code
-   `/home/michael/` — `install.sh` will need to template these.
+   in `default/niri/bindings.kdl` can't find the `nirimaki-*` helpers
+   by bare name. Use `spawn-sh "$HOME/.local/bin/nirimaki-foo"` — the
+   shell expands `$HOME` per-user at runtime, so no install-time
+   templating is needed. (Same trick for the included lock-screen path:
+   `spawn-sh "quickshell -p $HOME/.config/quickshell/lock/shell.qml"`.)
+
+   Niri **has no native unbind** ([wiki](https://github.com/niri-wm/niri/wiki/Configuration:-Key-Bindings) —
+   niri loads no defaults of its own, so "unbinding" only ever means
+   removing one of our shipped binds). The user-file workaround:
+   rebind the key to `spawn-sh "true"` — key is consumed, action no-ops.
+   `hotkey-overlay-title=null` is also legal and hides a bind from the
+   Mod+Shift+/ overlay, but does NOT disable it.
 
 2. **Quickshell platform menus** (`QsMenuAnchor`, SNI tray menus)
    need `//@ pragma UseQApplication` at the top of `shell.qml`.
@@ -149,31 +197,52 @@ still invoke the bare scripts.
 
 ## User customisation surface (Omarchy parity)
 
-Users extend Nirimaki by dropping files into `~/.config/nirimaki/`,
-NEVER by editing files in the repo (which would break the upgrade
-path). Four well-defined surfaces — anything outside these is
-implementation, not user config:
+Users extend Nirimaki by editing the user-side files listed below,
+NEVER by editing files under `default/` or other repo-owned paths
+(which would break the upgrade path).
 
-| Want to…                               | Drop a file at                                       |
-|----------------------------------------|------------------------------------------------------|
-| React to theme change                  | `~/.config/nirimaki/hooks/theme-set.d/<name>` (+x)   |
-| React to webapp install/remove         | `~/.config/nirimaki/hooks/{webapp-installed,webapp-removed}.d/<name>` (+x) |
-| Add/override a SettingsMenu entry      | `~/.config/nirimaki/extensions/menu.json`            |
-| Override how an app gets themed        | `~/.config/nirimaki/themed/<base>.tpl`               |
+| Want to…                                 | Edit                                                    |
+|------------------------------------------|---------------------------------------------------------|
+| Configure monitors                       | `~/.config/niri/monitors.kdl`                           |
+| Add / override / "unbind" niri keybinds  | `~/.config/niri/bindings.kdl`                           |
+| Override niri input (keyboard layout…)   | `~/.config/niri/input.kdl`                              |
+| Add niri window-rules                    | `~/.config/niri/windows.kdl`                            |
+| Add niri spawn-at-startup                | `~/.config/niri/autostart.kdl`                          |
+| Customise foot (font, keybinds, padding) | `~/.config/foot/foot.ini`                               |
+| Customise tmux                           | `~/.config/tmux/tmux.conf`                              |
+| Customise fish (path, abbrs, prompt…)    | `~/.config/fish/config.fish`                            |
+| React to theme change                    | `~/.config/nirimaki/hooks/theme-set.d/<name>` (+x)      |
+| React to webapp install/remove           | `~/.config/nirimaki/hooks/{webapp-installed,webapp-removed}.d/<name>` (+x) |
+| Add / override a SettingsMenu entry      | `~/.config/nirimaki/extensions/menu.json`               |
+| Override how an app gets themed          | `~/.config/nirimaki/themed/<base>.tpl`                  |
 
-Samples shipped at `config/nirimaki/<dir>/*.sample`. Symlinked by
-`dev-link.sh` and copied by `install.sh`. See `docs/phase-j-platform.md`
-for the schema details.
+The niri + foot + tmux + fish user files are SEEDED ONCE by
+`dev-link.sh` / `install.sh` (copy, not symlink), so edits survive
+`git pull` or `nirimaki upgrade`. Quickshell + nvim + themes are
+repo-owned — symlinked in dev, copied (and overwritten) on upgrade
+by install.sh. foot + tmux specifically follow Omarchy's whole-file
+user-owned model (no defaults-vs-user layering — what we ship is the
+starting point and the user owns it from there); only foot's
+runtime theme palette stays upgrade-tracked via the
+`include=~/.config/theme/current/foot.ini` directive at the top of
+the user's foot.ini.
+
+`~/.config/nirimaki/*` samples shipped at `config/nirimaki/<dir>/*.sample`.
+See `docs/phase-j-platform.md` for the schema details.
 
 ## What's deferred
 
-- **`install.sh` + `packages.txt`**: blank-Arch → Nirimaki. Has to
-  template the `/home/michael/` paths in `keybinds.kdl` to the
-  target user's `$HOME` at install time. Copy (not symlink) so a
-  later `git pull` doesn't clobber a user's tweaks. Per-phase
-  install requirements are documented at the bottom of each phase
-  doc — see `docs/phase-i-webapps.md` for chromium policy-dir
-  chmod and the `xdg-settings` initial default-browser step, and
+- **`install.sh` + `packages.txt`**: blank-Arch → Nirimaki. Copy
+  (not symlink) so a later `git pull` doesn't clobber a user's
+  tweaks. Live code is now portable across users — `keybinds.kdl`
+  uses `spawn-sh "$HOME/..."` and QML uses
+  `Quickshell.env("HOME") + …`, so no per-user path templating is
+  needed. The one exception is qt5ct/qt6ct (`color_scheme_path=`),
+  which doesn't expand env vars — install.sh has to write that
+  line with the target user's literal home. Per-phase install
+  requirements are documented at the bottom of each phase doc —
+  see `docs/phase-i-webapps.md` for chromium policy-dir chmod and
+  the `xdg-settings` initial default-browser step, and
   `docs/phase-j-platform.md` for the `~/.config/nirimaki/`
   sample-copy step.
 

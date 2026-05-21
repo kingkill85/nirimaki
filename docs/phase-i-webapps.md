@@ -160,7 +160,7 @@ and the chrome's `BrowserThemeColor` stripe. Matches Omarchy's
 ### config/niri/keybinds.kdl
 
 `Mod+Shift+B` switched from hardcoded `spawn "zen-browser"` to
-`spawn "/home/michael/.local/bin/nirimaki-browser-launch"` — follows the
+`spawn-sh "$HOME/.local/bin/nirimaki-browser-launch"` — follows the
 default-browser setting.
 
 ### dev-link.sh
@@ -225,10 +225,9 @@ Per-user state initialized on first launch:
   it maps to both X11 `WM_CLASS` and Wayland app-id. Verified that
   `niri msg windows --json` reports `app_id: "nirimaki-webapp-<slug>"`
   after spawn (so the window-rule matches).
-- **Mod+Shift+B path** is hardcoded `/home/michael/...`, same as
-  the other `~/.local/bin/nirimaki-*` references in keybinds.kdl. The
-  TODO from Phase A is unchanged: install.sh must template this
-  for the target user's `$HOME`.
+- **Mod+Shift+B path** uses `spawn-sh "$HOME/.local/bin/nirimaki-browser-launch"`,
+  matching the rest of `keybinds.kdl` — no install.sh templating
+  required; the shell expands `$HOME` per-user at runtime.
 
 ## Sources
 

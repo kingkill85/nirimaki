@@ -1,0 +1,63 @@
+#!/bin/bash
+# nirimaki:summary=Pull the latest Nirimaki + refresh system / AUR packages
+# nirimaki:requires-sudo=true
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Nirimaki" "Update"
+
+# Resolve the Nirimaki git checkout.
+#   - End-user install: ~/.local/share/nirimaki/ is the clone (.git inside).
+#   - Dev install: ~/.local/share/nirimaki/default → repo/default (symlink),
+#                  so the git root is two levels up from the resolved path.
+#   - Explicit override: $NIRIMAKI_REPO (matches the prelude's convention).
+repo="${NIRIMAKI_REPO:-}"
+if [[ -z $repo ]]; then
+  share="$HOME/.local/share/nirimaki"
+  if [[ -d $share/.git ]]; then
+    repo="$share"
+  elif [[ -L $share/default ]]; then
+    resolved=$(readlink -f "$share/default")
+    repo=$(git -C "$resolved" rev-parse --show-toplevel 2>/dev/null || true)
+  fi
+fi
+
+if [[ -z $repo || ! -d $repo/.git ]]; then
+  echo "Couldn't find the Nirimaki git checkout."
+  echo "Set NIRIMAKI_REPO to the repo path and re-run."
+  nirimaki_pause
+  exit 1
+fi
+
+echo "Repo: $repo"
+echo
+
+echo "=> git pull --autostash"
+git -C "$repo" pull --autostash
+echo
+
+# System + AUR refresh. Prefer paru, fall back to pacman.
+nirimaki_sudo_prime
+if command -v paru >/dev/null 2>&1; then
+  echo "=> paru -Syu (system + AUR)"
+  paru -Syu --noconfirm
+else
+  echo "=> pacman -Syu (system only — paru not installed)"
+  sudo pacman -Syu --noconfirm
+fi
+echo
+
+# Refresh feature-state cache so the SettingsMenu's install/remove
+# filter picks up anything that changed.
+if [[ -x $HOME/.local/bin/nirimaki-feature-state ]]; then
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null
+fi
+
+# Reload niri config in case default/niri/*.kdl changed.
+if command -v niri >/dev/null 2>&1; then
+  niri msg action load-config-file 2>/dev/null || true
+fi
+
+echo "Done."
+nirimaki_pause

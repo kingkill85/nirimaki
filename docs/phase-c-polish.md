@@ -79,10 +79,10 @@ This is documented in `nirimaki-osd` so future-me doesn't repeat the diagnosis.
 **Niri keybind changes** in `~/.config/niri/config.kdl`:
 
 ```kdl
-XF86AudioRaiseVolume allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "raise"; }
-XF86AudioLowerVolume allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "lower"; }
-XF86AudioMute        allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "mute-toggle"; }
-XF86AudioMicMute     allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-input-mute"; }
+XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "$HOME/.local/bin/nirimaki-audio-output-volume raise"; }
+XF86AudioLowerVolume allow-when-locked=true { spawn-sh "$HOME/.local/bin/nirimaki-audio-output-volume lower"; }
+XF86AudioMute        allow-when-locked=true { spawn-sh "$HOME/.local/bin/nirimaki-audio-output-volume mute-toggle"; }
+XF86AudioMicMute     allow-when-locked=true { spawn-sh "$HOME/.local/bin/nirimaki-audio-input-mute"; }
 ```
 
 (Replaces the default direct `wpctl` invocations — they bypassed the OSD.)
@@ -568,7 +568,7 @@ Registered in `qmldir`, slotted into the bar between `Media` and
 
 ```kdl
 Mod+Alt+R allow-when-locked=false hotkey-overlay-title="Toggle screen recording (wf-recorder)" {
-    spawn "/home/michael/.local/bin/nirimaki-screenrecord";
+    spawn-sh "$HOME/.local/bin/nirimaki-screenrecord";
 }
 ```
 
@@ -818,8 +818,8 @@ nirimaki-audio-output-volume / nirimaki-osd workflow:
 **Niri keybinds** in `~/.config/niri/config.kdl`:
 
 ```kdl
-XF86MonBrightnessUp   allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "raise"; }
-XF86MonBrightnessDown allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "lower"; }
+XF86MonBrightnessUp   allow-when-locked=true { spawn-sh "$HOME/.local/bin/nirimaki-brightness-display raise"; }
+XF86MonBrightnessDown allow-when-locked=true { spawn-sh "$HOME/.local/bin/nirimaki-brightness-display lower"; }
 ```
 
 (Replaces the niri-default `brightnessctl --class=backlight` lines that

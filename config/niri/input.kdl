@@ -1,0 +1,23 @@
+// Your input overrides. Defaults loaded from
+// ~/.local/share/nirimaki/default/niri/input.kdl — re-declare the
+// `input { … }` block here to replace it (input is keyed, not
+// additive, so a partial override needs a full block).
+//
+// Wiki: https://niri-wm.github.io/niri/Configuration:-Input
+//
+// Example (German keyboard, caps as ctrl, disabled focus-follows-mouse):
+//
+//     input {
+//         keyboard {
+//             xkb {
+//                 layout "de"
+//                 options "ctrl:nocaps"
+//             }
+//             numlock
+//         }
+//         touchpad {
+//             tap
+//             natural-scroll
+//         }
+//         // focus-follows-mouse off (remove to disable)
+//     }

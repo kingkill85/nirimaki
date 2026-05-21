@@ -28,6 +28,13 @@ CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/nirimaki"
 OUT="$CACHE_DIR/state.json"
 mkdir -p "$CACHE_DIR"
 
+# mise shims (~/.local/share/mise/shims) hold the binaries for every
+# language installed via `mise use -g`. Niri spawns this script with a
+# minimal PATH (no fish conf.d sourced), so prepend the shim dir so
+# `command -v dotnet/ruby/go/…` can find them.
+MISE_SHIMS="${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims"
+[[ -d $MISE_SHIMS ]] && PATH="$MISE_SHIMS:$PATH"
+
 has_bin()    { command -v "$1" >/dev/null 2>&1; }
 has_pkg()    { pacman -Qi "$1" >/dev/null 2>&1; }
 has_helix()  { has_bin hx || has_bin helix; }
@@ -45,6 +52,27 @@ yn()   { if "$@"; then echo true; else echo false; fi; }
   emit steam      "$(yn has_pkg steam)"
   emit zed        "$(yn has_bin zed)"
   emit nvim       "$(yn has_bin nvim)"
+  emit docker     "$(yn has_bin docker)"
+  # Dev environments — track via the primary binary on PATH. mise-
+  # installed tools also land on PATH via mise shims.
+  emit dev_ruby    "$(yn has_bin ruby)"
+  emit dev_node    "$(yn has_bin node)"
+  emit dev_bun     "$(yn has_bin bun)"
+  emit dev_deno    "$(yn has_bin deno)"
+  emit dev_go      "$(yn has_bin go)"
+  emit dev_php     "$(yn has_bin php)"
+  emit dev_laravel "$(yn has_bin laravel)"
+  emit dev_symfony "$(yn has_bin symfony)"
+  emit dev_python  "$(yn has_bin python)"
+  emit dev_elixir  "$(yn has_bin elixir)"
+  emit dev_phoenix "$(yn has_bin mix)"
+  emit dev_rust    "$(yn has_bin rustc)"
+  emit dev_java    "$(yn has_bin java)"
+  emit dev_zig     "$(yn has_bin zig)"
+  emit dev_ocaml   "$(yn has_bin ocaml)"
+  emit dev_dotnet  "$(yn has_bin dotnet)"
+  emit dev_clojure "$(yn has_bin clojure)"
+  emit dev_scala   "$(yn has_bin scala)"
   # Generated. Refreshed on every install/remove + at session start.
   # Last record has no trailing comma (printf below replaces the last
   # `,\n` with `\n`).

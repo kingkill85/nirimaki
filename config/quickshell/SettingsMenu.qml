@@ -114,10 +114,16 @@ Item {
     }
 
     property var _defaultTree: ({})
+    property var _generatedTree: ({})
     property var _userTree: ({})
 
+    // Merge order: defaults (repo) ← generated (cache, e.g. font list)
+    //              ← user (extensions). Each layer can override the
+    // previous via the shallow id-level merge in _mergeTrees.
     function _rebuildTree() {
-        root.tree = root._mergeTrees(root._defaultTree, root._userTree);
+        root.tree = root._mergeTrees(
+                       root._mergeTrees(root._defaultTree, root._generatedTree),
+                       root._userTree);
         if (root.opened) root.rebuild();
     }
 
@@ -130,6 +136,21 @@ Item {
             if (t) { root._defaultTree = t; root._rebuildTree(); }
         }
         onFileChanged: reload()
+    }
+
+    // Auto-generated menu fragments (built by nirimaki-*-menu-refresh
+    // scripts). Currently used for Style→Font dynamic drilldown.
+    property FileView _generatedTreeFile: FileView {
+        path: Quickshell.env("HOME") + "/.cache/nirimaki/menu-fonts.json"
+        watchChanges: true
+        printErrors: false
+        onLoaded: {
+            const t = root._loadTreeJson(text(), "cache/menu-fonts.json");
+            root._generatedTree = t || ({});
+            root._rebuildTree();
+        }
+        onFileChanged: reload()
+        onLoadFailed: { root._generatedTree = ({}); root._rebuildTree(); }
     }
 
     property FileView _userTreeFile: FileView {
@@ -187,7 +208,10 @@ Item {
 
     function _label(id) {
         const n = tree[id];
-        return n && n.labelKey ? I18n.t(n.labelKey) : id;
+        if (!n) return id;
+        if (n.labelKey) return I18n.t(n.labelKey);
+        if (n.label)    return n.label;
+        return id;
     }
 
     function _breadcrumb() {
@@ -253,6 +277,9 @@ Item {
     function select(delta) {
         if (displayModel.count === 0) return;
         selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count;
+        // Keep the selection visible — needed for any drilldown that
+        // overflows the card (Install → Development, foot's font list, …).
+        rowList.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
     function setFilter(next) {
         filterText = next;

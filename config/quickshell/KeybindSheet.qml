@@ -4,9 +4,17 @@ import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
 
-// Keybind cheat sheet — parses ~/.config/niri/keybinds.kdl and shows
-// every bind grouped under its `===== <Section> =====` header.
-// Replaces niri's built-in `show-hotkey-overlay`.
+// Keybind cheat sheet — concatenates the Nirimaki default binds and
+// the user's override file, then groups every bind under its
+// `===== <Section> =====` header. Replaces niri's built-in
+// `show-hotkey-overlay`.
+//
+// Reads:
+//   ~/.local/share/nirimaki/default/niri/bindings.kdl   (defaults)
+//   ~/.config/niri/bindings.kdl                          (user overrides)
+//
+// The user file usually has no section headers — its binds appear
+// under a synthetic "User overrides" header injected at concat time.
 //
 // Two columns: chord left, label right. Filter input on top.
 // Trigger: `quickshell ipc call -- keybind-sheet toggle`.
@@ -14,7 +22,10 @@ Item {
     id: root
 
     property bool opened: false
-    property string raw: ""
+    property string rawDefault: ""
+    property string rawUser: ""
+    readonly property string raw:
+        rawDefault + "\n// ===== " + tr("section", "User overrides") + " =====\n" + rawUser
     property var rows: []   // [{kind: "section"|"bind", section?, chord?, label?}, …]
 
     readonly property color accent:     Theme.accent
@@ -199,13 +210,23 @@ Item {
     }
 
     FileView {
-        id: kdlFile
-        path: Quickshell.env("HOME") + "/.config/niri/keybinds.kdl"
+        id: defaultBinds
+        path: Quickshell.env("HOME") + "/.local/share/nirimaki/default/niri/bindings.kdl"
         watchChanges: true
         printErrors: false
-        onLoaded:       { root.raw = text(); if (root.opened) root.reparse(); }
+        onLoaded:       { root.rawDefault = text(); if (root.opened) root.reparse(); }
         onFileChanged:  reload()
-        onLoadFailed:   { root.raw = ""; if (root.opened) root.reparse(); }
+        onLoadFailed:   { root.rawDefault = ""; if (root.opened) root.reparse(); }
+    }
+
+    FileView {
+        id: userBinds
+        path: Quickshell.env("HOME") + "/.config/niri/bindings.kdl"
+        watchChanges: true
+        printErrors: false
+        onLoaded:       { root.rawUser = text(); if (root.opened) root.reparse(); }
+        onFileChanged:  reload()
+        onLoadFailed:   { root.rawUser = ""; if (root.opened) root.reparse(); }
     }
 
     IpcHandler {

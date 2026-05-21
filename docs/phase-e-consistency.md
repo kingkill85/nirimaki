@@ -133,7 +133,7 @@ rounding              = 0                       # sharp corners
    `~/.config/theme/templates/niri-theme.kdl.tpl` (active-color +
    focus-ring blocks using `{{ accent }}`). `nirimaki-theme-set` renders
    into `~/.config/theme/current/niri-theme.kdl`. Add an
-   `include "/home/michael/.config/theme/current/niri-theme.kdl"`
+   `include "~/.config/theme/current/niri-theme.kdl"`
    to the main config (or fallback to a `sed` rewrite if niri's
    `include` doesn't apply to `layout` children).
 
@@ -165,7 +165,7 @@ couple of Electron apps → expect 1–2 allow-list rules.
   built-in config watcher follows the main file only, not the
   included one, so the explicit reload is required.
 - **`~/.config/niri/config.kdl`** had its entire layout block
-  replaced with `include "/home/michael/.config/theme/current/niri-theme.kdl"`
+  replaced with `include "~/.config/theme/current/niri-theme.kdl"`
   near the top. `prefer-no-csd` is now enabled (no app needed an
   allow-list — Zen/Nautilus/kitty/Qt apps all draw cleanly).
 - `nirimaki-theme-set <name>` flips the focused-window border in real time;

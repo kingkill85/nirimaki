@@ -1,0 +1,47 @@
+#!/bin/bash
+# nirimaki:group=font
+# nirimaki:summary=Set the system monospace font (Quickshell + foot)
+# nirimaki:args=<font-family>
+#
+# Validates the family is installed (fc-list), then:
+#   1. Persists to ~/.config/nirimaki/font (Quickshell FileView picks it
+#      up live — no Quickshell restart needed).
+#   2. Updates ~/.config/foot/foot.ini (foot.ini is user-owned; sed-in-
+#      place is safe). Existing foot windows keep their current font —
+#      restart foot to see the change.
+#
+# Glyph caveat: the bar uses Nerd Font icons. Pick a "<Family> Nerd Font"
+# variant to keep glyphs rendering. Plain fonts produce missing-glyph
+# boxes in the bar / starship / lazygit / eza.
+
+set -e
+
+family="${1:-}"
+if [[ -z $family ]]; then
+  echo "Usage: nirimaki font set <family>" >&2
+  echo "Run 'nirimaki font list' for installed families." >&2
+  exit 1
+fi
+
+# Validate: fc-list 'Family Name' returns lines if the family exists.
+if ! fc-list -q "$family" 2>/dev/null && ! fc-list | grep -iqF "$family"; then
+  echo "Font '$family' not found. Install it first (paru -S … or 'nirimaki help install')." >&2
+  exit 1
+fi
+
+# 1. Persist for Quickshell.
+state_dir="$HOME/.config/nirimaki"
+mkdir -p "$state_dir"
+printf '%s\n' "$family" > "$state_dir/font"
+
+# 2. Foot.
+foot_ini="$HOME/.config/foot/foot.ini"
+if [[ -f $foot_ini ]]; then
+  # Preserve any :size= suffix the user has set.
+  sed -i -E "s|^font=[^:]+(:.*)?$|font=$family\1|" "$foot_ini"
+  if pgrep -x foot >/dev/null 2>&1; then
+    notify-send -u low "Nirimaki" "Font set to $family — restart foot to see the change." 2>/dev/null || true
+  fi
+fi
+
+echo "Font set to: $family"

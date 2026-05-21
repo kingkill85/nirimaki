@@ -1,21 +1,34 @@
 #!/usr/bin/env bash
-# dev-link.sh — replace the live config paths with symlinks into this
-# repo, so editing a file in the repo immediately changes the running
-# session. Run once after cloning; idempotent on re-run (after a
-# `git pull` you do NOT need to re-run unless new linked dirs were
-# added).
+# dev-link.sh — wire this repo into the live session.
 #
-# What it links:
-#   ~/.config/niri/                  → repo/config/niri/
+# Two flavours of linking:
+#   A. Dir-symlink for content that's purely repo-owned (Quickshell,
+#      tmux, nvim, theme templates / themes, all `default/...`
+#      upgrade-tracked content under ~/.local/share/nirimaki/).
+#   B. Per-file seed (COPY, not symlink) for niri's ~/.config/niri/
+#      files — they're user-owned after install, so a symlink would
+#      send edits back into the repo. Defaults the user can override
+#      live under ~/.local/share/nirimaki/default/niri/ instead.
+#
+# What it links / seeds:
+#   ~/.local/share/nirimaki/default/ → repo/default/        (dir symlink)
+#   ~/.local/share/nirimaki/bin/     → repo/bin/            (dir symlink)
 #   ~/.config/quickshell/            → repo/config/quickshell/
-#   ~/.config/fish/                  → repo/config/fish/
-#   ~/.config/foot/                  → repo/config/foot/
-#   ~/.config/tmux/                  → repo/config/tmux/
 #   ~/.config/nvim/                  → repo/config/nvim/
 #   ~/.config/theme/templates/       → repo/config/theme/templates/
 #   ~/.config/theme/themes/          → repo/config/theme/themes/
-#   ~/.config/nirimaki/{hooks,extensions,themed}/  — per-file samples,
-#                                     so user-added files can coexist
+#   ~/.config/niri/<each>            COPIED from repo/config/niri/<each>
+#                                    (only on first run — re-runs leave
+#                                     user edits alone)
+#   ~/.config/foot/foot.ini          COPIED from repo/config/foot/foot.ini
+#                                    (user-owned; theme tracks via internal
+#                                     include= directive)
+#   ~/.config/tmux/tmux.conf         COPIED from repo/config/tmux/tmux.conf
+#                                    (user-owned; no theming layer)
+#   ~/.config/fish/config.fish       COPIED from repo/config/fish/config.fish
+#                                    (user-owned)
+#   ~/.config/fish/{rest}            → repo/config/fish/{rest}
+#   ~/.config/nirimaki/{hooks,extensions,themed}/  — per-file samples
 #   ~/.local/bin/nirimaki-<each>     → repo/bin/nirimaki-<each>
 #
 # Also: prunes dangling ~/.local/bin/qs-* symlinks from before the
@@ -41,13 +54,28 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Sanity: confirm we're in a real nirimaki repo, not some random dir.
-for required in config/niri/config.kdl config/quickshell/shell.qml bin/nirimaki-theme-set; do
+for required in default/niri/bindings.kdl config/quickshell/shell.qml bin/nirimaki-theme-set; do
   if [[ ! -e $REPO_DIR/$required ]]; then
     echo "dev-link.sh: missing $REPO_DIR/$required — refusing to link." >&2
     echo "Run this script from inside the nirimaki repo after files are in place." >&2
     exit 1
   fi
 done
+
+# seed_user_file <src-in-repo> <dest-in-home>
+# - If $dest already exists (file, symlink, or otherwise): leave it alone.
+# - Otherwise: copy $src to $dest. The file is now user-owned —
+#   subsequent `dev-link.sh` runs won't touch it.
+seed_user_file() {
+  local src="$1" dest="$2"
+  if [[ -e $dest || -L $dest ]]; then
+    printf '  keep %s\n' "$dest"
+    return
+  fi
+  mkdir -p "$(dirname "$dest")"
+  cp "$src" "$dest"
+  printf '  seed %s  <-  %s\n' "$dest" "$src"
+}
 
 # link_path <src-in-repo> <dest-in-home>
 # - If $dest is already the right symlink: do nothing.
@@ -79,16 +107,86 @@ link_path() {
   printf '  link %s  ->  %s\n' "$dest" "$src"
 }
 
-echo "== Linking config dirs =="
-link_path "$REPO_DIR/config/niri"            "$HOME/.config/niri"
+echo "== Linking repo defaults under ~/.local/share/nirimaki/ =="
+# Upgrade-tracked content: niri defaults that the user's ~/.config/niri/
+# config.kdl `include`s. install.sh will cp these instead, but in dev
+# we symlink so edits show up live.
+mkdir -p "$HOME/.local/share/nirimaki"
+link_path "$REPO_DIR/default"                "$HOME/.local/share/nirimaki/default"
+
+echo "== Linking purely-repo-owned config dirs =="
 link_path "$REPO_DIR/config/quickshell"      "$HOME/.config/quickshell"
-link_path "$REPO_DIR/config/fish"            "$HOME/.config/fish"
-link_path "$REPO_DIR/config/foot"            "$HOME/.config/foot"
-link_path "$REPO_DIR/config/tmux"            "$HOME/.config/tmux"
 link_path "$REPO_DIR/config/nvim"            "$HOME/.config/nvim"
 mkdir -p "$HOME/.config/theme"
 link_path "$REPO_DIR/config/theme/templates" "$HOME/.config/theme/templates"
 link_path "$REPO_DIR/config/theme/themes"    "$HOME/.config/theme/themes"
+
+# Detect a legacy dir-symlink for any of the now-user-owned surfaces
+# (niri, fish, foot, tmux). The per-file seed mode below would write
+# into the repo through such a symlink and corrupt it. Migration is
+# one-time and manual.
+for legacy in \
+  "$HOME/.config/niri" \
+  "$HOME/.config/fish" \
+  "$HOME/.config/foot" \
+  "$HOME/.config/tmux"; do
+  if [[ -L $legacy ]]; then
+    target="$(readlink "$legacy")"
+    if [[ $target == "$REPO_DIR/"* ]]; then
+      echo
+      echo "ERROR: $legacy is a legacy dir-symlink (-> $target)" >&2
+      echo "       The current dev-link.sh layout needs this as a real" >&2
+      echo "       directory so user files can coexist with repo content." >&2
+      echo >&2
+      echo "       Migrate manually (one time):" >&2
+      echo "         mv $legacy ${legacy}.bak-restructure" >&2
+      echo "         mkdir -p $legacy" >&2
+      echo "         # then re-run dev-link.sh — it will seed the user files" >&2
+      echo "         # and re-create the per-element symlinks." >&2
+      exit 2
+    fi
+  fi
+done
+
+echo "== Seeding ~/.config/niri/ user files (copy-once, never overwritten) =="
+# Repo ships small seed files under config/niri/ that get copied to the
+# user's ~/.config/niri/. After the first run these are the user's
+# files — edit freely; re-running dev-link.sh leaves them alone.
+mkdir -p "$HOME/.config/niri"
+for seed in "$REPO_DIR"/config/niri/*.kdl; do
+  seed_user_file "$seed" "$HOME/.config/niri/$(basename "$seed")"
+done
+
+echo "== Seeding ~/.config/foot/foot.ini (copy-once, never overwritten) =="
+# foot.ini is whole-file user-owned (Omarchy convention). Theme
+# tracking still works via the `include=~/.config/theme/current/foot.ini`
+# directive inside the file — that target IS upgrade-tracked.
+mkdir -p "$HOME/.config/foot"
+seed_user_file "$REPO_DIR/config/foot/foot.ini" "$HOME/.config/foot/foot.ini"
+
+echo "== Seeding ~/.config/tmux/tmux.conf (copy-once, never overwritten) =="
+# tmux.conf is whole-file user-owned. No theming layer — tmux uses
+# the terminal ANSI palette directly (Omarchy convention).
+mkdir -p "$HOME/.config/tmux"
+seed_user_file "$REPO_DIR/config/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf"
+
+echo "== Seeding + linking ~/.config/fish/ =="
+# config.fish is user-owned (per Omarchy convention — fish loads
+# conf.d/* first, then config.fish, so the user file always gets the
+# last word). Our content lives entirely in conf.d/, completions/,
+# functions/, themes/ — those are symlinked.
+mkdir -p "$HOME/.config/fish"
+seed_user_file "$REPO_DIR/config/fish/config.fish" "$HOME/.config/fish/config.fish"
+for fish_dir in conf.d completions functions themes; do
+  [[ -d "$REPO_DIR/config/fish/$fish_dir" ]] || continue
+  link_path "$REPO_DIR/config/fish/$fish_dir" "$HOME/.config/fish/$fish_dir"
+done
+# fish_plugins / fish_variables are runtime state — symlink so fisher's
+# updates persist in the repo (dev convenience; install.sh will copy).
+for fish_state in fish_plugins fish_variables; do
+  [[ -e "$REPO_DIR/config/fish/$fish_state" ]] || continue
+  link_path "$REPO_DIR/config/fish/$fish_state" "$HOME/.config/fish/$fish_state"
+done
 
 echo "== Pruning stale ~/.local/bin/qs-* symlinks =="
 # Phase J renamed bin/qs-* → bin/nirimaki-*. Stale symlinks left over
