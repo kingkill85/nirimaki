@@ -1,0 +1,64 @@
+#!/bin/bash
+# nirimaki:group=gaming
+# nirimaki:summary=Install matching lib32 GPU drivers for the detected GPU(s)
+# nirimaki:requires-sudo=true
+# nirimaki:hidden=true
+#
+# Called by nirimaki-steam-install (and potentially future gaming
+# installs that need 32-bit GPU + Vulkan). Detects GPU vendor via
+# lspci, picks the lib32-vulkan-* + nvidia variant accordingly.
+#
+# Mirrors Omarchy's `omarchy-install-gaming-gpu-lib32` logic, with
+# the caller responsible for [multilib] being already enabled.
+
+set -e
+
+if ! command -v lspci >/dev/null 2>&1; then
+  echo "lspci not found — install \`pciutils\` first." >&2
+  exit 1
+fi
+
+declare -A VULKAN=(
+  [AMD]=lib32-vulkan-radeon
+  [Intel]=lib32-vulkan-intel
+)
+
+packages=()
+for vendor in "${!VULKAN[@]}"; do
+  if lspci | grep -iE "(VGA|Display|3D).*$vendor" >/dev/null 2>&1; then
+    packages+=("${VULKAN[$vendor]}")
+  fi
+done
+
+# NVIDIA — split between current cards (Turing+, GSP-capable) which use
+# the mainline `nvidia` driver, and older cards (Maxwell/Pascal) which
+# need the `nvidia-470xx` legacy series. We can't perfectly auto-detect
+# without parsing nvidia-smi, so use a pragmatic heuristic: presence of
+# the `nvidia` kernel module → mainline; otherwise fall back to legacy.
+if lspci | grep -iE "(VGA|Display|3D).*NVIDIA" >/dev/null 2>&1; then
+  if lsmod | grep -q '^nvidia\b'; then
+    packages+=(lib32-nvidia-utils)
+  else
+    echo "NVIDIA card detected, but kernel module not loaded — installing"
+    echo "lib32-nvidia-utils anyway. Check \`pacman -Ss lib32-nvidia\` if you"
+    echo "need a legacy driver variant."
+    packages+=(lib32-nvidia-utils)
+  fi
+fi
+
+# Mesa is the foundation for both AMD and Intel — pull it regardless
+# of which vendor detected.
+if [[ " ${packages[*]} " == *lib32-vulkan-radeon* ]] \
+     || [[ " ${packages[*]} " == *lib32-vulkan-intel* ]]; then
+  packages+=(lib32-mesa lib32-vulkan-icd-loader)
+fi
+
+if [[ ${#packages[@]} -eq 0 ]]; then
+  echo "No supported GPU detected by lspci — skipping lib32 GPU driver install."
+  echo "(If you know what you need: \`pacman -S lib32-vulkan-... lib32-mesa\`)"
+  exit 0
+fi
+
+echo "Installing 32-bit GPU stack:"
+printf '  - %s\n' "${packages[@]}"
+sudo pacman -S --needed --noconfirm "${packages[@]}"
