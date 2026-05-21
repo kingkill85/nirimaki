@@ -55,12 +55,21 @@ done
 # Sweep stale entries first; rm -rf so we handle both files and symlinks.
 for existing in "$CURRENT_DIR"/*; do
   base=$(basename "$existing")
-  # Don't sweep template outputs — those are regenerated below.
-  # foot.ini in particular is `include=`-watched by running foot
-  # instances and a transient absence between sweep + render would
-  # leave the next SIGUSR1 reload pointing at nothing.
+  # Don't sweep template outputs — those are regenerated below, and a
+  # transient absence between sweep + render is visible to live config
+  # watchers in the gap:
+  #   foot.ini       — `include=`-watched by running foot, missing
+  #                    file would leave the next reload pointing at
+  #                    nothing
+  #   qt-colors.conf — qt5ct/qt6ct read it on app launch; missing
+  #                    breaks newly-launched Qt apps mid-swap
+  #   niri-theme.kdl — included from ~/.config/niri/config.kdl; niri's
+  #                    inotify watcher fires immediately on the rm and
+  #                    pops an on-screen "failed to read included
+  #                    config" error overlay before the template loop
+  #                    can recreate the file
   case "$base" in
-    foot.ini|qt-colors.conf) continue ;;
+    foot.ini|qt-colors.conf|niri-theme.kdl) continue ;;
   esac
   if [[ -z ${keep[$base]+x} ]]; then
     rm -rf "$existing"
@@ -165,7 +174,13 @@ if [[ -d $TEMPLATES_DIR ]]; then
         out="$CURRENT_DIR/$base"
         ;;
     esac
-    sed -f "$sed_script" "$tpl" >"$out"
+    # Atomic write so live config watchers (niri's inotify on the
+    # included niri-theme.kdl, foot's include=, …) never see a
+    # half-written or truncated file. sed > out leaves a brief
+    # zero-byte window between open(O_TRUNC) and the first write —
+    # long enough for niri to log a parse error and surface its
+    # on-screen overlay.
+    sed -f "$sed_script" "$tpl" >"$out.tmp" && mv "$out.tmp" "$out"
   done
 
   rm -f "$sed_script"

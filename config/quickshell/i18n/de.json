@@ -69,6 +69,8 @@
   "settings.style":                 "Erscheinungsbild",
   "settings.style.theme":           "Theme",
   "settings.style.background":      "Hintergrund",
+  "settings.style.background.pick":  "Hintergrund auswählen",
+  "settings.style.background.folder":"Eigene Hintergründe",
   "settings.style.font":            "Schrift",
   "settings.style.keybinds":        "Tastenkürzel",
   "settings.setup":                 "System",

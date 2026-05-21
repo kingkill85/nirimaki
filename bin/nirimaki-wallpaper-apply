@@ -7,12 +7,17 @@
 # startup, from qs-theme-set, and from BackgroundPicker.
 #
 # Resolution order:
-#   1. ~/.config/theme/current/wallpaper      symlink to a specific
-#                                             image. Set by the
-#                                             background picker (E7).
+#   1. ~/.config/theme/current/wallpaper        symlink to a specific
+#                                               image. Set by the
+#                                               background picker.
 #   2. first sorted image in
-#      ~/.config/theme/current/backgrounds/   theme default.
-#   3. solid fallback colour                  empty themes (`default`).
+#      ~/.config/nirimaki/backgrounds/<theme>/  user per-theme dir
+#                                               (Omarchy convention —
+#                                               additive, not shipped
+#                                               by the theme).
+#   3. first sorted image in
+#      ~/.config/theme/current/backgrounds/     theme default.
+#   4. solid fallback colour                    empty themes.
 #
 # Themes can curate ordering by prefixing filenames with digits
 # (Omarchy convention: 1-foo.jpg, 2-bar.jpg, …).
@@ -24,9 +29,31 @@ BG_DIR="$THEME_DIR/backgrounds"
 PICK="$THEME_DIR/wallpaper"
 FALLBACK_COLOR="#101315"
 
+# User per-theme bg dir, keyed off the active theme.name.
+THEME_NAME=""
+[[ -f $THEME_DIR/theme.name ]] && THEME_NAME=$(head -n1 "$THEME_DIR/theme.name")
+USER_BG_DIR=""
+[[ -n $THEME_NAME ]] && USER_BG_DIR="$HOME/.config/nirimaki/backgrounds/$THEME_NAME"
+
 # Kill any existing swaybg cleanly. -x matches by exact name so we
 # catch instances spawned with any arguments.
 pkill -x swaybg 2>/dev/null || true
+
+# Pick the first sortable image in $1 if any; print path, return 0.
+first_image_in() {
+  local dir="$1"
+  [[ -d $dir ]] || return 1
+  shopt -s nullglob
+  local files=("$dir"/*)
+  shopt -u nullglob
+  IFS=$'\n' read -r -d '' -a files < <(printf '%s\n' "${files[@]}" | sort && printf '\0')
+  for f in "${files[@]}"; do
+    case "${f,,}" in
+      *.jpg|*.jpeg|*.png|*.webp|*.gif|*.bmp) printf '%s\n' "$f"; return 0 ;;
+    esac
+  done
+  return 1
+}
 
 img=""
 
@@ -35,16 +62,14 @@ if [[ -L $PICK ]] && [[ -f $PICK ]]; then
   img=$(readlink -f "$PICK" 2>/dev/null || true)
 fi
 
-# 2. First image in the theme's backgrounds/.
-if [[ -z $img && -d $BG_DIR ]]; then
-  shopt -s nullglob
-  files=("$BG_DIR"/*)
-  shopt -u nullglob
-  for f in "${files[@]}"; do
-    case "${f,,}" in
-      *.jpg|*.jpeg|*.png|*.webp) img="$f"; break ;;
-    esac
-  done
+# 2. First image in the user's per-theme dir.
+if [[ -z $img && -n $USER_BG_DIR ]]; then
+  img=$(first_image_in "$USER_BG_DIR" || true)
+fi
+
+# 3. First image in the theme's shipped backgrounds/.
+if [[ -z $img ]]; then
+  img=$(first_image_in "$BG_DIR" || true)
 fi
 
 if [[ -n $img && -f $img ]]; then

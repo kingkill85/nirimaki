@@ -16,9 +16,14 @@ QtObject {
     readonly property int count: popups.length
 
     function durationFor(urgency) {
-        if (urgency === NotificationUrgency.Critical) return 0;     // sticky
-        if (urgency === NotificationUrgency.Low)      return 3000;
-        return 5000;
+        // freedesktop notify-send default urgency is "normal"; theme
+        // switch + most install/remove flows fall under normal. Bumped
+        // from 3/5 → 6/10 so multi-line bodies are readable without
+        // hover-to-pause. Hover still pauses the lifetime bar; click
+        // still dismisses. Critical stays sticky.
+        if (urgency === NotificationUrgency.Critical) return 0;
+        if (urgency === NotificationUrgency.Low)      return 6000;
+        return 10000;
     }
 
     function snapshot(n) {

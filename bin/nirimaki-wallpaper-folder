@@ -1,0 +1,31 @@
+#!/bin/bash
+# nirimaki:group=wallpaper
+# nirimaki:summary=Open the current theme's user-backgrounds folder in a file manager
+#
+# Mirror of Omarchy's `omarchy theme bg install` — opens
+# `~/.config/nirimaki/backgrounds/<active-theme>/` so the user can
+# drop image files in. The BackgroundPicker (Mod+Ctrl+Space) merges
+# this dir with the theme-shipped backgrounds on every open.
+#
+# Creates the dir on demand. Uses nautilus when available (it's our
+# default file manager — see default/niri/bindings.kdl Mod+Shift+E),
+# falls back to xdg-open otherwise.
+
+set -e
+
+theme_name=""
+[[ -f $HOME/.config/theme/current/theme.name ]] && \
+  theme_name=$(head -n1 "$HOME/.config/theme/current/theme.name")
+[[ -z $theme_name ]] && theme_name=default
+
+dir="$HOME/.config/nirimaki/backgrounds/$theme_name"
+mkdir -p "$dir"
+
+if command -v nautilus >/dev/null 2>&1; then
+  exec nautilus "$dir"
+elif command -v xdg-open >/dev/null 2>&1; then
+  exec xdg-open "$dir"
+else
+  echo "No file manager found. Drop images into: $dir" >&2
+  exit 1
+fi

@@ -17,6 +17,8 @@
   "settings.style":                 "Style",
   "settings.style.theme":           "Theme",
   "settings.style.background":      "Background",
+  "settings.style.background.pick":  "Pick wallpaper",
+  "settings.style.background.folder":"My wallpapers folder",
   "settings.style.font":            "Font",
   "settings.style.keybinds":        "Keybinds",
   "settings.setup":                 "Setup",

@@ -51,6 +51,10 @@ Item {
     // URL itself change on swap, which FolderListModel does pick up.
     readonly property string bgDir:
         Quickshell.env("HOME") + "/.config/theme/themes/" + Theme.themeName + "/backgrounds"
+    // User per-theme dir (Omarchy convention). Additive — images here
+    // appear in the picker alongside the theme-shipped set.
+    readonly property string userBgDir:
+        Quickshell.env("HOME") + "/.config/nirimaki/backgrounds/" + Theme.themeName
     readonly property string pickPath:
         Quickshell.env("HOME") + "/.config/theme/current/wallpaper"
 
@@ -87,18 +91,30 @@ Item {
     function toggleMenu() { opened ? closeMenu() : open() }
 
     function loadBgList() {
-        const out = [];
-        for (let i = 0; i < bgFolder.count; i++) {
-            const n = bgFolder.get(i, "fileName");
-            if (!n || n.charAt(0) === ".") continue;
-            const lower = n.toLowerCase();
-            if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
-                lower.endsWith(".png") || lower.endsWith(".webp")) {
-                out.push(root.bgDir + "/" + n);
+        // Merge two FolderListModels: user per-theme dir (additive)
+        // + theme-shipped dir. User images sort first by basename so
+        // a user-prefixed `0-foo.jpg` lands ahead of any theme image.
+        // Dedupe by basename in case both dirs happen to share a name.
+        const seen = {};
+        function collect(model, baseUrl) {
+            const out = [];
+            for (let i = 0; i < model.count; i++) {
+                const n = model.get(i, "fileName");
+                if (!n || n.charAt(0) === ".") continue;
+                const lower = n.toLowerCase();
+                if (!(lower.endsWith(".jpg") || lower.endsWith(".jpeg") ||
+                      lower.endsWith(".png") || lower.endsWith(".webp"))) continue;
+                if (seen[n]) continue;
+                seen[n] = true;
+                out.push(baseUrl + "/" + n);
             }
+            return out;
         }
-        out.sort((a, b) => a.localeCompare(b));
-        bgs = out;
+        const userImgs  = collect(userBgFolder, root.userBgDir);
+        const themeImgs = collect(bgFolder,     root.bgDir);
+        userImgs.sort((a, b)  => a.localeCompare(b));
+        themeImgs.sort((a, b) => a.localeCompare(b));
+        bgs = userImgs.concat(themeImgs);
     }
 
     function rebuild() {
@@ -150,6 +166,17 @@ Item {
     FolderListModel {
         id: bgFolder
         folder: "file://" + root.bgDir
+        showFiles: true
+        showDirs: false
+        showOnlyReadable: true
+        sortField: FolderListModel.Name
+        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp"]
+        onCountChanged: if (root.opened) { root.loadBgList(); root.rebuild(); }
+    }
+
+    FolderListModel {
+        id: userBgFolder
+        folder: "file://" + root.userBgDir
         showFiles: true
         showDirs: false
         showOnlyReadable: true

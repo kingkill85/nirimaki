@@ -283,7 +283,7 @@ One-time ~2 MB download for the offline page cache.
 ## 10. Initial theme apply
 
 ```bash
-nirimaki theme set last-horizon
+nirimaki theme set tokyo-night
 ```
 
 One call renders every `.tpl` → its destination (kitty.conf-equiv,
@@ -376,7 +376,7 @@ niri validate -c ~/.config/niri/config.kdl
 quickshell ipc call -- settings-menu ping
 
 # Theme apply
-nirimaki theme set tokyo-night && nirimaki theme set last-horizon
+nirimaki theme set gruvbox && nirimaki theme set tokyo-night
 
 # Feature state populated
 cat ~/.cache/nirimaki/state.json | python3 -m json.tool | head
