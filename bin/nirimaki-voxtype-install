@@ -1,0 +1,130 @@
+#!/bin/bash
+# nirimaki:group=voxtype
+# nirimaki:summary=Install Voxtype dictation (wtype + voxtype-bin + ~150 MB model)
+# nirimaki:requires-sudo=true
+#
+# Idempotent: re-runs cleanly when voxtype is already installed (just
+# re-confirms config + systemd service). Mirrors Omarchy's
+# omarchy-voxtype-install in spirit; uses plain `read` instead of
+# gum (one fewer dependency) and `paru` instead of yay (whichever AUR
+# helper is present).
+
+set -e
+
+# shellcheck source=nirimaki-feature-prelude
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+CONFIG_DIR="$HOME/.config/voxtype"
+CONFIG_FILE="$CONFIG_DIR/config.toml"
+
+nirimaki_banner "Voxtype dictation" "Install"
+
+if command -v voxtype >/dev/null 2>&1; then
+  echo "voxtype is already installed at $(command -v voxtype)."
+  echo "Refreshing config + systemd user service only."
+else
+  echo "Installing:"
+  echo "  - wtype             (Arch official; types recognized text)"
+  echo "  - voxtype-bin       (AUR; the dictation daemon + CLI)"
+  echo "  - the multilingual base model (~150 MB download)"
+fi
+
+# Single sudo prompt for the whole script. Refreshed in the background
+# so long pacman / AUR builds don't outlast the timestamp timeout.
+nirimaki_sudo_prime
+
+# ---- packages ----
+echo
+if ! command -v wtype >/dev/null 2>&1; then
+  echo "Installing wtype…"
+  sudo pacman -S --needed --noconfirm wtype
+fi
+
+if ! command -v voxtype >/dev/null 2>&1; then
+  if   command -v paru >/dev/null 2>&1; then aur=paru
+  elif command -v yay  >/dev/null 2>&1; then aur=yay
+  else
+    echo "No AUR helper found (paru / yay). Install one, then retry." >&2
+    exit 1
+  fi
+  echo "Installing voxtype-bin via $aur…"
+  $aur -S --needed --noconfirm voxtype-bin
+fi
+
+# ---- default config (idempotent) ----
+mkdir -p "$CONFIG_DIR"
+if [[ ! -f $CONFIG_FILE ]]; then
+  echo
+  echo "Writing default config → $CONFIG_FILE"
+  cat > "$CONFIG_FILE" << 'EOF'
+# Nirimaki Voxtype defaults — see voxtype's docs for the full schema.
+# CLI overrides win; this file is just a starting point.
+
+# State file for external integrations (status reads it).
+state_file = "auto"
+
+[hotkey]
+# Hotkey is driven from niri keybinds.kdl (Mod+F9). Voxtype's
+# built-in global hotkey stays off so we don't double-bind.
+enabled = false
+
+[audio]
+device = "default"
+sample_rate = 16000
+max_duration_secs = 60
+pause_media = true
+
+[whisper]
+# `base` is the multilingual ~150 MB model (same size as base.en
+# but covers ~100 languages, slightly less accurate for English
+# only). `language = "auto"` detects per utterance, so mixed
+# English/German/etc. all work. Pin `language = "en"` / `"de"`
+# for slight accuracy gain in a single-language workflow, or
+# bump `model` to `large-v3-turbo` if you have a GPU.
+model = "base"
+language = "auto"
+translate = false
+
+[output]
+mode = "type"
+fallback_to_clipboard = true
+type_delay_ms = 1
+
+[output.notification]
+on_recording_start = false
+on_recording_stop  = false
+on_transcription   = false
+EOF
+fi
+
+# ---- download model + GPU + systemd ----
+# `voxtype setup --download` reads the model name from config.toml,
+# so the multilingual `base` model lands in
+# ~/.local/share/voxtype/ automatically. (~150 MB one-time.)
+echo
+echo "Running voxtype setup (downloads the multilingual base model)…"
+voxtype setup --download --quiet || true
+
+# Vulkan acceleration when available.
+if command -v vulkaninfo >/dev/null 2>&1 \
+     && vulkaninfo --summary 2>/dev/null | grep -q '^GPU id'; then
+  echo "Vulkan detected — enabling GPU acceleration…"
+  voxtype setup gpu --enable 2>/dev/null || true
+fi
+
+# Systemd USER service (no sudo) — runs the daemon under the user
+# session, started on demand by the Mod+F9 keybind via `voxtype record toggle`.
+voxtype setup systemd 2>/dev/null || true
+
+# ---- final notice ----
+notify-send "  Voxtype ready" "Press Mod+F9 to start/stop dictation." -t 8000 2>/dev/null || true
+echo
+echo "  ✓ Voxtype is installed and configured."
+echo "  → Mod+F9 toggles recording. Config: $CONFIG_FILE"
+
+# Fire the install hook so users can attach side-effects.
+if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
+  "$HOME/.local/bin/nirimaki-hook-run" voxtype-installed || true
+fi
+
+nirimaki_pause

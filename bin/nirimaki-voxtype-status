@@ -1,0 +1,27 @@
+#!/bin/bash
+# nirimaki:group=voxtype
+# nirimaki:summary=Report Voxtype install + service + daemon state
+# nirimaki:hidden=true
+
+set -u
+
+if ! command -v voxtype >/dev/null 2>&1; then
+  echo "voxtype: not installed"
+  exit 0
+fi
+
+echo "voxtype: $(voxtype --version 2>/dev/null || command -v voxtype)"
+
+if systemctl --user is-enabled voxtype.service >/dev/null 2>&1; then
+  echo "  service: enabled, $(systemctl --user is-active voxtype.service)"
+else
+  echo "  service: disabled"
+fi
+
+# state file lives under $XDG_RUNTIME_DIR/voxtype/state by default.
+state="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/voxtype/state"
+if [[ -r $state ]]; then
+  echo "  state:   $(<"$state")"
+else
+  echo "  state:   (no state file — daemon hasn't run yet)"
+fi

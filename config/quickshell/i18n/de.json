@@ -81,8 +81,12 @@
   "settings.setup.language":        "Sprache",
   "settings.install":               "Installieren",
   "settings.install.webapp":        "Web-App",
+  "settings.install.ai":            "KI",
+  "settings.install.ai.voxtype":    "Voxtype (Diktat)",
   "settings.remove":                "Entfernen",
   "settings.remove.webapp":         "Web-App",
+  "settings.remove.ai":             "KI",
+  "settings.remove.ai.voxtype":     "Voxtype (Diktat)",
   "settings.system":                "Energie",
 
   "language.placeholder":           "Sprache…",

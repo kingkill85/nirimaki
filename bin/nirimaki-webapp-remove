@@ -16,9 +16,14 @@
 
 set -euo pipefail
 
+# shellcheck source=nirimaki-feature-prelude
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
 APPS_DIR="$HOME/.local/share/applications"
 ICONS_DIR="$APPS_DIR/icons"
 DATA_ROOT="$HOME/.cache/nirimaki-webapps"
+
+nirimaki_banner "Web app" "Remove"
 
 if ! command -v fzf >/dev/null 2>&1; then
   echo "nirimaki-webapp-remove: fzf not installed" >&2
@@ -51,13 +56,11 @@ desktop_file=$(printf '%s' "$choice" | cut -f2)
 desktop_id=$(basename "$desktop_file" .desktop)
 slug="${desktop_id#nirimaki-webapp-}"
 
-echo "will remove:"
+# The fzf selection IS the consent — no second prompt.
+echo "removing:"
 echo "  .desktop:        $desktop_file"
 echo "  icon:            $ICONS_DIR/${desktop_id}.png"
 echo "  user-data-dir:   $DATA_ROOT/$slug"
-echo
-read -r -p "confirm? (y/N) " ans
-[[ ${ans,,} == y* ]] || { echo "abort"; exit 0; }
 
 rm -f -- "$desktop_file" "$ICONS_DIR/${desktop_id}.png"
 rm -rf -- "$DATA_ROOT/$slug"
@@ -73,8 +76,4 @@ if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
   "$HOME/.local/bin/nirimaki-hook-run" webapp-removed "$slug" || true
 fi
 
-# See nirimaki-webapp-install for the rationale: keep the foot window open
-# long enough to read the confirmation when launched from the
-# apps-menu (Terminal=true) path.
-echo
-read -r -p "Press Enter to close… " _ || true
+nirimaki_pause

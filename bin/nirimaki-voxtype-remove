@@ -1,0 +1,56 @@
+#!/bin/bash
+# nirimaki:group=voxtype
+# nirimaki:summary=Remove Voxtype dictation (drops voxtype-bin + user service + config)
+# nirimaki:requires-sudo=true
+
+set -e
+
+# shellcheck source=nirimaki-feature-prelude
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Voxtype dictation" "Remove"
+
+if ! command -v voxtype >/dev/null 2>&1; then
+  echo "voxtype is not installed — nothing to do."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing:"
+echo "  - voxtype.service user unit (disable + stop)"
+echo "  - voxtype-bin package (via your AUR helper)"
+echo "  - ~/.config/voxtype + ~/.local/share/voxtype (configs + model)"
+
+# voxtype-bin uninstall is an AUR helper call — paru typically needs
+# sudo for the pacman -R step it wraps. Prime once.
+nirimaki_sudo_prime
+
+echo
+echo "Stopping voxtype user service…"
+systemctl --user disable --now voxtype.service 2>/dev/null || true
+systemctl --user daemon-reload
+
+echo "Uninstalling voxtype-bin…"
+if   command -v paru >/dev/null 2>&1; then aur=paru
+elif command -v yay  >/dev/null 2>&1; then aur=yay
+else aur="" ; fi
+
+if [[ -n $aur ]]; then
+  $aur -Rns --noconfirm voxtype-bin 2>/dev/null || true
+else
+  echo "  (no AUR helper found — skip package removal, but cleanup the rest)"
+fi
+
+rm -rf "$HOME/.config/voxtype" "$HOME/.local/share/voxtype"
+
+# wtype isn't removed — it's used by the universal-clipboard binds
+# (Mod+C/V/X) so it has to stay regardless of dictation.
+
+echo
+echo "  ✓ Voxtype removed."
+
+if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
+  "$HOME/.local/bin/nirimaki-hook-run" voxtype-removed || true
+fi
+
+nirimaki_pause

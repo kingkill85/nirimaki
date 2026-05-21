@@ -194,6 +194,76 @@ grep -q 'HOME/.local/bin' ~/.bashrc 2>/dev/null \
 `nirimaki-*` glob (the bare `nirimaki` matches `nirimaki*` — we
 extended the glob to include it).
 
+## Optional-feature install/remove wrapper
+
+Add-on features (Voxtype, Tailscale, Steam — anything that isn't part
+of the baseline) ship as a small family of bash scripts:
+
+```
+bin/nirimaki-<feature>-install
+bin/nirimaki-<feature>-remove
+bin/nirimaki-<feature>-status   (optional)
+```
+
+…with matching SettingsMenu entries under `install.<category>.<feature>`
+and `remove.<category>.<feature>` (the JSON loader builds the tree).
+
+Every install/remove script begins by sourcing
+`bin/nirimaki-feature-prelude`, a tiny library that standardises three
+things across the whole install surface:
+
+1. **Branded banner** — `nirimaki_banner "<title>" "[subtitle]"` prints
+   the Nirimaki ASCII logo (tinted with the active theme's accent
+   read from `~/.config/theme/current/colors.toml`) plus a one-line
+   title bar. Every install/remove screen looks the same regardless
+   of who wrote it.
+2. **Single-sudo session** — `nirimaki_sudo_prime` validates the
+   user's sudo password ONCE (interactive prompt happens here),
+   then spawns a background `sudo -n -v` refresher every 60 s so
+   slow `pacman -S` / AUR builds don't outlast the timestamp
+   cache. EXIT trap installed so the refresher tears itself down.
+   Subsequent `sudo …` calls in the script never re-prompt.
+3. **Read-the-output pause** — `nirimaki_pause` is the final
+   "Press Enter to close…" line. Used so foot doesn't disappear
+   the install/remove output the moment the script returns.
+
+Confirmation prompts are NOT used. The user already consented by
+selecting the menu entry. Data-collection prompts (webapp install
+asking for name + URL) stay; "Are you sure?" prompts are gone.
+
+Template for adding a new optional feature (`nirimaki-foobar-install`):
+
+```bash
+#!/bin/bash
+# nirimaki:group=foobar
+# nirimaki:summary=Install Foobar (~XX MB)
+# nirimaki:requires-sudo=true
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Foobar" "Install"
+
+if command -v foobar >/dev/null 2>&1; then
+  echo "Foobar already installed — refreshing config only."
+else
+  echo "Installing foobar (~XX MB)."
+fi
+
+nirimaki_sudo_prime    # only if you call sudo / pacman / paru below
+
+sudo pacman -S --needed --noconfirm foobar
+# …post-install config…
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" foobar-installed || true
+
+nirimaki_pause
+```
+
+Remove script mirrors with `nirimaki_banner "Foobar" "Remove"`,
+the same `nirimaki_sudo_prime`, and `nirimaki_pause` at the end.
+
 ## User-facing abstraction map
 
 Future Claude: when a user asks "where do I customise X?" the answer

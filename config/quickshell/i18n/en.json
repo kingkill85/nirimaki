@@ -29,8 +29,12 @@
   "settings.setup.language":        "Language",
   "settings.install":               "Install",
   "settings.install.webapp":        "Web App",
+  "settings.install.ai":            "AI",
+  "settings.install.ai.voxtype":    "Voxtype (dictation)",
   "settings.remove":                "Remove",
   "settings.remove.webapp":         "Web App",
+  "settings.remove.ai":             "AI",
+  "settings.remove.ai.voxtype":     "Voxtype (dictation)",
   "settings.system":                "System",
 
   "language.placeholder":           "Language…",

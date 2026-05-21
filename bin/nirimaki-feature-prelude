@@ -1,0 +1,117 @@
+#!/bin/bash
+# nirimaki:group=feature
+# nirimaki:summary=Sourced library — banner + single-sudo session + close pause
+# nirimaki:hidden=true
+#
+# Standard prelude for install / remove scripts that run inside a
+# foot window from the SettingsMenu. Source (don't exec) at the top
+# of the calling script:
+#
+#   . "$HOME/.local/bin/nirimaki-feature-prelude"
+#   nirimaki_banner "Voxtype dictation" "Install"
+#   nirimaki_sudo_prime     # only call when the script needs sudo
+#   ...your install logic...
+#   nirimaki_pause
+#
+# Provides three functions:
+#
+# - `nirimaki_banner <title> [subtitle]`
+#     Prints the ASCII logo (tinted with the active theme's accent)
+#     followed by a one-line title bar. Standardised so every
+#     install/remove screen looks the same.
+#
+# - `nirimaki_sudo_prime`
+#     Prompts for the user's sudo password ONCE, then spawns a
+#     background refresher that calls `sudo -n -v` every 60s until
+#     the calling script exits. After this returns, every subsequent
+#     `sudo` in the script runs without re-prompting. EXIT trap is
+#     installed to clean up the refresher.
+#
+# - `nirimaki_pause`
+#     Final "Press Enter to close…" line. Used so the user can read
+#     the install/remove output before foot closes the window.
+
+# Logo: shipped at assets/logo.txt in the repo. Install lands it
+# under /usr/share/nirimaki/ on packaged installs; dev install reads
+# from the symlinked repo path. Stays silent if no logo can be found.
+nirimaki__locate_logo() {
+  local candidates=(
+    "/usr/share/nirimaki/logo.txt"
+    "$HOME/.local/share/nirimaki/logo.txt"
+    "${NIRIMAKI_REPO:-}/assets/logo.txt"
+  )
+  # Auto-detect repo logo via the symlink chain — `nirimaki` itself
+  # is a symlink into the repo on dev installs, so we can walk back
+  # to assets/ from there.
+  local self
+  self=$(readlink -f "$HOME/.local/bin/nirimaki" 2>/dev/null) || self=""
+  if [[ -n $self ]]; then
+    local repo_root="${self%/bin/*}"
+    candidates+=("$repo_root/assets/logo.txt")
+  fi
+  for p in "${candidates[@]}"; do
+    [[ -r $p ]] && { printf '%s' "$p"; return; }
+  done
+  printf ''
+}
+
+# Returns "38;2;R;G;B" — truecolor SGR foreground for the active
+# theme's accent, or empty if colors.toml can't be parsed.
+nirimaki__accent_sgr() {
+  local hex
+  hex=$(awk -F= '/^accent[[:space:]]*=/{
+    gsub(/["[:space:]#]/, "", $2); print $2; exit
+  }' "$HOME/.config/theme/current/colors.toml" 2>/dev/null) || hex=""
+  [[ ! $hex =~ ^[0-9A-Fa-f]{6}$ ]] && return
+  printf '38;2;%d;%d;%d' "0x${hex:0:2}" "0x${hex:2:2}" "0x${hex:4:2}"
+}
+
+nirimaki_banner() {
+  local title="${1:-Nirimaki}" subtitle="${2:-}"
+  local sgr;  sgr=$(nirimaki__accent_sgr)
+  local logo; logo=$(nirimaki__locate_logo)
+  echo
+  if [[ -n $logo ]]; then
+    [[ -n $sgr ]] && printf '\e[%sm' "$sgr"
+    cat "$logo"
+    [[ -n $sgr ]] && printf '\e[0m'
+  fi
+  if [[ -n $sgr ]]; then
+    printf '\e[%s;1m  %s\e[0m' "$sgr" "$title"
+  else
+    printf '  %s' "$title"
+  fi
+  [[ -n $subtitle ]] && printf '  \e[2m·  %s\e[0m' "$subtitle"
+  echo
+  echo
+}
+
+nirimaki_sudo_prime() {
+  # Validate sudo credentials upfront — interactive prompt happens
+  # here (and ONLY here). Subsequent `sudo …` calls in the script
+  # are cached for sudo's default timestamp_timeout (5 min) and
+  # extended by the background refresher below.
+  sudo -v || return $?
+
+  # Background loop: re-validate every 60 s so even slow pacman
+  # downloads don't outlast the timeout. Exits cleanly when the
+  # parent script ends (kill -0 check) or if sudo cache is
+  # invalidated externally.
+  (
+    while true; do
+      sleep 60
+      kill -0 $$ 2>/dev/null || exit 0
+      sudo -n -v 2>/dev/null || exit 0
+    done
+  ) &
+  local refresher_pid=$!
+  # Install EXIT trap — also tear down the refresher on script exit.
+  # Preserves any existing trap (scripts don't currently set one, but
+  # future-proof).
+  trap "kill $refresher_pid 2>/dev/null || true" EXIT
+}
+
+nirimaki_pause() {
+  echo
+  read -r -p "Press Enter to close… " _ || true
+}

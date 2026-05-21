@@ -69,7 +69,9 @@ fetch_favicon() {
   return 1
 }
 
-echo "== Nirimaki webapp install =="
+# shellcheck source=nirimaki-feature-prelude
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Web app" "Install"
 prompt "Name (display, e.g. 'GitHub')" name
 [[ -z ${name// } ]] && { echo "abort: empty name" >&2; exit 1; }
 
@@ -165,9 +167,5 @@ if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
   "$HOME/.local/bin/nirimaki-hook-run" webapp-installed "$slug" "$url" || true
 fi
 
-# When launched from the Quickshell Launcher (Terminal=true wraps us
-# in foot), the window closes the instant we exit. Pause so the user
-# can read the result. Hitting Enter from a normal interactive
-# terminal just exits cleanly.
-echo
-read -r -p "Press Enter to close… " _ || true
+# Final pause so the user can read the result before foot closes.
+nirimaki_pause
