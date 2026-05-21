@@ -27,7 +27,7 @@ binds {
 
     // ===== App launchers =====
     // Omarchy convention: Mod+Return / Mod+Space / Mod+Shift+<letter>.
-    Mod+Return       hotkey-overlay-title="Terminal: kitty"        { spawn "kitty"; }
+    Mod+Return       hotkey-overlay-title="Terminal: foot"         { spawn "foot"; }
     Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "launcher" "toggle"; }
     Mod+Shift+B      hotkey-overlay-title="Browser: Zen"           { spawn "zen-browser"; }
     Mod+Shift+E      hotkey-overlay-title="File explorer: nautilus" { spawn "nautilus"; }
@@ -56,7 +56,7 @@ binds {
     Mod+Shift+L hotkey-overlay-title="Lock the screen" { spawn "quickshell" "-p" "/home/michael/.config/quickshell/lock/shell.qml"; }
 
     // Quake-style drop-down terminal — Mod+grave (`). Single floating
-    // kitty instance; toggle spawns / closes.
+    // foot instance; toggle spawns / closes.
     Mod+grave hotkey-overlay-title="Toggle drop-down terminal" { spawn "/home/michael/.local/bin/qs-quake-toggle"; }
     // Screen reader (orca). Allowed when locked.
     Super+Alt+S allow-when-locked=true hotkey-overlay-title="Toggle screen reader" { spawn-sh "pkill orca || exec orca"; }
@@ -77,9 +77,11 @@ binds {
     // ===== Universal clipboard (Omarchy parity) =====
     // wtype injects Ctrl+Insert / Shift+Insert / Ctrl+X into the
     // focused window. Every sane app (browsers, GTK, vim, …) treats
-    // those as Copy / Paste / Cut. kitty needs `map ctrl+insert
-    // copy_to_clipboard` + `map shift+insert paste_from_clipboard`
-    // in kitty.conf to recognise the injected keys.
+    // those as Copy / Paste / Cut. foot needs the matching
+    // `clipboard-copy=...Control+Insert` /
+    // `clipboard-paste=...Shift+Insert` binds in foot.ini so its
+    // default `primary-paste-selection` on Shift+Insert doesn't
+    // intercept the injected keys.
     Mod+C hotkey-overlay-title="Copy (universal)"  { spawn "wtype" "-M" "ctrl"  "-P" "Insert" "-p" "Insert" "-m" "ctrl"; }
     Mod+V hotkey-overlay-title="Paste (universal)" { spawn "wtype" "-M" "shift" "-P" "Insert" "-p" "Insert" "-m" "shift"; }
     Mod+X hotkey-overlay-title="Cut (universal)"   { spawn "wtype" "-M" "ctrl"  "-P" "x"      "-p" "x"      "-m" "ctrl"; }

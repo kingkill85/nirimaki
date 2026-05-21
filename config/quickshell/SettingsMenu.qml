@@ -46,9 +46,9 @@ Item {
     // Leaves have `action: function()`; branches have `children: [...]`.
     // `labelKey` is an I18n key; `icon` is an nf glyph.
     function _spawnTui(appId, cmd) {
-        // Launches a kitty window with a recognisable class so niri's
+        // Launches a foot window with a recognisable app-id so niri's
         // floating-TUI window-rule catches it (1000×640 centred).
-        Quickshell.execDetached(["kitty", "--class=tui-" + appId, "-e", cmd]);
+        Quickshell.execDetached(["foot", "--app-id=tui-" + appId, cmd]);
     }
     function _ipc(target, fn) {
         // Defer the IPC call so the menu finishes closing first —
@@ -75,10 +75,10 @@ Item {
                              action: () => root._spawnTui("wiremix", "wiremix") },
         "setup.bluetooth": { icon: "󰂯", labelKey: "settings.setup.bluetooth",
                              action: () => Quickshell.execDetached(["sh", "-lc",
-                                 "rfkill unblock bluetooth; kitty --class=tui-bluetui -e bluetui"]) },
+                                 "rfkill unblock bluetooth; foot --app-id=tui-bluetui bluetui"]) },
         "setup.wifi":      { icon: "󰖩", labelKey: "settings.setup.wifi",
                              action: () => Quickshell.execDetached(["sh", "-lc",
-                                 "rfkill unblock wifi 2>/dev/null; kitty --class=tui-impala -e impala"]) },
+                                 "rfkill unblock wifi 2>/dev/null; foot --app-id=tui-impala impala"]) },
         "setup.language":  { icon: "󰗊", labelKey: "settings.setup.language",
                              action: () => root._ipc("language-picker") },
 

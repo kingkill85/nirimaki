@@ -71,7 +71,7 @@ QtObject {
             else if (k === "color1")     urgent = v;
             else if (k === "cursor")     cursor = v;
             // color0..color15 etc. aren't consumed by the QML side yet —
-            // kitty/btop pick those up via D3 templates.
+            // foot/btop pick those up via D3 templates.
         }
     }
 

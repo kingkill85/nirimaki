@@ -56,7 +56,7 @@
   "keybind.title.screenshot-region-satty":   "Screenshot (Auswahl)",
   "keybind.title.settings":                  "Einstellungen",
   "keybind.title.stop":                      "Stopp",
-  "keybind.title.terminal-kitty":            "Terminal: kitty",
+  "keybind.title.terminal-foot":             "Terminal: foot",
   "keybind.title.theme-picker":              "Theme-Auswahl",
   "keybind.title.toggle-dictation":          "Diktat ein/aus",
   "keybind.title.toggle-drop-down-terminal": "Drop-down-Terminal",

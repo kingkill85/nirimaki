@@ -61,11 +61,12 @@ Item {
         // .desktop entries with `Terminal=true` (nvim, htop, btop, etc.)
         // expect to be launched inside a terminal emulator. Quickshell's
         // built-in `execute()` runs the Exec line as-is, which for these
-        // means "spawn nvim with no TTY" → exits instantly. Wrap in kitty
-        // when runInTerminal is set; tiled kitty windows are the
-        // appropriate Nirimaki host for TUI apps.
+        // means "spawn nvim with no TTY" → exits instantly. Wrap in foot
+        // when runInTerminal is set; tiled foot windows are the
+        // appropriate Nirimaki host for TUI apps. (foot takes the
+        // command as positional args after options — no `-e` like kitty.)
         if (e.runInTerminal && e.command && e.command.length > 0) {
-            Quickshell.execDetached(["kitty", "-e", ...e.command]);
+            Quickshell.execDetached(["foot", ...e.command]);
         } else {
             e.execute();
         }

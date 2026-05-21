@@ -9,7 +9,7 @@
 #   ~/.config/niri/                  → repo/config/niri/
 #   ~/.config/quickshell/            → repo/config/quickshell/
 #   ~/.config/fish/                  → repo/config/fish/
-#   ~/.config/kitty/                 → repo/config/kitty/
+#   ~/.config/foot/                  → repo/config/foot/
 #   ~/.config/tmux/                  → repo/config/tmux/
 #   ~/.config/nvim/                  → repo/config/nvim/
 #   ~/.config/theme/templates/       → repo/config/theme/templates/
@@ -78,7 +78,7 @@ echo "== Linking config dirs =="
 link_path "$REPO_DIR/config/niri"            "$HOME/.config/niri"
 link_path "$REPO_DIR/config/quickshell"      "$HOME/.config/quickshell"
 link_path "$REPO_DIR/config/fish"            "$HOME/.config/fish"
-link_path "$REPO_DIR/config/kitty"           "$HOME/.config/kitty"
+link_path "$REPO_DIR/config/foot"            "$HOME/.config/foot"
 link_path "$REPO_DIR/config/tmux"            "$HOME/.config/tmux"
 link_path "$REPO_DIR/config/nvim"            "$HOME/.config/nvim"
 mkdir -p "$HOME/.config/theme"

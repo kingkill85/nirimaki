@@ -7,7 +7,7 @@
 # Strategy: override only the accent-tied surfaces (cwd path,
 # active tab, active mode, focused selection) with Nirimaki's accent
 # hex. Everything else stays unset so yazi falls back to its preset
-# theme — which uses ANSI named colours that already track the kitty
+# theme — which uses ANSI named colours that already track the foot
 # palette → that's the same indirect-follow story bat / delta / tmux
 # use.
 

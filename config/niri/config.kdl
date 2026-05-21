@@ -236,7 +236,8 @@ window-rule {
 }
 
 // Inactive default opacity — 90 %, Omarchy parity. Per-app rules
-// further down override this (kitty stays 0.85 regardless of focus).
+// further down override this (the qs-quake-term rule pins a fixed
+// size, not opacity — terminals inherit the 0.97/0.9 default).
 window-rule {
     match is-active=false
     opacity 0.9
@@ -245,7 +246,7 @@ window-rule {
 // No per-terminal opacity override. Omarchy's
 // `apps/terminals.conf` tags alacritty/kitty/ghostty/foot but applies
 // the same `opacity 0.97 0.9` as the default rule — terminals are not
-// extra-translucent. Kitty therefore inherits the 0.97/0.9 active/
+// extra-translucent. Foot therefore inherits the 0.97/0.9 active/
 // inactive split from the global rules above (niri#1823 border-bleed
 // fix lives on the global rule).
 
@@ -348,7 +349,7 @@ window-rule {
     default-window-height { fixed 338; }
 }
 
-// Floating TUI/utility windows: kitty TUIs (app-id "tui-<name>") and
+// Floating TUI/utility windows: foot TUIs (app-id "tui-<name>") and
 // satty (the screenshot annotator). Fixed 1000×640 logical pixels.
 // Opacity inherits from the global 0.97 / is-active=false 0.9 rules.
 window-rule {
@@ -360,7 +361,7 @@ window-rule {
 }
 
 // Quake-style drop-down terminal (Phase H6). qs-quake-toggle spawns a
-// single kitty with --class=qs-quake-term; this rule pins it floating
+// single foot with --app-id=qs-quake-term; this rule pins it floating
 // at a wider 1400×720, larger than the TUI rule above for a roomier
 // drop-down feel.
 window-rule {

@@ -4,7 +4,7 @@ import Quickshell.Io
 
 // Bluetooth status icon. Polls `bluetoothctl show` every 5 s for the
 // adapter's power state. Click → launch/focus `bluetui` in a floating
-// kitty (same convention as btop / wiremix).
+// foot (same convention as btop / wiremix).
 Item {
     id: root
 

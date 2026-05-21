@@ -3,7 +3,7 @@ import Quickshell.Services.Pipewire
 
 // Default-sink volume + mute indicator.
 //   Left click     → toggle mute
-//   Right click    → launch/focus `wiremix` (per-app TUI mixer) in a floating kitty
+//   Right click    → launch/focus `wiremix` (per-app TUI mixer) in a floating foot
 //   Scroll up/down → adjust volume by 5 %
 Item {
     id: root

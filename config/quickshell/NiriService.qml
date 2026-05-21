@@ -113,7 +113,7 @@ QtObject {
 
     property Process _actionProc: Process { id: actionProc }
 
-    // Launch (or focus existing) a TUI in a floating kitty window.
+    // Launch (or focus existing) a TUI in a floating foot window.
     // app-id becomes "tui-<name>" so the niri ^tui- rule floats it.
     // Initial size is 120 cols × 32 rows — monitor-independent.
     function launchTui(/* name, ...cmd */) {
@@ -131,13 +131,11 @@ QtObject {
                 return;
             }
         }
-        const kittyCmd = ["kitty",
-            "--class=tui-" + name,
-            "--override", "initial_window_width=120c",
-            "--override", "initial_window_height=32c",
-            "-e"
+        const footCmd = ["foot",
+            "--app-id=tui-" + name,
+            "--window-size-chars=120x32"
         ].concat(cmd);
-        tuiProc.command = kittyCmd;
+        tuiProc.command = footCmd;
         tuiProc.startDetached();
     }
 

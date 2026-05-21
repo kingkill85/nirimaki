@@ -3,7 +3,7 @@
 #
 #   ~/.config/theme/themes/<name>/    sources (colors.toml, shell.toml,
 #                                     btop.theme, etc.)
-#   ~/.config/theme/templates/*.tpl   per-app templates (kitty, btop,
+#   ~/.config/theme/templates/*.tpl   per-app templates (foot, btop,
 #                                     swaylock, …). {{ key }} / {{
 #                                     key_strip }} / {{ key_rgb }}
 #                                     placeholders substituted from
@@ -53,8 +53,11 @@ done
 for existing in "$CURRENT_DIR"/*; do
   base=$(basename "$existing")
   # Don't sweep template outputs — those are regenerated below.
+  # foot.ini in particular is `include=`-watched by running foot
+  # instances and a transient absence between sweep + render would
+  # leave the next SIGUSR1 reload pointing at nothing.
   case "$base" in
-    kitty.conf|qt-colors.conf) continue ;;
+    foot.ini|qt-colors.conf) continue ;;
   esac
   if [[ -z ${keep[$base]+x} ]]; then
     rm -rf "$existing"
@@ -205,10 +208,46 @@ for qtc in "$HOME/.config/qt6ct/qt6ct.conf" "$HOME/.config/qt5ct/qt5ct.conf"; do
 done
 
 # ===== Reload running apps =====
-# Kitty: SIGUSR1 → re-read every included config file in every running
-# instance. Cheap and complete.
-if pgrep -x kitty >/dev/null 2>&1; then
-  pkill -SIGUSR1 -x kitty 2>/dev/null || true
+# foot: no disk reload signal. Foot's SIGUSR1 only toggles the
+# in-memory [colors-dark] / [colors-light] palette pair that was
+# loaded at startup — it does NOT re-read the config file, so a
+# fresh ~/.config/theme/current/foot.ini is invisible to running
+# instances. Drive a live palette swap via OSC escape sequences
+# written to each foot's pts slave (the same channel a program
+# inside the terminal would use to recolour the chrome). Foot
+# interprets these out-of-band of whatever's running on the
+# command line, so vim / less / fzf etc. all recolour live.
+#
+# Newly-spawned foot instances pick up the rendered foot.ini from
+# disk on launch as normal — the OSC pass is for the existing ones.
+if pgrep -x foot >/dev/null 2>&1; then
+  ESC=$'\e'; BEL=$'\a'
+  declare -A FOOTC=()
+  while IFS= read -r line; do
+    if [[ $line =~ ^[[:space:]]*([A-Za-z0-9_]+)[[:space:]]*=[[:space:]]*\"(#[0-9A-Fa-f]{6})\" ]]; then
+      FOOTC[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+    fi
+  done < "$CURRENT_DIR/colors.toml"
+
+  foot_osc=""
+  for i in 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    c=${FOOTC[color$i]:-}
+    [[ -n $c ]] && foot_osc+="${ESC}]4;${i};${c}${BEL}"
+  done
+  [[ -n ${FOOTC[foreground]:-} ]]           && foot_osc+="${ESC}]10;${FOOTC[foreground]}${BEL}"
+  [[ -n ${FOOTC[background]:-} ]]           && foot_osc+="${ESC}]11;${FOOTC[background]}${BEL}"
+  [[ -n ${FOOTC[cursor]:-} ]]               && foot_osc+="${ESC}]12;${FOOTC[cursor]}${BEL}"
+  [[ -n ${FOOTC[selection_background]:-} ]] && foot_osc+="${ESC}]17;${FOOTC[selection_background]}${BEL}"
+  [[ -n ${FOOTC[selection_foreground]:-} ]] && foot_osc+="${ESC}]19;${FOOTC[selection_foreground]}${BEL}"
+
+  if [[ -n $foot_osc ]]; then
+    for foot_pid in $(pgrep -x foot); do
+      for child_pid in $(pgrep -P "$foot_pid" 2>/dev/null); do
+        tty=$(readlink "/proc/$child_pid/fd/1" 2>/dev/null) || continue
+        [[ $tty == /dev/pts/* && -w $tty ]] && printf '%s' "$foot_osc" > "$tty" 2>/dev/null || true
+      done
+    done
+  fi
 fi
 
 # Quickshell: explicit IPC reload — see niri-setup/phase-d-theming.md

@@ -181,9 +181,11 @@ Everything from H1–H9 plus a parity-driven LazyVim pass landed:
   on commands taking >5s.
 - ✅ **H6** — `bm` fish function (named directory bookmarks,
   `~/.local/share/fish/bookmarks` store, Ctrl-B fzf picker).
-  `qs-quake-toggle` script for the Quake-style drop-down kitty,
+  `qs-quake-toggle` script for the Quake-style drop-down terminal,
   bound to `Mod+grave`. Persists via a `tmux new-session -A -s
-  quake` wrapper so closing the kitty keeps the session alive.
+  quake` wrapper so closing the terminal keeps the session alive.
+  (Originally targeted kitty; rewritten to foot on 2026-05-21 —
+  see the post-Phase-H section below.)
 - ✅ **H7** — tmux 3.6a + the Omarchy `tmux.conf` ported verbatim
   (C-Space prefix, Alt+1-9 windows, Alt+Enter pane splits, vi
   copy, status bar). Plus the four bash-fns ported as fish
@@ -242,6 +244,11 @@ Omarchy-parity additions: explicit `JetBrainsMono Nerd Font`,
 tab bar, block cursor, no audio bell. Font size left at kitty's
 default 11pt — Omarchy's 9pt is too small at 1440p+.
 
+> **Superseded 2026-05-21** by the foot migration below.
+> `config/kitty/` and `config/theme/templates/kitty.conf.tpl` are
+> gone from the repo; the kitty package can stay installed as a
+> fallback but is no longer first-class.
+
 ### Omarchy shortcut ports (fish functions)
 
 | Function | Equivalent of | Purpose |
@@ -274,16 +281,107 @@ default 11pt — Omarchy's 9pt is too small at 1440p+.
   (the scrim and dialog are separate WlrLayershell surfaces —
   Wayland delivers clicks to one or the other, not both).
 
-### Known bug — mouse-wheel scrolling in KeybindSheet
+### KeybindSheet — keyboard nav redone the stock way
 
-Despite removing the MouseArea + adding an explicit `WheelHandler`
-on the ListView, mouse-wheel scrolling **still does not work** in
-the keybind sheet on the user's setup (niri + Quickshell on
-Wayland). Keyboard navigation works fine. Investigation lead:
-WheelHandler in QML 6 may not receive wheel events on a Flickable
-descendant in a WlrLayershell surface; further debugging
-deferred. The keyboard-nav fix is enough to use the sheet day to
-day.
+The hand-rolled `keyCatcher` Item + custom `WheelHandler` + direct
+`ListView.contentY` math is gone. Replaced with the same pattern
+Launcher uses:
+
+- Filter is a real `TextInput` with `focus: true` — typing and
+  backspace are native, no `event.text` synthesis.
+- `Keys.onDownPressed` / `Keys.onUpPressed` call a `move(delta)`
+  helper that sets `list.currentIndex` and `positionViewAtIndex(idx,
+  ListView.Contain)`. `Keys.onPressed` covers PgUp/PgDn (Qt's
+  `Keys` attached property has no named signal for those).
+- Bind-row delegate now responds to `ListView.isCurrentItem` with a
+  faint `fg @ 7% alpha` background + accent-colored chord text, so
+  Up/Down actually *show* something happening. Without that
+  highlight the previous code was scrolling an invisible cursor —
+  events were arriving (confirmed via `console.log`), the user just
+  couldn't tell.
+
+Direct `contentY` manipulation was the cause of the earlier "won't
+scroll to the end / visual glitches on scroll-up" bug: ListView is
+virtualising with non-uniform delegate heights (section=30,
+bind=26), so `contentHeight` is only an estimate until all
+delegates realise — assigning `contentY = contentHeight - height`
+lands past the real end and snaps + glitches as more delegates
+realise. `positionViewAtIndex` doesn't have this problem because
+Qt handles realisation internally.
+
+### Post-Phase H: foot replaced kitty (2026-05-21)
+
+Default terminal swap to [foot](https://codeberg.org/dnkl/foot) —
+1.27 from the Arch package. Reasoning the user gave: lighter, native
+Wayland (no XWayland fallback path), better fit with niri's column
+model. Migration was full, not surface-level:
+
+- **`Mod+Return`** → `spawn "foot"` (was kitty).
+- **`config/foot/foot.ini`** — repo-side base config. Same shell /
+  font / padding intent as the old kitty.conf, plus an explicit
+  `[key-bindings]` rebinding `clipboard-paste` onto Shift+Insert so
+  the universal-clipboard wtype injection (Mod+V) actually pastes
+  CLIPBOARD instead of foot's default `primary-paste-selection`.
+- **`config/theme/templates/foot.ini.tpl`** — palette + alpha=0.99,
+  rendered into both `[colors-dark]` and `[colors-light]` (foot
+  1.27 deprecated the unified `[colors]` section) and included
+  into foot.ini at the top level. New foot instances pick this up
+  on launch.
+- **Live theme reload** doesn't use SIGUSR1 like kitty did — foot's
+  SIGUSR1 only toggles the in-memory `[colors-dark]`/`[colors-light]`
+  pair that was loaded at startup, it doesn't re-read the file.
+  qs-theme-set instead writes OSC palette sequences (OSC 4 for
+  indexed 0–15, OSC 10/11/12/17/19 for fg/bg/cursor/selection)
+  directly to each running foot's pts slave (found via
+  `/proc/<child-shell-pid>/fd/1`). Foot interprets the OSCs the
+  same as if a program inside the terminal printed them, so live
+  recolouring works regardless of what's on the command line —
+  vim, less, fzf, lazygit all repaint immediately.
+- **`qs-quake-toggle`** — switched to `foot --app-id=qs-quake-term`
+  (was `kitty --class=...`). tmux wrapper unchanged: foot takes the
+  exec command as positional args after options, no `-e` flag like
+  kitty.
+- **`NiriService.launchTui` + `SettingsMenu` TUI spawns** —
+  `kitty --class=tui-X -e CMD` rewritten as
+  `foot --app-id=tui-X CMD`. `--override initial_window_*` (kitty
+  syntax) replaced with foot's `--window-size-chars=120x32`.
+- **`Launcher.qml`** — `runInTerminal` wrap is now
+  `["foot", ...e.command]`.
+- **`ff.fish`** — image preview path forks on `$TERM`: foot* uses
+  `img2sixel` (foot has native sixel rendering); xterm-kitty keeps
+  kitty icat as a fallback in case kitty is launched manually.
+- **niri window-rules** in config.kdl already matched on `app-id`
+  (which foot sets via `--app-id=` exactly the way kitty set it via
+  `--class=`); only the explanatory comments needed updating.
+  Floating TUI rule (`^tui-`) and quake rule (`qs-quake-term`) both
+  apply identically to foot.
+- **i18n** — `keybind.title.terminal-kitty` →
+  `keybind.title.terminal-foot` (the slug is derived from the
+  `hotkey-overlay-title`, which itself changed).
+- **Removed**: `config/kitty/`, `config/theme/templates/kitty.conf.tpl`,
+  the kitty `link_path` line in `dev-link.sh`. `config/foot/` linked
+  instead. The kitty pacman package is left in place — kitty still
+  works if launched manually, it's just no longer wired through the
+  shell.
+
+> No keybind conflicts. Mod+Insert / Shift+Insert paths are
+> identical between the two terminals; foot's `[key-bindings]`
+> entries above ensure parity.
+
+### Still broken — mouse-wheel in KeybindSheet
+
+Even after removing the custom WheelHandler and falling back to
+ListView's native Flickable wheel handling, the mouse wheel does
+not scroll the keybind sheet. Other Quickshell projects on
+WlrLayershell report native wheel works for them, so this is most
+likely environmental — note the runtime warning:
+
+> Quickshell was built against Qt 6.11.0 but the system has
+> updated to Qt 6.11.1 without rebuilding the package.
+
+Worth rebuilding `quickshell` (`yay -S quickshell-git` or rebuild
+the AUR package) before treating this as a Quickshell/niri bug.
+Keyboard nav is the daily-driver path either way.
 
 ### Out-of-Phase-H groundwork picked up while doing it
 
