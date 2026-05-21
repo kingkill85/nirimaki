@@ -1,0 +1,34 @@
+#!/bin/bash
+# nirimaki:group=locale
+# nirimaki:summary=Set the Quickshell UI locale override (or restore system default)
+# nirimaki:args=<code|system>
+#
+# Writes ~/.config/quickshell/locale (one line, the locale code) so
+# the I18n singleton picks it up reactively. Passing `system` deletes
+# the override file so I18n falls back to $LANG / $LC_MESSAGES.
+#
+# Called by the SettingsMenu → Setup → Language drilldown leaves.
+# Equivalent to picking from the standalone LanguagePicker dialog —
+# that picker still works via `quickshell ipc call -- language-picker`
+# (used by Calendar's date-heading shortcut).
+
+set -e
+
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $(basename "$0") <code|system>" >&2
+  exit 1
+fi
+
+locale_file="${XDG_CONFIG_HOME:-$HOME/.config}/quickshell/locale"
+
+case "$1" in
+  system)
+    rm -f -- "$locale_file"
+    notify-send -u low "Language" "System default" -t 2000 2>/dev/null || true
+    ;;
+  *)
+    mkdir -p "$(dirname "$locale_file")"
+    printf '%s\n' "$1" > "$locale_file"
+    notify-send -u low "Language" "$1" -t 2000 2>/dev/null || true
+    ;;
+esac
