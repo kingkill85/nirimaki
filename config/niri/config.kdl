@@ -150,6 +150,13 @@ spawn-at-startup "quickshell"
 // nirimaki-theme-set after every swap so the wallpaper follows the theme.
 spawn-sh-at-startup "$HOME/.local/bin/nirimaki-wallpaper-apply"
 
+// Feature-state snapshot — drives the SettingsMenu's
+// install/remove filter (so already-installed apps don't appear
+// under Install, and missing apps don't appear under Remove).
+// Refreshed by nirimaki-hook-run after every install/remove event;
+// this initial pass seeds the cache for the menu's first open.
+spawn-sh-at-startup "$HOME/.local/bin/nirimaki-feature-state"
+
 // Idle: lock after 5 min, power off displays after 10 min, lock before suspend.
 // Niri auto-powers monitors back on at any input — no `resume` action needed.
 spawn-sh-at-startup "swayidle -w timeout 300 'quickshell -p $HOME/.config/quickshell/lock/shell.qml' timeout 600 'niri msg action power-off-monitors' before-sleep 'quickshell -p $HOME/.config/quickshell/lock/shell.qml'"
@@ -404,6 +411,40 @@ window-rule {
     match app-id=r#"^org\.gnome\.World\.Secrets$"#
 
     block-out-from "screen-capture"
+}
+
+// Bitwarden — float by default (Electron window is dialog-shaped,
+// doesn't tile gracefully). Matches Omarchy's apps/bitwarden.lua
+// `tag = "+floating-window"`. Screen-capture block is on the rule
+// above (Bitwarden is already in that match list).
+window-rule {
+    match app-id=r#"^Bitwarden$"#
+    match app-id=r#"^chrome-nngceckbapebfimnlniiiahkandclblb-Default$"#
+    open-floating true
+}
+
+// Steam — Valve client. Matches Omarchy's apps/steam.lua:
+//   - opacity always 1.0 (game art / library thumbnails need full
+//     fidelity; translucency on those bleeds the desktop through)
+//   - floats by default (Steam's main UI is a single window that
+//     wants a fixed size, plus dozens of transient popups —
+//     friends list, achievements, dialogs — none of which tile well)
+//   - main window pinned to 1100×700, Friends List to 460×800
+//     (Omarchy parity)
+window-rule {
+    match app-id=r#"^steam$"#
+    opacity 1.0
+    open-floating true
+}
+window-rule {
+    match app-id="steam" title="^Steam$"
+    default-column-width { fixed 1100; }
+    default-window-height { fixed 700; }
+}
+window-rule {
+    match app-id="steam" title="^Friends List$"
+    default-column-width { fixed 460; }
+    default-window-height { fixed 800; }
 }
 
 // Example: enable rounded corners for all windows.

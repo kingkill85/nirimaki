@@ -1,0 +1,58 @@
+#!/bin/bash
+# nirimaki:group=feature
+# nirimaki:summary=Emit ~/.cache/nirimaki/state.json — drives menu's install/remove filter
+# nirimaki:hidden=true
+#
+# Writes a single JSON object mapping feature → boolean (true if
+# installed, false otherwise). SettingsMenu.qml FileView-watches the
+# file and hides install leaves for already-installed features
+# (and remove leaves for not-installed ones).
+#
+# Run by:
+#   - niri spawn-at-startup (initial seed when the session starts)
+#   - end of every nirimaki-<feature>-install / -remove (refresh)
+#   - manually if you've installed something outside the menu
+#     (`nirimaki feature state` to refresh)
+#
+# Detection strategy per feature:
+#   binary on PATH    (fast, works for most CLI/GUI tools)
+#   pacman -Qi <pkg>  (handles libs that don't put a binary on PATH)
+#   .desktop in XDG   (only for browsers / webapps)
+#
+# Adding a new feature: append a line below. Keep names lowercase /
+# matching the `<feature>` in `bin/nirimaki-<feature>-install`.
+
+set -u
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/nirimaki"
+OUT="$CACHE_DIR/state.json"
+mkdir -p "$CACHE_DIR"
+
+has_bin()    { command -v "$1" >/dev/null 2>&1; }
+has_pkg()    { pacman -Qi "$1" >/dev/null 2>&1; }
+has_helix()  { has_bin hx || has_bin helix; }
+
+emit() { printf '  "%s": %s,\n' "$1" "$2"; }
+yn()   { if "$@"; then echo true; else echo false; fi; }
+
+{
+  echo '{'
+  emit voxtype    "$(yn has_bin voxtype)"
+  emit tailscale  "$(yn has_bin tailscale)"
+  emit bitwarden  "$(yn has_pkg bitwarden)"
+  emit vscode     "$(yn has_bin code)"
+  emit helix      "$(yn has_helix)"
+  emit steam      "$(yn has_pkg steam)"
+  emit zed        "$(yn has_bin zed)"
+  emit nvim       "$(yn has_bin nvim)"
+  # Generated. Refreshed on every install/remove + at session start.
+  # Last record has no trailing comma (printf below replaces the last
+  # `,\n` with `\n`).
+  echo '  "_updated": "'"$(date -Iseconds)"'"'
+  echo '}'
+} > "$OUT.tmp"
+
+# Strip trailing comma on the last data line (we wrote `_updated` as
+# the no-comma terminator, so the file is already valid). Move
+# atomically so FileView sees a consistent snapshot.
+mv "$OUT.tmp" "$OUT"

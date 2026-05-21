@@ -13,45 +13,64 @@
 
 set -e
 
-# shellcheck source=nirimaki-feature-prelude
-. "$HOME/.local/bin/nirimaki-feature-prelude"
+# Two modes:
+#   nirimaki-editor-default <bin>   ← direct: set <bin> as $EDITOR (used
+#                                     by SettingsMenu drilldown leaves)
+#   nirimaki-editor-default          ← interactive: fzf-pick among
+#                                     installed editors (used by CLI)
+#
+# When called from the SettingsMenu's drilldown the banner/foot
+# shouldn't fire — direct mode is non-interactive and just updates the
+# fish + bash env in place. When called interactively from a terminal
+# it falls back to the legacy banner + fzf flow.
 
-nirimaki_banner "Default editor" "Select"
-
-# Common candidates, in display order. Special-case: helix's binary
-# is `hx` on Arch, `helix` on some distros — accept either.
-declare -A LABELS=(
-  [nvim]="Neovim (nvim)"
-  [helix]="Helix (helix)"
-  [hx]="Helix (hx)"
-  [code]="VS Code (code)"
-  [codium]="VS Codium (codium)"
-  [zed]="Zed (zed)"
-  [subl]="Sublime Text (subl)"
-  [emacs]="Emacs (emacs)"
-  [micro]="micro"
-  [nano]="GNU nano"
-  [vim]="Vim"
-)
-ORDER=(nvim helix hx code codium zed subl emacs micro nano vim)
-
-installed=()
-for bin in "${ORDER[@]}"; do
-  command -v "$bin" >/dev/null 2>&1 && installed+=("$bin")
-done
-
-if [[ ${#installed[@]} -eq 0 ]]; then
-  echo "No editors detected. Install one via Settings → Install → Editor first." >&2
-  nirimaki_pause
-  exit 1
-fi
-
-if [[ ${#installed[@]} -eq 1 ]]; then
-  chosen="${installed[0]}"
-  echo "Only one editor detected: ${LABELS[$chosen]:-$chosen}"
-  echo "Setting it as the default."
+# --- direct mode (single arg = binary to set) ---
+if [[ $# -eq 1 ]]; then
+  chosen="$1"
+  if ! command -v "$chosen" >/dev/null 2>&1; then
+    notify-send -u critical "Editor not installed" \
+      "'$chosen' is not on PATH. Install via Settings → Install → Editor first." 2>/dev/null \
+      || echo "nirimaki-editor-default: '$chosen' is not on PATH" >&2
+    exit 1
+  fi
+  _interactive=0
 else
-  if ! command -v fzf >/dev/null 2>&1; then
+  # --- interactive mode ---
+  # shellcheck source=nirimaki-feature-prelude
+  . "$HOME/.local/bin/nirimaki-feature-prelude"
+  nirimaki_banner "Default editor" "Select"
+
+  declare -A LABELS=(
+    [nvim]="Neovim (nvim)"
+    [helix]="Helix (helix)"
+    [hx]="Helix (hx)"
+    [code]="VS Code (code)"
+    [codium]="VS Codium (codium)"
+    [zed]="Zed (zed)"
+    [subl]="Sublime Text (subl)"
+    [emacs]="Emacs (emacs)"
+    [micro]="micro"
+    [nano]="GNU nano"
+    [vim]="Vim"
+  )
+  ORDER=(nvim helix hx code codium zed subl emacs micro nano vim)
+
+  installed=()
+  for bin in "${ORDER[@]}"; do
+    command -v "$bin" >/dev/null 2>&1 && installed+=("$bin")
+  done
+
+  if [[ ${#installed[@]} -eq 0 ]]; then
+    echo "No editors detected. Install one via Settings → Install → Editor first." >&2
+    nirimaki_pause
+    exit 1
+  fi
+
+  if [[ ${#installed[@]} -eq 1 ]]; then
+    chosen="${installed[0]}"
+    echo "Only one editor detected: ${LABELS[$chosen]:-$chosen}"
+    echo "Setting it as the default."
+  elif ! command -v fzf >/dev/null 2>&1; then
     echo "fzf not installed — falling back to numbered prompt." >&2
     i=1
     for bin in "${installed[@]}"; do
@@ -63,7 +82,6 @@ else
       || { echo "abort"; exit 1; }
     chosen="${installed[$((idx-1))]}"
   else
-    # fzf picker: show "<label>\t<bin>"; trim bin off the result.
     chosen=$(
       for bin in "${installed[@]}"; do
         printf '%s\t%s\n' "${LABELS[$bin]:-$bin}" "$bin"
@@ -73,6 +91,7 @@ else
     )
     [[ -z $chosen ]] && { echo "abort"; exit 0; }
   fi
+  _interactive=1
 fi
 
 # --- write fish env ---
@@ -105,13 +124,19 @@ p.write_text(content)
 PY
 fi
 
-echo
-echo "  ✓ EDITOR=$chosen   ($(command -v "$chosen"))"
-echo "  → new fish / bash shells will pick this up automatically;"
-echo "    running shells need to re-source (or just open a new terminal)."
+if [[ ${_interactive:-1} -eq 1 ]]; then
+  echo
+  echo "  ✓ EDITOR=$chosen   ($(command -v "$chosen"))"
+  echo "  → new fish / bash shells will pick this up automatically;"
+  echo "    running shells need to re-source (or just open a new terminal)."
+else
+  # Direct (drilldown) mode — surface success via notify-send since
+  # there's no foot window to print to.
+  notify-send -u low "Default editor" "$chosen" -t 2500 2>/dev/null || true
+fi
 
 if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
   "$HOME/.local/bin/nirimaki-hook-run" editor-set "$chosen" || true
 fi
 
-nirimaki_pause
+[[ ${_interactive:-1} -eq 1 ]] && nirimaki_pause
