@@ -14,7 +14,6 @@ Item {
     id: root
 
     property bool opened: false
-    property string filterText: ""
     property string raw: ""
     property var rows: []   // [{kind: "section"|"bind", section?, chord?, label?}, …]
 
@@ -55,16 +54,22 @@ Item {
 
     function open() {
         opened = true;
-        filterText = "";
+        if (shell.searchField) shell.searchField.text = "";
         reparse();
-        Qt.callLater(() => keyCatcher.forceActiveFocus());
+        Qt.callLater(() => { if (shell.searchField) shell.searchField.forceActiveFocus(); });
     }
     function closeMenu()  { opened = false }
     function toggleMenu() { opened ? closeMenu() : open() }
 
-    function setFilter(next) {
-        filterText = next;
-        rebuildView();
+    // Same pattern as Launcher: nudge currentIndex with bounds, then
+    // ask ListView to keep it visible. ListView handles all the
+    // scrolling math.
+    function move(delta) {
+        const n = displayModel.count;
+        if (n === 0) return;
+        const next = Math.max(0, Math.min(n - 1, list.currentIndex + delta));
+        list.currentIndex = next;
+        list.positionViewAtIndex(next, ListView.Contain);
     }
 
     // ---- Parser -------------------------------------------------
@@ -162,7 +167,7 @@ Item {
 
     function rebuildView() {
         displayModel.clear();
-        const q = filterText.trim().toLowerCase();
+        const q = (shell.searchField ? shell.searchField.text : "").trim().toLowerCase();
         let lastSection = "";
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
@@ -221,112 +226,93 @@ Item {
         cardBorderColor: root.border
         cardRadius: root.cornerRadius
 
+        // Exposed so root.open() can reset / focus the field without
+        // reaching across the DialogShell content boundary by id.
+        property alias searchField: search
+
         onCloseRequested: root.closeMenu()
 
-        Item {
-            id: keyCatcher
+        Column {
             anchors.fill: parent
-            focus: true
-            Keys.priority: Keys.BeforeItem
-            Keys.onPressed: (event) => {
-                if (event.key === Qt.Key_Escape) {
-                    if (root.filterText) root.setFilter("");
-                    else root.closeMenu();
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Backspace) {
-                    if (root.filterText.length > 0)
-                        root.setFilter(root.filterText.slice(0, -1));
-                    event.accepted = true;
-                // Keyboard scroll. Single arrow = one row (26 px); PgUp/Dn
-                // = 90% of viewport; Home/End jump to the ends.
-                } else if (event.key === Qt.Key_Down) {
-                    list.contentY = Math.min(
-                        Math.max(0, list.contentHeight - list.height),
-                        list.contentY + 26);
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Up) {
-                    list.contentY = Math.max(0, list.contentY - 26);
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_PageDown) {
-                    list.contentY = Math.min(
-                        Math.max(0, list.contentHeight - list.height),
-                        list.contentY + list.height * 0.9);
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_PageUp) {
-                    list.contentY = Math.max(0, list.contentY - list.height * 0.9);
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_Home) {
-                    list.contentY = 0;
-                    event.accepted = true;
-                } else if (event.key === Qt.Key_End) {
-                    list.contentY = Math.max(0, list.contentHeight - list.height);
-                    event.accepted = true;
-                } else if (event.text && event.text.length === 1 &&
-                           event.text.charCodeAt(0) >= 32 &&
-                           event.text.charCodeAt(0) !== 127) {
-                    root.setFilter(root.filterText + event.text);
-                    event.accepted = true;
-                }
-            }
+            anchors.margins: root.contentMargin
+            spacing: root.contentSpacing
 
-            Column {
-                anchors.fill: parent
-                anchors.margins: root.contentMargin
-                spacing: root.contentSpacing
+            // Filter header — a real TextInput. Typing, backspace, text
+            // cursor (Home/End within the text) are all native; we only
+            // override the keys that should navigate the list.
+            Item {
+                width: parent.width
+                height: root.headerHeight
 
-                // Filter header.
-                Item {
-                    width: parent.width
-                    height: root.headerHeight
-
-                    Text {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.filterText
-                              || I18n.t("keybinds.placeholder")
-                        color: root.foreground
-                        opacity: root.filterText ? 1 : 0.58
-                        font.family: root.fontFamily
-                        font.pixelSize: Theme.menuFontPx
-                        elide: Text.ElideRight
-                    }
-                }
-
-                ListView {
-                    id: list
-                    width: parent.width
-                    height: parent.height - root.headerHeight - root.contentSpacing
-                    model: displayModel
+                TextInput {
+                    id: search
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: root.foreground
+                    selectionColor: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                    selectedTextColor: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Theme.menuFontPx
                     clip: true
-                    spacing: 2
-                    boundsBehavior: Flickable.StopAtBounds
+                    focus: true
 
-                    // Explicit wheel handler. QML 6's MouseArea + sibling
-                    // anchor.fill items don't always route wheel events
-                    // to the inner Flickable; this PointerHandler claims
-                    // wheel events on the list area directly.
-                    WheelHandler {
-                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                        onWheel: function(event) {
-                            const step = event.angleDelta.y / 120 * 26 * 3;  // ~3 rows per notch
-                            list.contentY = Math.min(
-                                Math.max(0, list.contentHeight - list.height),
-                                Math.max(0, list.contentY - step));
+                    onTextChanged: { list.currentIndex = 0; root.rebuildView(); }
+
+                    Keys.onEscapePressed: {
+                        if (text) text = "";
+                        else root.closeMenu();
+                    }
+                    Keys.onDownPressed: root.move(1)
+                    Keys.onUpPressed:   root.move(-1)
+                    Keys.onPressed: (event) => {
+                        if (event.key === Qt.Key_PageDown) {
+                            root.move(10);
+                            event.accepted = true;
+                        } else if (event.key === Qt.Key_PageUp) {
+                            root.move(-10);
+                            event.accepted = true;
                         }
                     }
 
-                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    Text {
+                        visible: search.text === ""
+                        anchors.fill: parent
+                        text: I18n.t("keybinds.placeholder")
+                        color: root.foreground
+                        opacity: 0.58
+                        font: search.font
+                        elide: Text.ElideRight
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+            }
 
-                    delegate: Item {
+            ListView {
+                id: list
+                width: parent.width
+                height: parent.height - root.headerHeight - root.contentSpacing
+                model: displayModel
+                clip: true
+                spacing: 2
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                    delegate: Rectangle {
                         id: row
                         required property string kind
                         required property string section
                         required property string chord
                         required property string label
+                        readonly property bool selected: ListView.isCurrentItem && row.kind === "bind"
 
                         width: ListView.view.width
                         height: row.kind === "section" ? 30 : 26
+                        radius: Theme.radius
+                        color: row.selected
+                               ? Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.07)
+                               : "transparent"
 
                         // ---- Section header ----
                         Text {
@@ -352,7 +338,7 @@ Item {
                                 width: root.chordColumnWidth
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: row.chord
-                                color: root.foreground
+                                color: row.selected ? root.accent : root.foreground
                                 font.family: root.fontFamily
                                 font.pixelSize: Theme.fontPx
                             }
@@ -371,4 +357,3 @@ Item {
             }
         }
     }
-}
