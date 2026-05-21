@@ -24,14 +24,14 @@ in the SettingsMenu.
 
 ## Webapps stay on Chromium even when default browser is Zen
 
-Decision: `qs-webapp-launch` hardcodes `/usr/bin/chromium`. If the
+Decision: `nirimaki-webapp-launch` hardcodes `/usr/bin/chromium`. If the
 user picks Firefox or Zen as default browser via the SettingsMenu,
 regular link-clicking goes there — but installed webapps still open
 in Chromium so live theming keeps working. Same call Omarchy makes.
 
 ## What shipped
 
-### bin/qs-theme-set — Chromium hook
+### bin/nirimaki-theme-set — Chromium hook
 
 After the templates render, parse `~/.config/theme/current/colors.toml`
 into an associative array `THEMEC`, then:
@@ -59,11 +59,11 @@ Key details:
   chrome and vice versa.
 - **`-w` guard** silently skips if `/etc/chromium/policies/managed/`
   isn't writable yet — the install step below makes it writable
-  once. `qs-theme-set` never sudoes.
+  once. `nirimaki-theme-set` never sudoes.
 - **THEMEC** is parsed once at the top of the reload section; foot's
   OSC palette pass and this chromium pass share it.
 
-### bin/qs-webapp-install — interactive walker
+### bin/nirimaki-webapp-install — interactive walker
 
 Bash walker mirroring `omarchy-webapp-install` without the gum
 dependency. Plain `read` prompts for Name + URL → auto-fetches a
@@ -72,14 +72,14 @@ dependency. Plain `read` prompts for Name + URL → auto-fetches a
 to `[a-z0-9-]`, writes:
 
 ```
-~/.local/share/applications/qs-webapp-<slug>.desktop
-~/.local/share/applications/icons/qs-webapp-<slug>.png
+~/.local/share/applications/nirimaki-webapp-<slug>.desktop
+~/.local/share/applications/icons/nirimaki-webapp-<slug>.png
 ```
 
 The `.desktop`:
 ```
-Exec=$HOME/.local/bin/qs-webapp-launch <slug> '<url>'
-StartupWMClass=qs-webapp-<slug>
+Exec=$HOME/.local/bin/nirimaki-webapp-launch <slug> '<url>'
+StartupWMClass=nirimaki-webapp-<slug>
 Categories=Network;WebBrowser;
 ```
 
@@ -87,7 +87,7 @@ Trailing `read -p "Press Enter to close…"` so the foot window the
 walker runs in doesn't disappear before the user can read the
 result.
 
-### bin/qs-webapp-launch — chromium --app wrapper
+### bin/nirimaki-webapp-launch — chromium --app wrapper
 
 Always uses `/usr/bin/chromium`, regardless of default-browser
 setting. Per-app `--user-data-dir`:
@@ -95,8 +95,8 @@ setting. Per-app `--user-data-dir`:
 ```bash
 exec chromium \
   --ozone-platform-hint=auto \
-  --user-data-dir="$HOME/.cache/qs-webapps/$slug" \
-  --class="qs-webapp-$slug" \
+  --user-data-dir="$HOME/.cache/nirimaki-webapps/$slug" \
+  --class="nirimaki-webapp-$slug" \
   --app="$url" \
   --no-first-run --no-default-browser-check
 ```
@@ -106,20 +106,20 @@ Omarchy [#1384 RFE](https://github.com/basecamp/omarchy/issues/1384)
 asked for this; we made it the default (each webapp gets its own
 logins, no cookie cross-contamination). Cost: a few MB per webapp.
 
-### bin/qs-webapp-remove — fzf picker
+### bin/nirimaki-webapp-remove — fzf picker
 
-fzf over `qs-webapp-*.desktop` entries. On confirmation, removes
+fzf over `nirimaki-webapp-*.desktop` entries. On confirmation, removes
 the `.desktop`, the icon, and the user-data-dir (so logged-in
 sessions go too — same UX as Chromium's "remove PWA" UI).
 
-### bin/qs-browser-launch + bin/qs-default-browser-set
+### bin/nirimaki-browser-launch + bin/nirimaki-browser-default
 
-`qs-browser-launch` reads `xdg-settings get default-web-browser`
+`nirimaki-browser-launch` reads `xdg-settings get default-web-browser`
 and exec's the matching binary; bound to `Mod+Shift+B` so the
 keybind respects the current default without needing a niri
 reload.
 
-`qs-default-browser-set <chromium|firefox|zen>` calls
+`nirimaki-browser-default <chromium|firefox|zen>` calls
 `xdg-settings set default-web-browser <name>.desktop` and writes
 `set -gx BROWSER <name>` to `~/.config/fish/conf.d/browser.fish`
 so new fish shells inherit it.
@@ -130,14 +130,14 @@ Two new top-level branches added (after `setup`, before `system`),
 mirroring Omarchy's `omarchy-menu` Install / Remove branches:
 
 ```
-Install → Web App   (spawns foot running qs-webapp-install)
-Remove  → Web App   (spawns foot running qs-webapp-remove)
+Install → Web App   (spawns foot running nirimaki-webapp-install)
+Remove  → Web App   (spawns foot running nirimaki-webapp-remove)
 ```
 
 And under `setup`:
 
 ```
-Default browser → Zen / Firefox / Chromium  (qs-default-browser-set)
+Default browser → Zen / Firefox / Chromium  (nirimaki-browser-default)
 ```
 
 i18n keys added to both `en.json` and `de.json`:
@@ -148,7 +148,7 @@ i18n keys added to both `en.json` and `de.json`:
 
 ```kdl
 window-rule {
-    match app-id=r#"^qs-webapp-"#
+    match app-id=r#"^nirimaki-webapp-"#
     opacity 1.0
 }
 ```
@@ -160,7 +160,7 @@ and the chrome's `BrowserThemeColor` stripe. Matches Omarchy's
 ### config/niri/keybinds.kdl
 
 `Mod+Shift+B` switched from hardcoded `spawn "zen-browser"` to
-`spawn "/home/michael/.local/bin/qs-browser-launch"` — follows the
+`spawn "/home/michael/.local/bin/nirimaki-browser-launch"` — follows the
 default-browser setting.
 
 ### dev-link.sh
@@ -194,17 +194,17 @@ xdg-settings set default-web-browser zen-browser.desktop \
   || xdg-settings set default-web-browser firefox.desktop
 ```
 
-The chmod is the only privileged step at runtime. `qs-theme-set`
+The chmod is the only privileged step at runtime. `nirimaki-theme-set`
 never sudoes; if the dir isn't writable it silently degrades to
 "no live chromium reload" (newly-spawned chromium instances still
 pick up theming on launch via the policy file from a previous run).
 
 Per-user state initialized on first launch:
-- `~/.cache/qs-webapps/<slug>/` — created lazily by `qs-webapp-launch`.
+- `~/.cache/nirimaki-webapps/<slug>/` — created lazily by `nirimaki-webapp-launch`.
 - `~/.local/share/applications/icons/` — created lazily by
-  `qs-webapp-install`.
+  `nirimaki-webapp-install`.
 - `~/.config/fish/conf.d/browser.fish` — written by
-  `qs-default-browser-set`; remove or pre-seed at install if desired.
+  `nirimaki-browser-default`; remove or pre-seed at install if desired.
 
 ## Risks / gotchas
 
@@ -217,16 +217,16 @@ Per-user state initialized on first launch:
   and the live reload silently no-ops. Newly-spawned chromium
   instances still see the policy on startup, so swapping themes
   before launching chromium works on any version.
-- **Per-webapp user-data-dir** under `~/.cache/qs-webapps/<slug>/`
+- **Per-webapp user-data-dir** under `~/.cache/nirimaki-webapps/<slug>/`
   is not in `~/.config/` because Chromium's data dirs aren't
-  config — they're caches + cookies + history. `qs-webapp-remove`
+  config — they're caches + cookies + history. `nirimaki-webapp-remove`
   rm -rf's the whole dir on uninstall.
 - **No `--app-id=` flag on chromium**: Chromium uses `--class=` and
   it maps to both X11 `WM_CLASS` and Wayland app-id. Verified that
-  `niri msg windows --json` reports `app_id: "qs-webapp-<slug>"`
+  `niri msg windows --json` reports `app_id: "nirimaki-webapp-<slug>"`
   after spawn (so the window-rule matches).
 - **Mod+Shift+B path** is hardcoded `/home/michael/...`, same as
-  the other `~/.local/bin/qs-*` references in keybinds.kdl. The
+  the other `~/.local/bin/nirimaki-*` references in keybinds.kdl. The
   TODO from Phase A is unchanged: install.sh must template this
   for the target user's `$HOME`.
 

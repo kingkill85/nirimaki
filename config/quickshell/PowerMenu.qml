@@ -124,7 +124,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-power-menu"
+        dialogNamespace: "nirimaki-power-menu"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

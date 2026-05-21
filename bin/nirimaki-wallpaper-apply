@@ -1,5 +1,7 @@
 #!/bin/bash
-# qs-wallpaper-apply — start swaybg on the user's currently-chosen
+# nirimaki:group=wallpaper
+# nirimaki:summary=Apply the current wallpaper to every output via swaybg
+# nirimaki-wallpaper-apply — start swaybg on the user's currently-chosen
 # background image (if any), otherwise the active theme's first
 # image, otherwise a solid colour. Called from niri's spawn-at-
 # startup, from qs-theme-set, and from BackgroundPicker.

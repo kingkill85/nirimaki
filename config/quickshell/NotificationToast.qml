@@ -12,7 +12,7 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    WlrLayershell.namespace: "qs-notification-toast"
+    WlrLayershell.namespace: "nirimaki-notification-toast"
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
 

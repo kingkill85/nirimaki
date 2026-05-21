@@ -1,5 +1,8 @@
 #!/bin/bash
-# qs-brightness-display — adjust brightness on every DDC/CI-capable monitor
+# nirimaki:group=brightness
+# nirimaki:summary=Step every external monitor's brightness via DDC/CI
+# nirimaki:args=raise|lower
+# nirimaki-brightness-display — adjust brightness on every DDC/CI-capable monitor
 # via ddcutil, then pop the OSD bezel. Used by niri XF86MonBrightness*
 # keybinds.
 #

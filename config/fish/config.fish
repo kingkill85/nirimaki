@@ -11,7 +11,7 @@ if not status is-interactive
     exit
 end
 
-# ~/.local/bin holds the qs-* helpers (linked by dev-link.sh). Add it
+# ~/.local/bin holds the nirimaki-* helpers (linked by dev-link.sh). Add it
 # to PATH if it isn't already — Arch's default fish path does not
 # include it.
 if test -d "$HOME/.local/bin"

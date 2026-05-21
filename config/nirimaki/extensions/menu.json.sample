@@ -1,0 +1,31 @@
+{
+  "_comment": [
+    "User additions to the Quickshell SettingsMenu. Activate by renaming",
+    "this file to menu.json (no `.sample`) in this same directory.",
+    "",
+    "Each entry is merged into the menu tree at the same id. To add a",
+    "child, list it in the parent's `children`. To override an existing",
+    "entry, repeat its id with new fields.",
+    "",
+    "Action shapes:",
+    "  { \"type\": \"ipc\",         \"target\": \"<dialog-id>\" }",
+    "  { \"type\": \"tui\",         \"name\":   \"<short>\",  \"exec\": [\"cmd\", \"args\"] }",
+    "  { \"type\": \"shell\",       \"cmd\":    \"sh-string\" }",
+    "  { \"type\": \"exec\",        \"cmd\":    [\"binary\", \"args\"] }",
+    "  { \"type\": \"exec-in-foot\",\"appId\":  \"tui-X\",   \"cmd\": [\"binary\", \"args\"] }",
+    "  { \"type\": \"quickshell-spawn\", \"path\": \"$HOME/.config/quickshell/lock/shell.qml\" }",
+    "",
+    "labelKey points at an i18n string (see config/quickshell/i18n/);",
+    "if you don't add a key, use `label` for an inline literal instead."
+  ],
+
+  "setup": {
+    "children": ["setup.audio", "setup.bluetooth", "setup.wifi",
+                 "setup.browser", "setup.language", "setup.notes"]
+  },
+  "setup.notes": {
+    "icon":  "󰠮",
+    "label": "Notes",
+    "action": { "type": "exec-in-foot", "appId": "tui-notes", "cmd": ["nvim", "~/notes.md"] }
+  }
+}

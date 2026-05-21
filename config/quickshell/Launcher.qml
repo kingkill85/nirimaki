@@ -83,7 +83,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-launcher"
+        dialogNamespace: "nirimaki-launcher"
         cardWidth: 620
         cardHeight: 540
         cardColor: Theme.cardBg

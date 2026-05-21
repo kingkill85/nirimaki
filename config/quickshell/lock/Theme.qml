@@ -4,7 +4,7 @@ import Quickshell
 import Quickshell.Io
 
 // Theme singleton — palette comes from ~/.config/theme/current/{colors,
-// shell}.toml. Both files are FileView-watched, so `qs-theme-set <name>`
+// shell}.toml. Both files are FileView-watched, so `nirimaki-theme-set <name>`
 // re-tints every widget within a frame or two without restarting
 // quickshell.
 //
@@ -92,7 +92,7 @@ QtObject {
         shellValues = parsed;
     }
 
-    // Manual reload trigger. `qs-theme-set` calls
+    // Manual reload trigger. `nirimaki-theme-set` calls
     //   quickshell ipc call -- theme reload
     // after it rewrites the theme files, because inotify-based file
     // watches race against `cp` (truncate-then-write fires onFileChanged
@@ -112,7 +112,7 @@ QtObject {
     }
 
     // FileViews remain as a fallback for theme changes that happen
-    // outside qs-theme-set (e.g. editing colors.toml by hand). The
+    // outside nirimaki-theme-set (e.g. editing colors.toml by hand). The
     // watch may miss races but will eventually re-fire when the file
     // settles.
     property FileView _colorsFile: FileView {

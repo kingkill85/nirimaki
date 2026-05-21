@@ -29,7 +29,7 @@ binds {
     // Omarchy convention: Mod+Return / Mod+Space / Mod+Shift+<letter>.
     Mod+Return       hotkey-overlay-title="Terminal: foot"         { spawn "foot"; }
     Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "launcher" "toggle"; }
-    Mod+Shift+B      hotkey-overlay-title="Browser"                { spawn "/home/michael/.local/bin/qs-browser-launch"; }
+    Mod+Shift+B      hotkey-overlay-title="Browser"                { spawn "/home/michael/.local/bin/nirimaki-browser-launch"; }
     Mod+Shift+E      hotkey-overlay-title="File explorer: nautilus" { spawn "nautilus"; }
 
     // ===== Pickers =====
@@ -57,7 +57,7 @@ binds {
 
     // Quake-style drop-down terminal — Mod+grave (`). Single floating
     // foot instance; toggle spawns / closes.
-    Mod+grave hotkey-overlay-title="Toggle drop-down terminal" { spawn "/home/michael/.local/bin/qs-quake-toggle"; }
+    Mod+grave hotkey-overlay-title="Toggle drop-down terminal" { spawn "/home/michael/.local/bin/nirimaki-quake-toggle"; }
     // Screen reader (orca). Allowed when locked.
     Super+Alt+S allow-when-locked=true hotkey-overlay-title="Toggle screen reader" { spawn-sh "pkill orca || exec orca"; }
     Mod+Shift+P hotkey-overlay-title="Power off monitors"                          { power-off-monitors; }
@@ -71,7 +71,7 @@ binds {
         spawn-sh "DIR=\"$(xdg-user-dir PICTURES)/Screenshots\"; mkdir -p \"$DIR\"; grim -g \"$(slurp -o -d)\" - | satty --filename - --output-filename \"$DIR/Screenshot_$(date '+%Y-%m-%d_%H-%M-%S').png\" --early-exit --copy-command wl-copy"
     }
     Mod+Alt+R allow-when-locked=false hotkey-overlay-title="Toggle screen recording" {
-        spawn "/home/michael/.local/bin/qs-screenrecord";
+        spawn "/home/michael/.local/bin/nirimaki-screenrecord";
     }
 
     // ===== Universal clipboard (Omarchy parity) =====
@@ -90,10 +90,10 @@ binds {
     // Wrappers in ~/.local/bin adjust the default sink/source via
     // wpctl and pop the Quickshell OSD. Absolute paths — niri's
     // PATH doesn't include ~/.local/bin.
-    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume up"   { spawn "/home/michael/.local/bin/qs-audio-output-volume" "raise"; }
-    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "/home/michael/.local/bin/qs-audio-output-volume" "lower"; }
-    XF86AudioMute        allow-when-locked=true hotkey-overlay-title="Mute output" { spawn "/home/michael/.local/bin/qs-audio-output-volume" "mute-toggle"; }
-    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="Mute mic"    { spawn "/home/michael/.local/bin/qs-audio-input-mute"; }
+    XF86AudioRaiseVolume allow-when-locked=true hotkey-overlay-title="Volume up"   { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "raise"; }
+    XF86AudioLowerVolume allow-when-locked=true hotkey-overlay-title="Volume down" { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "lower"; }
+    XF86AudioMute        allow-when-locked=true hotkey-overlay-title="Mute output" { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "mute-toggle"; }
+    XF86AudioMicMute     allow-when-locked=true hotkey-overlay-title="Mute mic"    { spawn "/home/michael/.local/bin/nirimaki-audio-input-mute"; }
 
     // ===== Media playback (MPRIS via playerctl) =====
     XF86AudioPlay allow-when-locked=true hotkey-overlay-title="Play / pause" { spawn-sh "playerctl play-pause"; }
@@ -103,9 +103,9 @@ binds {
 
     // ===== External-monitor brightness (DDC/CI via ddcutil) =====
     // brightnessctl --class=backlight is a no-op here (no laptop
-    // panel); qs-brightness-display drives every external monitor.
-    XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="Brightness up"   { spawn "/home/michael/.local/bin/qs-brightness-display" "raise"; }
-    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness down" { spawn "/home/michael/.local/bin/qs-brightness-display" "lower"; }
+    // panel); nirimaki-brightness-display drives every external monitor.
+    XF86MonBrightnessUp   allow-when-locked=true hotkey-overlay-title="Brightness up"   { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "raise"; }
+    XF86MonBrightnessDown allow-when-locked=true hotkey-overlay-title="Brightness down" { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "lower"; }
 
     // ===== Overview + close =====
     Mod+O repeat=false { toggle-overview; }

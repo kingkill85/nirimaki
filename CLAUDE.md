@@ -27,7 +27,7 @@ session:
 ~/.config/quickshell/            -> config/quickshell/
 ~/.config/theme/templates/       -> config/theme/templates/
 ~/.config/theme/themes/          -> config/theme/themes/
-~/.local/bin/qs-<each>           -> bin/qs-<each>     (one symlink per helper)
+~/.local/bin/nirimaki-<each>           -> bin/nirimaki-<each>     (one symlink per helper)
 ```
 
 So when you edit `config/quickshell/Bar.qml` in this repo, you're
@@ -61,10 +61,10 @@ config/theme/
   templates/        kitty.conf.tpl, btop.theme.tpl,
                     niri-theme.kdl.tpl, qt-colors.conf.tpl
   themes/<name>/    colors.toml, backgrounds/, preview.png, …
-bin/                qs-theme-set, qs-theme-list,
-                    qs-wallpaper-apply, qs-osd, qs-screenrecord,
-                    qs-audio-output-volume, qs-audio-input-mute,
-                    qs-brightness-display
+bin/                nirimaki-theme-set, nirimaki-theme-list,
+                    nirimaki-wallpaper-apply, nirimaki-osd, nirimaki-screenrecord,
+                    nirimaki-audio-output-volume, nirimaki-audio-input-mute,
+                    nirimaki-brightness-display
 docs/phase-*.md     A-G phase logs — each has `### Outcome`
                     describing what actually shipped
 assets/             logo (ASCII + PNG variants), splash.bmp,
@@ -73,7 +73,7 @@ assets/             logo (ASCII + PNG variants), splash.bmp,
 
 ## ~/.config/theme/current/ is NOT in scope
 
-It's a regular directory that `qs-theme-set` rewrites in place
+It's a regular directory that `nirimaki-theme-set` rewrites in place
 (`cp -f`) when switching themes — preserves inotify watches that
 Quickshell's `FileView` relies on. Don't symlink it, don't track
 it. The repo only owns `templates/` and `themes/` (the sources).
@@ -81,7 +81,7 @@ it. The repo only owns `templates/` and `themes/` (the sources).
 ## Gotchas worth knowing
 
 1. **niri's PATH excludes `~/.local/bin/`.** Plain `spawn "..."` calls
-   in `keybinds.kdl` need absolute paths to the `qs-*` helpers.
+   in `keybinds.kdl` need absolute paths to the `nirimaki-*` helpers.
    `spawn-sh "..."` goes through a shell so `$HOME` expands there.
    The plain-spawn paths in `keybinds.kdl` still hard-code
    `/home/michael/` — `install.sh` will need to template these.
@@ -132,12 +132,38 @@ it. The repo only owns `templates/` and `themes/` (the sources).
 
 | Task | Command |
 |---|---|
-| Validate niri config | `niri validate -c ~/.config/niri/config.kdl` |
-| Switch theme | `qs-theme-set <name>` |
-| List themes | `qs-theme-list` |
-| Restart Quickshell | see *Live development model* above |
-| Toggle a dialog | `quickshell ipc call <target> toggle` |
-| Re-render logo PNGs from ASCII | `scripts/ascii2png.sh` |
+| Validate niri config            | `niri validate -c ~/.config/niri/config.kdl` |
+| Switch theme                    | `nirimaki theme set <name>`                  |
+| List themes                     | `nirimaki theme list`                        |
+| Install a webapp                | `nirimaki webapp install`                    |
+| Change default browser          | `nirimaki browser default <zen\|firefox\|chromium>` |
+| List all commands               | `nirimaki help`                              |
+| Restart Quickshell              | see *Live development model* above           |
+| Toggle a dialog                 | `quickshell ipc call <target> toggle`        |
+| Re-render logo PNGs from ASCII  | `scripts/ascii2png.sh`                       |
+
+The bare names (`nirimaki-theme-set`, `nirimaki-webapp-install`, …)
+stay directly executable — the unified `nirimaki <group> <action>`
+form is the user-friendly surface; keybinds.kdl and .desktop entries
+still invoke the bare scripts.
+
+## User customisation surface (Omarchy parity)
+
+Users extend Nirimaki by dropping files into `~/.config/nirimaki/`,
+NEVER by editing files in the repo (which would break the upgrade
+path). Four well-defined surfaces — anything outside these is
+implementation, not user config:
+
+| Want to…                               | Drop a file at                                       |
+|----------------------------------------|------------------------------------------------------|
+| React to theme change                  | `~/.config/nirimaki/hooks/theme-set.d/<name>` (+x)   |
+| React to webapp install/remove         | `~/.config/nirimaki/hooks/{webapp-installed,webapp-removed}.d/<name>` (+x) |
+| Add/override a SettingsMenu entry      | `~/.config/nirimaki/extensions/menu.json`            |
+| Override how an app gets themed        | `~/.config/nirimaki/themed/<base>.tpl`               |
+
+Samples shipped at `config/nirimaki/<dir>/*.sample`. Symlinked by
+`dev-link.sh` and copied by `install.sh`. See `docs/phase-j-platform.md`
+for the schema details.
 
 ## What's deferred
 
@@ -147,12 +173,14 @@ it. The repo only owns `templates/` and `themes/` (the sources).
   later `git pull` doesn't clobber a user's tweaks. Per-phase
   install requirements are documented at the bottom of each phase
   doc — see `docs/phase-i-webapps.md` for chromium policy-dir
-  chmod and the `xdg-settings` initial default-browser step.
+  chmod and the `xdg-settings` initial default-browser step, and
+  `docs/phase-j-platform.md` for the `~/.config/nirimaki/`
+  sample-copy step.
 
 ## What NOT to do
 
 - Don't run `git config --global` (see above).
-- Don't add `~/.local/bin/` symlinks for `qs-*` to system-wide
+- Don't add `~/.local/bin/` symlinks for `nirimaki-*` to system-wide
   paths — they need to live in the user's `~/.local/bin/`.
 - Don't reformat untouched code when making targeted edits.
 - Don't write planning docs / analysis files unless asked. Update

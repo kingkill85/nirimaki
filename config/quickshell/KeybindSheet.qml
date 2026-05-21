@@ -219,7 +219,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-keybind-sheet"
+        dialogNamespace: "nirimaki-keybind-sheet"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

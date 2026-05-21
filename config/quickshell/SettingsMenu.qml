@@ -43,95 +43,107 @@ Item {
     function withAlpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a); }
 
     // ---- Menu tree --------------------------------------------------
-    // Leaves have `action: function()`; branches have `children: [...]`.
-    // `labelKey` is an I18n key; `icon` is an nf glyph.
-    function _spawnTui(appId, cmd) {
-        // Launches a foot window with a recognisable app-id so niri's
-        // floating-TUI window-rule catches it (1000×640 centred).
-        Quickshell.execDetached(["foot", "--app-id=tui-" + appId, cmd]);
+    // Loaded from config/quickshell/settings-menu.json + merged with the
+    // user's ~/.config/nirimaki/extensions/menu.json (entries with the
+    // same id override; new ids extend). Schema documented at the top
+    // of the JSON file.
+    property var tree: ({})
+
+    // Replace $HOME tokens inside any string within an action payload.
+    function _expandHome(v) {
+        if (typeof v === "string")
+            return v.split("$HOME").join(Quickshell.env("HOME"));
+        if (Array.isArray(v))
+            return v.map(root._expandHome);
+        return v;
     }
-    function _ipc(target, fn) {
-        // Defer the IPC call so the menu finishes closing first —
-        // otherwise some overlays open behind our backdrop.
-        Qt.callLater(() => Quickshell.execDetached([
-            "quickshell", "ipc", "call", "--", target, fn || "toggle"
-        ]));
+
+    // Dispatcher: map { type, ... } action records to the right runtime
+    // call. Types mirror the schema documented in settings-menu.json.
+    function _dispatch(action) {
+        if (!action || !action.type) return;
+        const a = action;
+        if (a.type === "ipc") {
+            // Defer the IPC call so the menu finishes closing first —
+            // otherwise some overlays open behind our backdrop.
+            const target = a.target, fn = a.fn || "toggle";
+            Qt.callLater(() => Quickshell.execDetached([
+                "quickshell", "ipc", "call", "--", target, fn]));
+        } else if (a.type === "tui") {
+            NiriService.launchTui.apply(null, [a.name].concat((a.exec || []).map(root._expandHome)));
+        } else if (a.type === "shell") {
+            Quickshell.execDetached(["sh", "-lc", root._expandHome(a.cmd)]);
+        } else if (a.type === "exec") {
+            Quickshell.execDetached((a.cmd || []).map(root._expandHome));
+        } else if (a.type === "exec-in-foot") {
+            const argv = ["foot", "--app-id=" + a.appId].concat(
+                (a.cmd || []).map(root._expandHome));
+            Quickshell.execDetached(argv);
+        } else if (a.type === "quickshell-spawn") {
+            Quickshell.execDetached(["quickshell", "-p", root._expandHome(a.path)]);
+        } else {
+            console.warn("SettingsMenu: unknown action type:", a.type);
+        }
     }
 
-    readonly property var tree: ({
-        "":         { children: ["style", "setup", "install", "remove", "system"] },
-        "style":    { icon: "󰸌", labelKey: "settings.style",
-                      children: ["style.theme", "style.background", "style.keybinds"] },
-        "style.theme":      { icon: "󰸌", labelKey: "settings.style.theme",
-                              action: () => root._ipc("theme-picker") },
-        "style.background": { icon: "󰸀", labelKey: "settings.style.background",
-                              action: () => root._ipc("background-picker") },
-        "style.keybinds":   { icon: "󰌌", labelKey: "settings.style.keybinds",
-                              action: () => root._ipc("keybind-sheet") },
+    // Merge `extra` (user JSON) on top of `base` (shipped JSON), per-key.
+    // Each menu id is a top-level key. If the user redefines an id, the
+    // user's fields fully replace the shipped node (no deep merge of
+    // children arrays — too clever, would surprise on override).
+    function _mergeTrees(base, extra) {
+        const out = {};
+        for (const k in base)  out[k] = base[k];
+        for (const k in extra) {
+            if (k === "_comment") continue;
+            out[k] = extra[k];
+        }
+        return out;
+    }
 
-        "setup":    { icon: "󰒓", labelKey: "settings.setup",
-                      children: ["setup.audio", "setup.bluetooth", "setup.wifi",
-                                 "setup.browser", "setup.language"] },
-        "setup.audio":     { icon: "󰓃", labelKey: "settings.setup.audio",
-                             action: () => root._spawnTui("wiremix", "wiremix") },
-        "setup.bluetooth": { icon: "󰂯", labelKey: "settings.setup.bluetooth",
-                             action: () => Quickshell.execDetached(["sh", "-lc",
-                                 "rfkill unblock bluetooth; foot --app-id=tui-bluetui bluetui"]) },
-        "setup.wifi":      { icon: "󰖩", labelKey: "settings.setup.wifi",
-                             action: () => Quickshell.execDetached(["sh", "-lc",
-                                 "rfkill unblock wifi 2>/dev/null; foot --app-id=tui-impala impala"]) },
-        "setup.browser":   { icon: "󰖟", labelKey: "settings.setup.browser",
-                             children: ["setup.browser.zen", "setup.browser.firefox",
-                                        "setup.browser.chromium"] },
-        "setup.browser.zen":      { icon: "󰖟", labelKey: "settings.setup.browser.zen",
-                                    action: () => Quickshell.execDetached([
-                                        Quickshell.env("HOME") + "/.local/bin/qs-default-browser-set", "zen"]) },
-        "setup.browser.firefox":  { icon: "󰈹", labelKey: "settings.setup.browser.firefox",
-                                    action: () => Quickshell.execDetached([
-                                        Quickshell.env("HOME") + "/.local/bin/qs-default-browser-set", "firefox"]) },
-        "setup.browser.chromium": { icon: "󰊯", labelKey: "settings.setup.browser.chromium",
-                                    action: () => Quickshell.execDetached([
-                                        Quickshell.env("HOME") + "/.local/bin/qs-default-browser-set", "chromium"]) },
-        "setup.language":  { icon: "󰗊", labelKey: "settings.setup.language",
-                             action: () => root._ipc("language-picker") },
+    function _loadTreeJson(raw, source) {
+        if (!raw) return null;
+        try {
+            const parsed = JSON.parse(raw);
+            // Strip the _comment key for sanity (it's documentation only).
+            delete parsed._comment;
+            return parsed;
+        } catch (e) {
+            console.warn("SettingsMenu: failed to parse " + source + ":", e.toString());
+            return null;
+        }
+    }
 
-        // Install / Remove: Omarchy parity. Their omarchy-menu surfaces
-        // these as top-level branches; webapp install/remove are the
-        // first leaves under each. Spawned in a floating foot (same
-        // app-id pattern as the audio/bluetooth/wifi TUI launches
-        // above) so the CLI walker is a one-shot dialog, not a
-        // persistent terminal.
-        "install":  { icon: "󰏗", labelKey: "settings.install",
-                      children: ["install.webapp"] },
-        "install.webapp": { icon: "󰖟", labelKey: "settings.install.webapp",
-                            action: () => Quickshell.execDetached([
-                                "foot", "--app-id=tui-qs-webapp-install",
-                                Quickshell.env("HOME") + "/.local/bin/qs-webapp-install"]) },
+    property var _defaultTree: ({})
+    property var _userTree: ({})
 
-        "remove":   { icon: "󰗨", labelKey: "settings.remove",
-                      children: ["remove.webapp"] },
-        "remove.webapp":  { icon: "󰖟", labelKey: "settings.remove.webapp",
-                            action: () => Quickshell.execDetached([
-                                "foot", "--app-id=tui-qs-webapp-remove",
-                                Quickshell.env("HOME") + "/.local/bin/qs-webapp-remove"]) },
+    function _rebuildTree() {
+        root.tree = root._mergeTrees(root._defaultTree, root._userTree);
+        if (root.opened) root.rebuild();
+    }
 
-        "system":   { icon: "󰐥", labelKey: "settings.system",
-                      children: ["system.lock", "system.suspend", "system.logout",
-                                 "system.restart", "system.shutdown"] },
-        "system.lock":     { icon: "󰌾", labelKey: "power.action.lock",
-                             action: () => Quickshell.execDetached([
-                                 "quickshell", "-p",
-                                 Quickshell.env("HOME") + "/.config/quickshell/lock/shell.qml"]) },
-        "system.suspend":  { icon: "󰒲", labelKey: "power.action.suspend",
-                             action: () => Quickshell.execDetached(["systemctl", "suspend"]) },
-        "system.logout":   { icon: "󰍃", labelKey: "power.action.logout",
-                             action: () => Quickshell.execDetached([
-                                 "niri", "msg", "action", "quit", "--skip-confirmation"]) },
-        "system.restart":  { icon: "󰜉", labelKey: "power.action.restart",
-                             action: () => Quickshell.execDetached(["systemctl", "reboot"]) },
-        "system.shutdown": { icon: "󰐥", labelKey: "power.action.shutdown",
-                             action: () => Quickshell.execDetached(["systemctl", "poweroff"]) },
-    })
+    property FileView _defaultTreeFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/quickshell/settings-menu.json"
+        watchChanges: true
+        printErrors: false
+        onLoaded: {
+            const t = root._loadTreeJson(text(), "settings-menu.json");
+            if (t) { root._defaultTree = t; root._rebuildTree(); }
+        }
+        onFileChanged: reload()
+    }
+
+    property FileView _userTreeFile: FileView {
+        path: Quickshell.env("HOME") + "/.config/nirimaki/extensions/menu.json"
+        watchChanges: true
+        printErrors: false
+        onLoaded: {
+            const t = root._loadTreeJson(text(), "extensions/menu.json");
+            root._userTree = t || ({});
+            root._rebuildTree();
+        }
+        onFileChanged: reload()
+        onLoadFailed: { root._userTree = ({}); root._rebuildTree(); }
+    }
 
     function _currentNode() {
         return tree[path.length > 0 ? path[path.length - 1] : ""];
@@ -217,7 +229,7 @@ Item {
             _enterChild(item.id);
         } else if (node.action) {
             closeMenu();
-            node.action();
+            _dispatch(node.action);
         }
     }
 
@@ -234,7 +246,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-settings-menu"
+        dialogNamespace: "nirimaki-settings-menu"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

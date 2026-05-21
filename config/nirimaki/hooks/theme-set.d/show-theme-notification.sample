@@ -1,0 +1,9 @@
+#!/bin/bash
+# Sample hook — pops a desktop notification when the theme changes.
+# Activate by removing the `.sample` suffix and making it executable:
+#   chmod +x ~/.config/nirimaki/hooks/theme-set.d/show-theme-notification
+#
+# The hook is called with one argument: the new theme name.
+
+theme="${1:-?}"
+notify-send -u low -t 2500 "Theme" "$theme"

@@ -6,7 +6,7 @@ import QtQuick.Controls
 import Qt.labs.folderlistmodel
 
 // Theme picker — overlay that lists every directory under
-// ~/.config/theme/themes/ and runs `qs-theme-set <name>` on Enter.
+// ~/.config/theme/themes/ and runs `nirimaki-theme-set <name>` on Enter.
 // Same UX shape as PowerMenu / EmojiPicker / ClipboardPicker: scrim
 // over the workspace, centred card, fuzzy filter, accent-coloured
 // selected row.
@@ -105,10 +105,10 @@ Item {
         if (idx < 0 || idx >= displayModel.count) return;
         const name = displayModel.get(idx).name;
         closeMenu();
-        // qs-theme-set lives in ~/.local/bin which niri's spawn path
+        // nirimaki-theme-set lives in ~/.local/bin which niri's spawn path
         // doesn't include — use the absolute path.
         Quickshell.execDetached([
-            Quickshell.env("HOME") + "/.local/bin/qs-theme-set",
+            Quickshell.env("HOME") + "/.local/bin/nirimaki-theme-set",
             name
         ]);
     }
@@ -137,7 +137,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-theme-picker"
+        dialogNamespace: "nirimaki-theme-picker"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

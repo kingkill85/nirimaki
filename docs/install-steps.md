@@ -93,7 +93,7 @@ Symlinks created:
 - `~/.config/nvim/`            → `repo/config/nvim/`
 - `~/.config/theme/templates/` → `repo/config/theme/templates/`
 - `~/.config/theme/themes/`    → `repo/config/theme/themes/`
-- `~/.local/bin/qs-<each>`     → `repo/bin/qs-<each>`
+- `~/.local/bin/nirimaki-<each>`     → `repo/bin/nirimaki-<each>`
 
 `install.sh` (deferred) will **copy** instead of symlink so a
 later `git pull` doesn't clobber user tweaks, and templatize the
@@ -198,12 +198,12 @@ the `tldr` / `help` fish abbreviation.
 
 ## 9. Initial theme apply
 
-The Nirimaki theme system (Phase D + H9) runs from `qs-theme-set`.
+The Nirimaki theme system (Phase D + H9) runs from `nirimaki-theme-set`.
 A fresh install ships `last-horizon` as the bundled default —
 trigger one swap so all template outputs are rendered:
 
 ```bash
-qs-theme-set last-horizon       # or any theme from `qs-theme-list`
+nirimaki-theme-set last-horizon       # or any theme from `nirimaki-theme-list`
 ```
 
 That single call:
@@ -243,7 +243,7 @@ Requires `mkinitcpio.conf` HOOKS already include `plymouth` after
 
 The quake terminal launches into a persistent `tmux new-session -A
 -s quake`. Nothing to install ahead of time — `tmux` (step 1b)
-plus the `qs-quake-toggle` script (symlinked via step 3) are
+plus the `nirimaki-quake-toggle` script (symlinked via step 3) are
 enough. First `Mod+grave` press creates the session.
 
 ## 12. Verification checklist
@@ -263,7 +263,7 @@ done
 fish -c 'echo abbrs=(abbr -l | count); echo functions=(functions | tr "," "\n" | grep -E "^(t|n|ff|eff|oc|cc|io|ic|ioc|bm|tdl)$" | count)'
 
 # Themes propagate
-qs-theme-set tokyo-night && qs-theme-set last-horizon
+nirimaki-theme-set tokyo-night && nirimaki-theme-set last-horizon
 ```
 
 ## What this doc does NOT cover

@@ -1,5 +1,7 @@
 #!/bin/bash
-# qs-theme-list — print available themes, marking the current one.
+# nirimaki:group=theme
+# nirimaki:summary=List available themes, marking the current one
+# nirimaki-theme-list — print available themes, marking the current one.
 
 set -euo pipefail
 

@@ -40,7 +40,7 @@ if command -q bat
     set -gx PAGER bat
     set -gx MANPAGER 'sh -c "col -bx | bat -l man -p"'
     set -gx MANROFFOPT '-c'
-    set -gx BAT_THEME nirimaki  # custom theme rendered by qs-theme-set per Nirimaki theme
+    set -gx BAT_THEME nirimaki  # custom theme rendered by nirimaki-theme-set per Nirimaki theme
 end
 
 # Default editor for git, sudoedit, eff, tdl, ...  LazyVim is wired in
@@ -66,7 +66,7 @@ if bind -M insert >/dev/null 2>&1
 end
 
 # --- theme colors -----------------------------------------------------
-# fish_color_* universals are set live by qs-theme-set when a theme is
+# fish_color_* universals are set live by nirimaki-theme-set when a theme is
 # swapped (so all running shells re-tint instantly). This safety-net
 # source runs on fresh sessions in case the universal vars were never
 # initialised (clean install, wiped ~/.local/share/fish/, etc).

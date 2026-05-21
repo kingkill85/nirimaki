@@ -1,5 +1,8 @@
 #!/bin/bash
-# qs-osd — show the Quickshell OSD bezel.
+# nirimaki:group=osd
+# nirimaki:summary=Pop the on-screen overlay bezel via Quickshell IPC
+# nirimaki:args=<icon> <message> [progress]
+# nirimaki-osd — show the Quickshell OSD bezel.
 # Port of Omarchy's `omarchy-osd`. Forwards an icon / message / progress
 # triple to the `osd` IPC channel served by ~/.config/quickshell/Osd.qml.
 #

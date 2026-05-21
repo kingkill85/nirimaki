@@ -28,7 +28,7 @@ write into. No app actually reads from it yet — that happens in
 │   └── theme.name       #   - plain-text name of the current theme
 └── themes/              # source themes; each subdir is a self-contained
     └── <name>/          # theme that gets copied into current/ by
-        ├── colors.toml  # qs-theme-set.
+        ├── colors.toml  # nirimaki-theme-set.
         ├── shell.toml
         ├── btop.theme   #   - app-specific overrides land alongside,
         ├── icons.theme  #     picked up in later D steps.
@@ -51,11 +51,11 @@ hard-coded in `Theme.qml` through Phases A–C.
 
 **Switcher scripts** under `~/.local/bin/`:
 
-- `qs-theme-set <name>` — stages `~/.config/theme/next/`, copies the
+- `nirimaki-theme-set <name>` — stages `~/.config/theme/next/`, copies the
   selected theme dir + writes `theme.name`, then atomic `mv` into
   `current/`. Refuses to switch if `colors.toml` is missing. App-restart
   hooks land in D3 (kitty, btop) and D7 (Plymouth) — not needed yet.
-- `qs-theme-list` — prints every directory under `themes/` and marks
+- `nirimaki-theme-list` — prints every directory under `themes/` and marks
   the current one with `*`.
 
 Both use `export PATH=…` at the top so they survive niri's spawn-PATH
@@ -65,8 +65,8 @@ gotcha if we later bind theme-cycle to a key
 **Verification:**
 
 ```sh
-qs-theme-list                  # → * default
-qs-theme-set default           # → qs-theme-set: now using 'default'
+nirimaki-theme-list                  # → * default
+nirimaki-theme-set default           # → nirimaki-theme-set: now using 'default'
 ls ~/.config/theme/current/    # → colors.toml shell.toml theme.name
 cat ~/.config/theme/current/theme.name
 ```
@@ -81,7 +81,7 @@ read from `current/`.
 
 **Goal:** wire `Theme.qml` to read its palette from
 `~/.config/theme/current/{colors,shell}.toml`, and re-apply across every
-widget when `qs-theme-set` swaps themes — no quickshell restart.
+widget when `nirimaki-theme-set` swaps themes — no quickshell restart.
 
 **Changes to `~/.config/quickshell/Theme.qml`:**
 
@@ -102,14 +102,14 @@ widget when `qs-theme-set` swaps themes — no quickshell restart.
   ones via `Qt.lighter / Qt.darker / Qt.rgba` so they auto-update
   whenever the source changes.
 - `IpcHandler { target: "theme"; function reload() }` exposes a
-  manual reload that `qs-theme-set` calls after writing the files.
+  manual reload that `nirimaki-theme-set` calls after writing the files.
   (See "Why explicit IPC" below.)
 - `FileView { watchChanges: true }` kept as a fallback path for
-  changes made outside `qs-theme-set` (e.g. editing colors.toml by
+  changes made outside `nirimaki-theme-set` (e.g. editing colors.toml by
   hand). The inotify watch is fragile when the file is rewritten
   rapidly — explicit IPC handles the common case.
 
-**Changes to `~/.local/bin/qs-theme-set`:**
+**Changes to `~/.local/bin/nirimaki-theme-set`:**
 
 - Stopped doing `rm -rf $CURRENT_DIR; mv $NEXT_DIR $CURRENT_DIR` —
   that destroyed the inode the FileView was watching, and the new
@@ -154,8 +154,8 @@ schema is wire-compatible with their upstream themes.
 
 ```sh
 quickshell ipc show | grep -A1 target | grep theme  # → target theme
-qs-theme-set tokyo-night                            # bar turns blue
-qs-theme-set default                                # bar back to monochrome
+nirimaki-theme-set tokyo-night                            # bar turns blue
+nirimaki-theme-set default                                # bar back to monochrome
 ```
 
 The swap is instant — within ~50 ms of the script's exit the entire
@@ -167,17 +167,17 @@ bar / popups / workspace pills / OSD / launcher all re-tint.
 
 **Goal:** generate `kitty.conf` and `btop.theme` from the active
 `colors.toml` so the terminal palette and btop dashboard track every
-`qs-theme-set`.
+`nirimaki-theme-set`.
 
 **Templates** under `~/.config/theme/templates/` — verbatim ports of
 basecamp/omarchy@master:`default/themed/*.tpl`. `{{ key }}` is the raw
 hex (`#cacccc`); `{{ key_strip }}` drops the leading `#`;
 `{{ key_rgb }}` produces a decimal `r,g,b` tuple. The substitutions are
-built into a sed script in `qs-theme-set` from `current/colors.toml`.
+built into a sed script in `nirimaki-theme-set` from `current/colors.toml`.
 
 **Output paths:**
 - `~/.config/theme/current/kitty.conf` — `~/.config/kitty/kitty.conf`
-  picks it up via `include`. `qs-theme-set` sends `SIGUSR1` to running
+  picks it up via `include`. `nirimaki-theme-set` sends `SIGUSR1` to running
   kitty processes so the swap is live.
 - `~/.config/btop/themes/qs.theme` — written directly into btop's
   fixed lookup dir.
@@ -270,7 +270,7 @@ back-pocket plan whenever this surface area changes):
 
 - `paru -Rns gtklock` (uninstall package).
 - `rm -f ~/.config/theme/templates/gtklock.css.tpl ~/.config/theme/current/gtklock.css`.
-- `qs-theme-set`'s "don't sweep these rendered outputs" allow-list
+- `nirimaki-theme-set`'s "don't sweep these rendered outputs" allow-list
   drops `gtklock.css`.
 - `~/.config/swaylock/` already removed in the swaylock → gtklock
   transition (Step D3 interlude).
@@ -280,7 +280,7 @@ back-pocket plan whenever this surface area changes):
 ## Step D5 — GTK theme + icons + dark/light hot-swap
 
 **Goal:** every GTK app and the freedesktop color-scheme portal track
-the active theme. Switching `qs-theme-set` flips Nautilus / GNOME
+the active theme. Switching `nirimaki-theme-set` flips Nautilus / GNOME
 Settings / file dialogs from dark to light in real time.
 
 **Per-theme files** (mirroring `basecamp/omarchy@master:themes/<name>/`):
@@ -292,7 +292,7 @@ Settings / file dialogs from dark to light in real time.
   Mirrors Omarchy's marker exactly (we briefly used a `mode` text
   file instead; switched to presence-test for direct compatibility).
 
-**`qs-theme-set` GTK block** at the end of the script:
+**`nirimaki-theme-set` GTK block** at the end of the script:
 - Reads `~/.config/theme/current/light.mode` → decides `prefer-light`
   vs `prefer-dark` and `Adwaita` vs `Adwaita-dark`.
 - Reads `~/.config/theme/current/icons.theme` (default fallback
@@ -315,9 +315,9 @@ Settings / file dialogs from dark to light in real time.
 **Verification:**
 
 ```sh
-qs-theme-set tokyo-night        # bar + apps re-tint, icons turn purple
-qs-theme-set catppuccin-latte   # full light flip
-qs-theme-set default            # back to mono-dark
+nirimaki-theme-set tokyo-night        # bar + apps re-tint, icons turn purple
+nirimaki-theme-set catppuccin-latte   # full light flip
+nirimaki-theme-set default            # back to mono-dark
 gsettings get org.gnome.desktop.interface color-scheme
 gsettings get org.gnome.desktop.interface icon-theme
 ```
@@ -338,13 +338,13 @@ falls back to the compiled-in (light) Adwaita.
 **Fix (modern path, no extra packages):** keep `gtk-theme-name=Adwaita`
 always and let dark/light flip via the
 `gtk-application-prefer-dark-theme` flag + freedesktop color-scheme
-portal. Both `settings.ini` files + the `qs-theme-set` GTK block now
+portal. Both `settings.ini` files + the `nirimaki-theme-set` GTK block now
 do that. The `Adwaita-dark` name is deprecated for GTK3.20+ anyway.
 
 ### Remmina has its own dark switch
 
 Remmina ignores the GTK theme and reads `dark_theme=<bool>` from
-`~/.config/remmina/remmina.pref`. `qs-theme-set` now also sed-rewrites
+`~/.config/remmina/remmina.pref`. `nirimaki-theme-set` now also sed-rewrites
 that line to mirror `light.mode`, so Remmina follows the active theme.
 Needs a Remmina restart per swap.
 
@@ -353,7 +353,7 @@ Needs a Remmina restart per swap.
 ## Step D5b — Qt apps (qt5ct + qt6ct)
 
 **Goal:** every Qt app uses the active theme's palette + icon theme,
-flipping dark / light with `qs-theme-set`.
+flipping dark / light with `nirimaki-theme-set`.
 
 **Install:** `paru -S qt5ct qt6ct` (qt5ct is AUR on Arch; qt6ct is in
 extra). `yaru-icon-theme` from D5 covers the icon side.
@@ -361,7 +361,7 @@ extra). `yaru-icon-theme` from D5 covers the icon side.
 **Static configs** (written once):
 - `~/.config/qt6ct/qt6ct.conf` — `style=Fusion`, `custom_palette=true`,
   `color_scheme_path=/home/michael/.config/theme/current/qt-colors.conf`,
-  `icon_theme=Yaru-blue` (rewritten by qs-theme-set on each swap).
+  `icon_theme=Yaru-blue` (rewritten by nirimaki-theme-set on each swap).
 - `~/.config/qt5ct/qt5ct.conf` — identical, separate path.
 
 **Template:** `~/.config/theme/templates/qt-colors.conf.tpl` renders a
@@ -370,7 +370,7 @@ Qt color-scheme INI with three rows of 21 `#aarrggbb` colours
 `colors.toml`. Lands at
 `~/.config/theme/current/qt-colors.conf`; both qt5ct and qt6ct read it.
 
-**qs-theme-set** adds a per-swap `sed -i "s|^icon_theme=…"` on each
+**nirimaki-theme-set** adds a per-swap `sed -i "s|^icon_theme=…"` on each
 `qt*ct.conf` to keep the icon theme synced with GTK.
 
 **Niri `environment` block** gets `QT_QPA_PLATFORMTHEME "qt6ct"` so
@@ -391,7 +391,7 @@ through to `~/.config/qt5ct`.
 ```sh
 QT_QPA_PLATFORMTHEME=qt6ct kate          # opens dark
 QT_QPA_PLATFORMTHEME=qt6ct qbittorrent   # opens dark
-qs-theme-set catppuccin-latte && QT_QPA_PLATFORMTHEME=qt6ct kate  # opens light
+nirimaki-theme-set catppuccin-latte && QT_QPA_PLATFORMTHEME=qt6ct kate  # opens light
 ```
 
 ---
@@ -431,7 +431,7 @@ correctly wired by Arch defaults + the gsettings changes we made.
   # → (<<uint32 1>>,)   (1 = prefer-dark)
   ```
 
-  `qs-theme-set <name>` flips that value because it sets
+  `nirimaki-theme-set <name>` flips that value because it sets
   `org.gnome.desktop.interface color-scheme` via gsettings, which the
   portal exposes verbatim.
 
@@ -548,7 +548,7 @@ mkinitcpio -P` so the theme is baked into the UKI.
 
 **Why the colours are hard-coded:** Plymouth runs *before* `sd-encrypt`
 unlocks the disk, so `~/.config/theme/current/colors.toml` isn't
-readable yet. Live `qs-theme-set` swaps don't propagate to the boot
+readable yet. Live `nirimaki-theme-set` swaps don't propagate to the boot
 splash; updating boot colours requires editing the script + rebuilding
 the UKI.
 
@@ -800,7 +800,7 @@ sudo rm /etc/mkinitcpio.d/linux.preset.bak \
 
 Every Phase-D item shipped:
 
-- ✅ D1 — Theme directory layout + switcher (`qs-theme-set`/`-list`).
+- ✅ D1 — Theme directory layout + switcher (`nirimaki-theme-set`/`-list`).
 - ✅ D2 — Quickshell `Theme.qml` reads `colors.toml`+`shell.toml`,
   reloads via IPC.
 - ✅ D3 — kitty + btop templates rendered per theme.

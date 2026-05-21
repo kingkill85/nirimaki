@@ -47,7 +47,7 @@ sources together first.
 - **22 themes** under `config/theme/themes/` — imported from Omarchy
   plus custom additions (`catppuccin`, `gruvbox`, `tokyo-night`,
   `nord`, `rose-pine`, `kanagawa`, `everforest`, `solitude`,
-  `hackerman`, `retro-82`, …). One `qs-theme-set <name>` re-skins
+  `hackerman`, `retro-82`, …). One `nirimaki-theme-set <name>` re-skins
   niri / Quickshell / kitty / btop / Qt apps atomically.
 - **Wallpaper per theme**: each theme ships its own backgrounds;
   swap follows the theme.
@@ -85,7 +85,7 @@ cd ~/Projekte/kingkill85/nirimaki
 ~/.config/nvim/                 →                config/nvim/
 ~/.config/theme/templates/      →                config/theme/templates/
 ~/.config/theme/themes/         →                config/theme/themes/
-~/.local/bin/qs-*               →                bin/qs-*
+~/.local/bin/nirimaki-*               →                bin/nirimaki-*
 ```
 
 with symlinks back into the repo. Anything you already had at those
@@ -111,7 +111,7 @@ themed, working Nirimaki desktop in one go:
 2. Copy (not symlink) `config/*` → `~/.config/`, `bin/*` → `~/.local/bin/`.
 3. Template `keybinds.kdl` spawn paths to the user's `$HOME`.
 4. Enable systemd units (`swayidle`, `niri-session.target`, …).
-5. `qs-theme-set default` → materialise the active theme.
+5. `nirimaki-theme-set default` → materialise the active theme.
 
 The canonical install sequence is recorded in
 [`docs/install-steps.md`](docs/install-steps.md). Until `install.sh`
@@ -133,10 +133,10 @@ config/
   tmux/         tmux.conf (Omarchy port — C-Space prefix, vi-mode)
   nvim/         LazyVim starter + Nirimaki theme hot-reload glue
   theme/
-    templates/  per-app .tpl rendered by qs-theme-set
+    templates/  per-app .tpl rendered by nirimaki-theme-set
     themes/    22 themes (colors.toml + backgrounds + previews)
-bin/            qs-theme-set, qs-quake-toggle, qs-wallpaper-apply,
-                qs-osd, audio + brightness + screenrecord helpers
+bin/            nirimaki-theme-set, nirimaki-quake-toggle, nirimaki-wallpaper-apply,
+                nirimaki-osd, audio + brightness + screenrecord helpers
 docs/           phase-a-foundations.md … phase-h-terminal.md
                 + install-steps.md — the actual build log
 assets/         logo (ASCII source + 11 coloured PNG variants),

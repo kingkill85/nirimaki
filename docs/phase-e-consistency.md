@@ -18,8 +18,8 @@ Order of work — smallest visible win to biggest refactor:
 | **E2** | niri borders + CSD matching Omarchy. |
 | **E3** | Quickshell visual reset — square corners, transparent cards, font sweep. |
 | **E4** | Shared `Surface` component to lock the new look in one place. |
-| **E5** | Wallpaper switching — set the active theme's wallpaper via swaybg, swap on `qs-theme-set`. |
-| **E6** | Theme picker — Quickshell overlay that lists themes and calls `qs-theme-set`. |
+| **E5** | Wallpaper switching — set the active theme's wallpaper via swaybg, swap on `nirimaki-theme-set`. |
+| **E6** | Theme picker — Quickshell overlay that lists themes and calls `nirimaki-theme-set`. |
 | **E7** | Background picker — Quickshell overlay that lists wallpapers in the current theme. |
 
 ---
@@ -37,7 +37,7 @@ Order of work — smallest visible win to biggest refactor:
    set to `Yaru-purple` (Omarchy's choice was `Yaru-magenta`).
 4. Cleaned up `/tmp/omarchy`.
 
-**Final theme list** (`qs-theme-list`):
+**Final theme list** (`nirimaki-theme-list`):
 `catppuccin, catppuccin-latte, default, ethereal, everforest,
 flexoki-light, gruvbox, hackerman, kanagawa, last-horizon, lumon,
 matte-black, miasma, nord, osaka-jade, retro-82, ristretto, rose-pine,
@@ -46,7 +46,7 @@ solitude, tokyo-night, vantablack, white`.
 Light themes (have `light.mode` marker): `catppuccin-latte`,
 `flexoki-light`, `rose-pine`, `white`. The rest are dark.
 
-**Plus one fix to `qs-theme-set` discovered en route:** the script
+**Plus one fix to `nirimaki-theme-set` discovered en route:** the script
 used `cp -f` per source file which silently skipped subdirectories
 (so `backgrounds/` never landed in `current/`). Replaced with:
 
@@ -58,11 +58,11 @@ used `cp -f` per source file which silently skipped subdirectories
 **Verification:**
 
 ```sh
-qs-theme-list                                       # 22 entries
+nirimaki-theme-list                                       # 22 entries
 ls ~/.config/theme/themes/gruvbox/backgrounds       # 7 images
-qs-theme-set tokyo-night
+nirimaki-theme-set tokyo-night
 ls ~/.config/theme/current/                         # symlink to backgrounds/
-qs-theme-set default
+nirimaki-theme-set default
 ```
 
 **Open thread:** our `default` theme ships no wallpaper (started life
@@ -131,7 +131,7 @@ rounding              = 0                       # sharp corners
    that render badly without their own decorations after the toggle.
 4. **Theme-tracking** for the active border colour: write
    `~/.config/theme/templates/niri-theme.kdl.tpl` (active-color +
-   focus-ring blocks using `{{ accent }}`). `qs-theme-set` renders
+   focus-ring blocks using `{{ accent }}`). `nirimaki-theme-set` renders
    into `~/.config/theme/current/niri-theme.kdl`. Add an
    `include "/home/michael/.config/theme/current/niri-theme.kdl"`
    to the main config (or fallback to a `sed` rewrite if niri's
@@ -146,7 +146,7 @@ couple of Electron apps → expect 1–2 allow-list rules.
 - kitty + Zen + Nautilus + Qt app open side-by-side, tabbing through
   each: every window has a square 2 px border; focused = theme accent;
   rest = grey. No double-decoration.
-- `qs-theme-set tokyo-night` → focus ring instantly Tokyo-Night blue.
+- `nirimaki-theme-set tokyo-night` → focus ring instantly Tokyo-Night blue.
 
 ### Outcome
 
@@ -159,7 +159,7 @@ couple of Electron apps → expect 1–2 allow-list rules.
   2 px border that flips colour on focus (cleaner than the
   table-suggested stacked focus-ring + border, which double-draws on
   the active window).
-- `qs-theme-set` renders the template into
+- `nirimaki-theme-set` renders the template into
   `~/.config/theme/current/niri-theme.kdl` like any other `.tpl`,
   and now calls `niri msg action load-config-file` at the end. niri's
   built-in config watcher follows the main file only, not the
@@ -168,7 +168,7 @@ couple of Electron apps → expect 1–2 allow-list rules.
   replaced with `include "/home/michael/.config/theme/current/niri-theme.kdl"`
   near the top. `prefer-no-csd` is now enabled (no app needed an
   allow-list — Zen/Nautilus/kitty/Qt apps all draw cleanly).
-- `qs-theme-set <name>` flips the focused-window border in real time;
+- `nirimaki-theme-set <name>` flips the focused-window border in real time;
   switching between gruvbox / tokyo-night / hackerman / nord all
   works.
 
@@ -237,7 +237,7 @@ via `cardAlpha`.
 - All popup borders are square.
 - Every visible string is in JetBrainsMonoNL Nerd Font; no DejaVu
   Sans anywhere.
-- `qs-theme-set catppuccin-latte` keeps the alpha and inverts the bg
+- `nirimaki-theme-set catppuccin-latte` keeps the alpha and inverts the bg
   tint to light, still readable.
 
 ### Outcome
@@ -348,10 +348,10 @@ Cross-checked against upstream Omarchy
 
 **Wallpaper (groundwork for E5):**
 
-- `~/.local/bin/qs-wallpaper-apply` picks the first image (sorted)
+- `~/.local/bin/nirimaki-wallpaper-apply` picks the first image (sorted)
   under `~/.config/theme/current/backgrounds/` and starts swaybg on
   it; falls back to a solid `#101315` if a theme ships no images.
-- `niri/config.kdl` spawn-at-startup calls the script; `qs-theme-set`
+- `niri/config.kdl` spawn-at-startup calls the script; `nirimaki-theme-set`
   calls it after every theme swap.
 - Without this, swaybg ran on a solid colour, which made the niri
   blur invisible (blurring a solid colour gives the same solid
@@ -420,9 +420,9 @@ quickshell after each, eyeball each widget.
 
 **Problem:** swaybg currently shows a solid colour from Step 19. With
 themes shipping wallpapers (after E1) we can have the wallpaper
-follow `qs-theme-set`.
+follow `nirimaki-theme-set`.
 
-**Goal:** `qs-theme-set` picks the first image from the current
+**Goal:** `nirimaki-theme-set` picks the first image from the current
 theme's `backgrounds/` and tells swaybg to display it. Theme swap →
 wallpaper swap, no restart.
 
@@ -433,7 +433,7 @@ wallpaper swap, no restart.
    - The first image alphabetically, OR
    - A `~/.config/theme/current/wallpaper` symlink the user can
      manually point elsewhere (used by E7's background picker).
-2. `qs-theme-set` after copying theme files:
+2. `nirimaki-theme-set` after copying theme files:
    - Resolve the active wallpaper path.
    - `pkill swaybg` and `swaybg -i <path> -m fill &`.
 3. niri's startup line (currently `spawn-sh-at-startup "swaybg -c
@@ -447,9 +447,9 @@ wallpaper swap, no restart.
 
 **Verification:**
 
-- `qs-theme-set tokyo-night` → wallpaper changes to TN's shipped
+- `nirimaki-theme-set tokyo-night` → wallpaper changes to TN's shipped
   image.
-- `qs-theme-set default` → back to TN's image (it inherits whatever
+- `nirimaki-theme-set default` → back to TN's image (it inherits whatever
   was set), unless `default` ships its own wallpaper — TBD if we want
   to ship one with `default`.
 
@@ -458,13 +458,13 @@ wallpaper swap, no restart.
 Built as part of E3.5 once the niri blur work made it clear that
 the solid `#101315` swaybg was the reason no blur was visible.
 
-- **`~/.local/bin/qs-wallpaper-apply`** picks the first image
+- **`~/.local/bin/nirimaki-wallpaper-apply`** picks the first image
   (sorted) under `~/.config/theme/current/backgrounds/` and starts
   swaybg on it; falls back to a solid `#101315` if a theme ships no
   images (today: only the `default` theme).
 - **niri** spawn-sh-at-startup calls the script in place of the
   old `swaybg -c "#101315"` line.
-- **`qs-theme-set`** calls it after every theme swap. Old swaybg
+- **`nirimaki-theme-set`** calls it after every theme swap. Old swaybg
   is `pkill`d cleanly first so the new one binds to the same
   Wayland output.
 - We deferred the planned `~/.config/theme/current/wallpaper`
@@ -476,7 +476,7 @@ the solid `#101315` swaybg was the reason no blur was visible.
 ## Step E6 — Theme picker (Quickshell overlay) ✅
 
 **Goal:** a `Mod+<key>` overlay that lists every available theme and
-calls `qs-theme-set` on enter — same UX as the Launcher / Power-Menu
+calls `nirimaki-theme-set` on enter — same UX as the Launcher / Power-Menu
 / Emoji picker.
 
 **Plan:**
@@ -489,7 +489,7 @@ calls `qs-theme-set` on enter — same UX as the Launcher / Power-Menu
    - If a `themes/<name>/preview.png` exists, a small thumbnail.
    - Highlighted = current theme.
 4. Up / Down / fuzzy filter; Enter spawns
-   `qs-theme-set <selected>` via `Quickshell.execDetached`. Live
+   `nirimaki-theme-set <selected>` via `Quickshell.execDetached`. Live
    re-tint shows the theme without dismissing.
 5. IPC `theme-picker` toggle handler. niri bind: `Mod+T` (already?
    check first) or something free.
@@ -517,12 +517,12 @@ calls `qs-theme-set` on enter — same UX as the Launcher / Power-Menu
   (looked up via `Theme.themeName`) so the menu opens "on" the
   current selection; arrow keys / fuzzy filter move from there.
 - Enter calls
-  `Quickshell.execDetached(["~/.local/bin/qs-theme-set", name])`.
+  `Quickshell.execDetached(["~/.local/bin/nirimaki-theme-set", name])`.
   Absolute path because Quickshell's spawn PATH doesn't include
-  `~/.local/bin`. `qs-theme-set` already triggers the full chain
+  `~/.local/bin`. `nirimaki-theme-set` already triggers the full chain
   (Theme IPC reload, niri reload, swaybg restart, GTK/Qt gsettings).
 - Mouse click on a row activates that theme.
-- Namespace `qs-theme-picker` so the existing layer surface rules
+- Namespace `nirimaki-theme-picker` so the existing layer surface rules
   apply (or don't — we have no layer-rule blur).
 - **Initial bug:** missing `import QtQuick.Controls` — needed for
   `ScrollBar` on the ListView. Added.
@@ -557,20 +557,20 @@ calls `qs-theme-set` on enter — same UX as the Launcher / Power-Menu
 
 - Bind opens grid of thumbnails for the active theme.
 - Arrow keys + Enter applies a new wallpaper instantly.
-- Theme swap (`qs-theme-set …`) resets to that theme's default
+- Theme swap (`nirimaki-theme-set …`) resets to that theme's default
   wallpaper, which is then re-overrideable.
 
 ### Outcome
 
 **Persistence layer:**
 
-- `qs-wallpaper-apply` resolution order changed:
+- `nirimaki-wallpaper-apply` resolution order changed:
     1. `~/.config/theme/current/wallpaper` symlink, if it resolves
        to a real file.
     2. First sorted image in `current/backgrounds/`.
     3. Solid `#101315` fallback (themes shipping no images).
-- `qs-theme-set` removes the `wallpaper` symlink before re-running
-  `qs-wallpaper-apply`, so each theme starts on its own first image
+- `nirimaki-theme-set` removes the `wallpaper` symlink before re-running
+  `nirimaki-wallpaper-apply`, so each theme starts on its own first image
   and user-picked wallpapers don't bleed across themes.
 
 **`~/.config/quickshell/BackgroundPicker.qml`** — grid of
@@ -599,7 +599,7 @@ thumbnails, same overlay UX as ThemePicker:
   activates, type to fuzzy-filter, Esc dismisses.
 - Activate writes the symlink + reruns the apply script in one
   shell call:
-  `ln -sfn <path> ~/.config/theme/current/wallpaper && qs-wallpaper-apply`
+  `ln -sfn <path> ~/.config/theme/current/wallpaper && nirimaki-wallpaper-apply`
   (JSON-quoted via `JSON.stringify` for spaces / specials in paths).
 
 **Wiring:**
@@ -627,5 +627,5 @@ thumbnails, same overlay UX as ThemePicker:
 - **Backup before destructive ops.** Each step writes its own `.bak`;
   cleanup commands documented at the end of the step.
 - **Theme swap test** at the end of each step that touches theme
-  files — confirm `qs-theme-set <each-of-three-themes>` still produces
+  files — confirm `nirimaki-theme-set <each-of-three-themes>` still produces
   consistent output.

@@ -151,7 +151,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-language-picker"
+        dialogNamespace: "nirimaki-language-picker"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

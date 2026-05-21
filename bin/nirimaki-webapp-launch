@@ -1,12 +1,15 @@
 #!/bin/bash
-# qs-webapp-launch — open a URL as a standalone chromium webapp.
+# nirimaki:group=webapp
+# nirimaki:summary=Launch a registered webapp with its own user-data-dir
+# nirimaki:args=<slug> <url> [chromium-args...]
+# nirimaki-webapp-launch — open a URL as a standalone chromium webapp.
 #
-# Usage: qs-webapp-launch <slug> <url> [extra-chromium-args...]
+# Usage: nirimaki-webapp-launch <slug> <url> [extra-chromium-args...]
 #
 # - <slug> is a short ASCII identifier (a-z0-9-). It becomes:
-#   * the wayland app-id: `qs-webapp-<slug>` (so niri's window-rule
+#   * the wayland app-id: `nirimaki-webapp-<slug>` (so niri's window-rule
 #     can match; opacity 1.0, no terminal-style translucency).
-#   * the chromium user-data-dir leaf: ~/.cache/qs-webapps/<slug>/
+#   * the chromium user-data-dir leaf: ~/.cache/nirimaki-webapps/<slug>/
 #     — per-app isolation so cookies / logged-in sessions don't
 #     cross between webapps (different Google accounts for Gmail
 #     vs Calendar, for instance).
@@ -29,16 +32,16 @@ url="$2"
 shift 2
 
 if [[ ! $slug =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
-  echo "qs-webapp-launch: slug must match [a-z0-9-], got '$slug'" >&2
+  echo "nirimaki-webapp-launch: slug must match [a-z0-9-], got '$slug'" >&2
   exit 1
 fi
 
 if ! command -v chromium >/dev/null 2>&1; then
-  echo "qs-webapp-launch: chromium not installed (pacman -S chromium)" >&2
+  echo "nirimaki-webapp-launch: chromium not installed (pacman -S chromium)" >&2
   exit 1
 fi
 
-user_data_dir="$HOME/.cache/qs-webapps/$slug"
+user_data_dir="$HOME/.cache/nirimaki-webapps/$slug"
 mkdir -p "$user_data_dir"
 
 # --ozone-platform-hint=auto: prefer wayland, fall back to x11 (so
@@ -49,7 +52,7 @@ mkdir -p "$user_data_dir"
 exec chromium \
   --ozone-platform-hint=auto \
   --user-data-dir="$user_data_dir" \
-  --class="qs-webapp-$slug" \
+  --class="nirimaki-webapp-$slug" \
   --app="$url" \
   --no-first-run \
   --no-default-browser-check \

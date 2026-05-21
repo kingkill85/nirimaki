@@ -1,18 +1,20 @@
 #!/bin/bash
-# qs-webapp-install — interactively register a URL as a Nirimaki webapp.
+# nirimaki:group=webapp
+# nirimaki:summary=Interactively register a URL as a standalone Chromium webapp
+# nirimaki-webapp-install — interactively register a URL as a Nirimaki webapp.
 #
 # Mirrors Omarchy's `omarchy-webapp-install` flow without the gum
 # dependency: plain `read` prompts, auto-fetches a 128px favicon
 # from google.com/s2/favicons (with a manual fallback URL prompt
 # if that 404s), and drops:
 #
-#   ~/.local/share/applications/qs-webapp-<slug>.desktop
-#   ~/.local/share/applications/icons/qs-webapp-<slug>.png
+#   ~/.local/share/applications/nirimaki-webapp-<slug>.desktop
+#   ~/.local/share/applications/icons/nirimaki-webapp-<slug>.png
 #
-# The .desktop's Exec= invokes qs-webapp-launch, which runs
+# The .desktop's Exec= invokes nirimaki-webapp-launch, which runs
 # chromium --app=URL with a per-webapp --user-data-dir (so each
 # webapp has its own session, cookies, logged-in state). The
-# wayland app-id is qs-webapp-<slug>, matched by niri's window
+# wayland app-id is nirimaki-webapp-<slug>, matched by niri's window
 # rule (opacity 1.0, no terminal translucency).
 #
 # Quickshell's Launcher picks the .desktop up automatically — no
@@ -78,7 +80,7 @@ case $url in
 esac
 
 slug=$(slugify "$name")
-desktop_id="qs-webapp-$slug"
+desktop_id="nirimaki-webapp-$slug"
 desktop_file="$APPS_DIR/${desktop_id}.desktop"
 icon_file="$ICONS_DIR/${desktop_id}.png"
 
@@ -120,7 +122,7 @@ else
 fi
 
 # --- .desktop ---
-exec_path="$HOME/.local/bin/qs-webapp-launch"
+exec_path="$HOME/.local/bin/nirimaki-webapp-launch"
 
 # Escape single quotes in name/url for the desktop file.
 esc() { printf '%s' "$1" | sed "s/'/'\\\\''/g"; }
@@ -139,7 +141,7 @@ Comment=$name_esc — Nirimaki webapp
 Exec=$exec_path $slug '$url_esc'
 Terminal=false
 StartupNotify=true
-StartupWMClass=qs-webapp-$slug
+StartupWMClass=nirimaki-webapp-$slug
 ${icon_line}
 Categories=Network;WebBrowser;
 EOF
@@ -156,7 +158,12 @@ echo
 echo "  ✓ installed: $desktop_file"
 [[ -f $icon_file ]] && echo "  ✓ icon:      $icon_file"
 echo "  → launch from the apps menu (Mod+Space) or:"
-echo "      qs-webapp-launch $slug '$url'"
+echo "      nirimaki-webapp-launch $slug '$url'"
+
+# Fire the webapp-installed hook so users can attach side-effects.
+if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
+  "$HOME/.local/bin/nirimaki-hook-run" webapp-installed "$slug" "$url" || true
+fi
 
 # When launched from the Quickshell Launcher (Terminal=true wraps us
 # in foot), the window closes the instant we exit. Pause so the user

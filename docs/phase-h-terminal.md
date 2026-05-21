@@ -59,7 +59,7 @@ NotificationService.
 
 - `bookmark` — fish function + fzf-picker for named directory pins
   (the "T-marks" layer above zoxide's frecency).
-- `qs-quake-toggle` — drop-down kitty toggle bound to `Mod+grave`.
+- `nirimaki-quake-toggle` — drop-down kitty toggle bound to `Mod+grave`.
 
 ### Explicitly out of scope
 
@@ -73,21 +73,21 @@ NotificationService.
 | Step | Topic | What changes |
 |------|-------|--------------|
 | **H1** | fish + chsh + scaffolding | Install fish, add to `/etc/shells`, `chsh -s /usr/bin/fish`. Repo-side `config/fish/` skeleton. `dev-link.sh` linked. |
-| **H2** | starship | Install, template `starship.toml` per theme, source in `config.fish` + `~/.bashrc`, hot-reload on `qs-theme-set`. |
+| **H2** | starship | Install, template `starship.toml` per theme, source in `config.fish` + `~/.bashrc`, hot-reload on `nirimaki-theme-set`. |
 | **H3** | Core tools | eza · bat · fzf · zoxide · ripgrep · fd · git-delta — install, abbrs, fish key bindings, `$PAGER`/`$EDITOR` env. |
 | **H4** | Tier 2 + light | lazygit · tealdeer · pay-respects · sd · ouch · dust · duf · procs · xh · hyperfine · tokei. |
 | **H5** | Fish plugins | fisher bootstrap, install fzf.fish/autopair/puffer/done/sponge. Verify `done` toasts via NotificationService. |
-| **H6** | Homegrown | `bookmark` fish function + Quickshell-style fzf picker. `qs-quake-toggle` script + niri rule. |
+| **H6** | Homegrown | `bookmark` fish function + Quickshell-style fzf picker. `nirimaki-quake-toggle` script + niri rule. |
 | **H7** | tmux | Baseline `tmux.conf` (prefix, vi-mode, mouse, true-color, sane copy). Themed via template in H9. Decide tpm vs hand-rolled when we land it. |
 | **H8** | Keybind sweep | `fish_user_key_bindings` (Ctrl-R/T, Alt-C, Ctrl-B, Ctrl-G, Alt-E, Ctrl-X Ctrl-L). Mirror via `~/.inputrc` for bash. niri adds: `Mod+grave` quake, `Mod+Shift+Return` floating term, `Mod+Alt+G` floating lazygit. |
-| **H9** | Theme integration | Templates: `starship.toml.tpl`, `bat-theme` selection, `delta.gitconfig.tpl`, `fish-colors.fish.tpl`, `lazygit.yml.tpl`, `tmux-theme.conf.tpl`. Sourced/applied by `qs-theme-set`. |
+| **H9** | Theme integration | Templates: `starship.toml.tpl`, `bat-theme` selection, `delta.gitconfig.tpl`, `fish-colors.fish.tpl`, `lazygit.yml.tpl`, `tmux-theme.conf.tpl`. Sourced/applied by `nirimaki-theme-set`. |
 
 ## Locked decisions
 
 1. **fish via chsh, not via kitty-only.** Means SSH sessions, TTY,
    and any new terminal land in fish — consistent. The kitty
    `shell` setting is left at default (uses login shell).
-2. **All repo scripts stay bash.** `bin/qs-*` and `install.sh`
+2. **All repo scripts stay bash.** `bin/nirimaki-*` and `install.sh`
    never converted. `#!/bin/bash` shebangs. Rationale:
    compatibility with non-Nirimaki users running them; fish is for
    the user's interactive sessions only.
@@ -102,12 +102,12 @@ NotificationService.
    the plugin's default (10s); reuses libnotify which our daemon
    already speaks.
 6. **Quake terminal = single floating kitty instance.** Fixed
-   `app-id=qs-quake-term`, niri window-rule for float + size +
-   centre, `qs-quake-toggle` script handles show/hide via niri IPC
+   `app-id=nirimaki-quake-term`, niri window-rule for float + size +
+   centre, `nirimaki-quake-toggle` script handles show/hide via niri IPC
    (spawn first time, focus-toggle thereafter).
 7. **No multiplexer keybind conflicts.** tmux's prefix stays
    `Ctrl-B` (default) — niri's `Mod` is super, no overlap.
-8. **Theme reload for shell prompt.** `qs-theme-set` already does
+8. **Theme reload for shell prompt.** `nirimaki-theme-set` already does
    IPC reloads for Quickshell + signals kitty. Add a starship
    refresh by re-rendering `starship.toml` from the template; the
    running shell picks up the new file on next prompt redraw
@@ -127,7 +127,7 @@ NotificationService.
   threshold is 10s; tune via `set -g __done_min_cmd_duration`.
 - Theme hot-reload for fish: changing
   `~/.config/fish/conf.d/fish-colors.fish` only takes effect for
-  *new* fish sessions unless we `source` it via an IPC. `qs-theme-set`
+  *new* fish sessions unless we `source` it via an IPC. `nirimaki-theme-set`
   will need to write a fish universal variable
   (`fish -c 'set -U fish_color_...'`) — universal variables persist
   AND propagate to all running fish instances. This is the clean
@@ -181,7 +181,7 @@ Everything from H1–H9 plus a parity-driven LazyVim pass landed:
   on commands taking >5s.
 - ✅ **H6** — `bm` fish function (named directory bookmarks,
   `~/.local/share/fish/bookmarks` store, Ctrl-B fzf picker).
-  `qs-quake-toggle` script for the Quake-style drop-down terminal,
+  `nirimaki-quake-toggle` script for the Quake-style drop-down terminal,
   bound to `Mod+grave`. Persists via a `tmux new-session -A -s
   quake` wrapper so closing the terminal keeps the session alive.
   (Originally targeted kitty; rewritten to foot on 2026-05-21 —
@@ -215,7 +215,7 @@ Modelled after `basecamp/omarchy` + `nicomiguelino/omarchy-nvim`:
     `~/.config/theme/current/neovim.lua` (the active theme's
     spec), portable across machines without symlinks.
   - `nirimaki-theme-hotreload.lua` — defines
-    `_G.NirimakiReloadTheme()` invoked from `qs-theme-set` via
+    `_G.NirimakiReloadTheme()` invoked from `nirimaki-theme-set` via
     `nvim --remote-expr` against `$XDG_RUNTIME_DIR/nvim.*.0`
     sockets. Re-dofile's the theme, clears highlights, unloads
     the previous plugin's lua modules, loads the new
@@ -330,14 +330,14 @@ model. Migration was full, not surface-level:
 - **Live theme reload** doesn't use SIGUSR1 like kitty did — foot's
   SIGUSR1 only toggles the in-memory `[colors-dark]`/`[colors-light]`
   pair that was loaded at startup, it doesn't re-read the file.
-  qs-theme-set instead writes OSC palette sequences (OSC 4 for
+  nirimaki-theme-set instead writes OSC palette sequences (OSC 4 for
   indexed 0–15, OSC 10/11/12/17/19 for fg/bg/cursor/selection)
   directly to each running foot's pts slave (found via
   `/proc/<child-shell-pid>/fd/1`). Foot interprets the OSCs the
   same as if a program inside the terminal printed them, so live
   recolouring works regardless of what's on the command line —
   vim, less, fzf, lazygit all repaint immediately.
-- **`qs-quake-toggle`** — switched to `foot --app-id=qs-quake-term`
+- **`nirimaki-quake-toggle`** — switched to `foot --app-id=nirimaki-quake-term`
   (was `kitty --class=...`). tmux wrapper unchanged: foot takes the
   exec command as positional args after options, no `-e` flag like
   kitty.
@@ -353,7 +353,7 @@ model. Migration was full, not surface-level:
 - **niri window-rules** in config.kdl already matched on `app-id`
   (which foot sets via `--app-id=` exactly the way kitty set it via
   `--class=`); only the explanatory comments needed updating.
-  Floating TUI rule (`^tui-`) and quake rule (`qs-quake-term`) both
+  Floating TUI rule (`^tui-`) and quake rule (`nirimaki-quake-term`) both
   apply identically to foot.
 - **i18n** — `keybind.title.terminal-kitty` →
   `keybind.title.terminal-foot` (the slug is derived from the

@@ -8,9 +8,9 @@ import Qt.labs.folderlistmodel
 // Background picker — overlay grid of every image under
 // ~/.config/theme/current/backgrounds/. Enter writes a symlink
 // `current/wallpaper -> <chosen>` and respawns swaybg via
-// qs-wallpaper-apply.
+// nirimaki-wallpaper-apply.
 //
-// The symlink lives until qs-theme-set runs (theme swap clears it
+// The symlink lives until nirimaki-theme-set runs (theme swap clears it
 // so each new theme starts on its own first image). Picker
 // selection therefore persists across reboots within the same
 // theme, but a theme change resets the wallpaper. Acceptable
@@ -143,7 +143,7 @@ Item {
         //    symlink and starts a fresh swaybg pointed at it).
         Quickshell.execDetached(["sh", "-lc",
             "ln -sfn " + JSON.stringify(path) + " " + JSON.stringify(root.pickPath) +
-            " && " + Quickshell.env("HOME") + "/.local/bin/qs-wallpaper-apply"
+            " && " + Quickshell.env("HOME") + "/.local/bin/nirimaki-wallpaper-apply"
         ]);
     }
 
@@ -171,7 +171,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-background-picker"
+        dialogNamespace: "nirimaki-background-picker"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

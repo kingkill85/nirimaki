@@ -7,13 +7,14 @@ import Quickshell.Wayland
 // niri's compositor blur is scoped to the card's geometry only,
 // not the entire scrim. Pre-refactor each dialog was a single
 // full-screen layer surface with a translucent scrim child, which
-// caused niri's `background-effect blur` (matched on `qs-*`) to
+// caused niri's `background-effect blur` (matched on `nirimaki-*`) to
 // blur the entire screen behind the dialog — not the Omarchy look.
 //
 // Now we host two layer surfaces:
-//   - scrim  (namespace `qs-scrim`, full-screen, NOT matched by
-//     niri's blur layer-rule)
-//   - dialog (namespace `qs-<name>`, sized to card, IS matched and
+//   - scrim  (namespace `dialog-scrim`, full-screen, NOT matched by
+//     niri's blur layer-rule — that's load-bearing; renaming to start
+//     with `nirimaki-` blurs the entire desktop dim)
+//   - dialog (namespace `nirimaki-<name>`, sized to card, IS matched and
 //     gets compositor blur behind its translucent body)
 //
 // Both anchor `exclusiveZone: 0` so they sit below the bar's
@@ -33,7 +34,7 @@ Item {
     // outside the card and dismiss the dialog. Per-dialog overrides
     // are accepted but discouraged.
     property color scrimColor: "transparent"
-    property string dialogNamespace: "qs-dialog"
+    property string dialogNamespace: "nirimaki-dialog"
     property int cardWidth: 400
     property int cardHeight: 300
     property color cardColor: Theme.cardBg
@@ -53,11 +54,12 @@ Item {
         visible: shell.open
         anchors { top: true; bottom: true; left: true; right: true }
         color: shell.scrimColor
-        // Namespace is intentionally outside the `qs-*` family so
-        // niri's blur layer-rule (which matches `^(quickshell|qs-.*)$`)
+        // Namespace is intentionally outside the `nirimaki-*` family so
+        // niri's blur layer-rule (which matches `^(quickshell|nirimaki-.*)$`)
         // does NOT apply blur to the scrim. Only the dialog surface
-        // gets blur.
-        WlrLayershell.namespace: "nirimaki-scrim"
+        // gets blur. (Pre-Phase-J this was `qs-scrim`, which was also
+        // outside the old `qs-*` regex — same design intent.)
+        WlrLayershell.namespace: "dialog-scrim"
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.exclusiveZone: 0
 

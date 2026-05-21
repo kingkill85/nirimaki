@@ -9,8 +9,8 @@ import Quickshell.Wayland
 //   quickshell ipc call osd show '<json payload>'
 //
 // after they've changed the underlying state (volume, brightness, mic, …).
-// Payload keys: icon, message, value, max, progressText. See bin/qs-osd
-// for the convenience wrapper and bin/qs-audio-* for callers.
+// Payload keys: icon, message, value, max, progressText. See bin/nirimaki-osd
+// for the convenience wrapper and bin/nirimaki-audio-* for callers.
 //
 // Deviations from upstream:
 //   - qs.Commons → Theme.qml
@@ -100,7 +100,7 @@ Item {
         visible: root.opened
         anchors { top: true; bottom: true; left: true; right: true }
         color: "transparent"
-        WlrLayershell.namespace: "qs-osd"
+        WlrLayershell.namespace: "nirimaki-osd"
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         exclusionMode: ExclusionMode.Ignore

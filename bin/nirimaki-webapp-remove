@@ -1,11 +1,13 @@
 #!/bin/bash
-# qs-webapp-remove — interactively delete an installed Nirimaki webapp.
+# nirimaki:group=webapp
+# nirimaki:summary=fzf-pick an installed webapp and delete it (.desktop + icon + profile)
+# nirimaki-webapp-remove — interactively delete an installed Nirimaki webapp.
 #
-# fzf-picks over the qs-webapp-*.desktop entries in
+# fzf-picks over the nirimaki-webapp-*.desktop entries in
 # ~/.local/share/applications/, then removes:
 #   - the .desktop file
 #   - the per-app icon under .../icons/
-#   - the per-app chromium user-data-dir under ~/.cache/qs-webapps/
+#   - the per-app chromium user-data-dir under ~/.cache/nirimaki-webapps/
 #
 # Cookies / logged-in sessions go with the user-data-dir wipe;
 # that's the same as uninstalling a PWA in Chrome's UI. The repo's
@@ -16,15 +18,15 @@ set -euo pipefail
 
 APPS_DIR="$HOME/.local/share/applications"
 ICONS_DIR="$APPS_DIR/icons"
-DATA_ROOT="$HOME/.cache/qs-webapps"
+DATA_ROOT="$HOME/.cache/nirimaki-webapps"
 
 if ! command -v fzf >/dev/null 2>&1; then
-  echo "qs-webapp-remove: fzf not installed" >&2
+  echo "nirimaki-webapp-remove: fzf not installed" >&2
   exit 1
 fi
 
 shopt -s nullglob
-desktops=("$APPS_DIR"/qs-webapp-*.desktop)
+desktops=("$APPS_DIR"/nirimaki-webapp-*.desktop)
 shopt -u nullglob
 
 if [[ ${#desktops[@]} -eq 0 ]]; then
@@ -47,7 +49,7 @@ choice=$(printf '%s\n' "${entries[@]}" \
 
 desktop_file=$(printf '%s' "$choice" | cut -f2)
 desktop_id=$(basename "$desktop_file" .desktop)
-slug="${desktop_id#qs-webapp-}"
+slug="${desktop_id#nirimaki-webapp-}"
 
 echo "will remove:"
 echo "  .desktop:        $desktop_file"
@@ -66,7 +68,12 @@ fi
 
 echo "  ✓ removed $slug"
 
-# See qs-webapp-install for the rationale: keep the foot window open
+# Fire the webapp-removed hook so users can attach side-effects.
+if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
+  "$HOME/.local/bin/nirimaki-hook-run" webapp-removed "$slug" || true
+fi
+
+# See nirimaki-webapp-install for the rationale: keep the foot window open
 # long enough to read the confirmation when launched from the
 # apps-menu (Terminal=true) path.
 echo

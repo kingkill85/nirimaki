@@ -26,7 +26,7 @@ ShellRoot {
     // Single Launcher (overlay, IPC-triggered).
     Launcher {}
 
-    // OSD bezel for volume / mute / brightness. IPC-driven; see bin/qs-osd.
+    // OSD bezel for volume / mute / brightness. IPC-driven; see bin/nirimaki-osd.
     Osd {}
 
     // Clipboard history picker. IPC-triggered (Mod+Period).
@@ -39,12 +39,12 @@ ShellRoot {
     EmojiPicker {}
 
     // Theme picker — pick an entry under ~/.config/theme/themes/ and
-    // apply via qs-theme-set. IPC-triggered (Mod+Shift+T).
+    // apply via nirimaki-theme-set. IPC-triggered (Mod+Shift+T).
     ThemePicker {}
 
     // Background picker — grid of images under the current theme's
     // backgrounds/. Writes a symlink + restarts swaybg via
-    // qs-wallpaper-apply. IPC-triggered (Mod+Shift+B).
+    // nirimaki-wallpaper-apply. IPC-triggered (Mod+Shift+B).
     BackgroundPicker {}
 
     // Keybind cheat sheet — parses keybinds.kdl + shows every bind

@@ -42,8 +42,8 @@ abbr -a sc   'systemctl --user'
 abbr -a jc   'journalctl --user -e'
 
 # --- Nirimaki helpers --------------------------------------------------
-abbr -a tl   'qs-theme-list'
-abbr -a ts   'qs-theme-set'
+abbr -a tl   'nirimaki-theme-list'
+abbr -a ts   'nirimaki-theme-set'
 
 # --- eza (modern ls) ---------------------------------------------------
 # `ls` itself stays as fish's stock ls in scripts (abbr only fires when

@@ -115,7 +115,7 @@ output "DP-2" {
 // Bar pills are back to plain idx (`1 2 3` on each output).
 
 // Layout (gaps, focus-ring/border colours, shadow, struts) lives in a
-// generated include so `qs-theme-set` can flip the focused-window
+// generated include so `nirimaki-theme-set` can flip the focused-window
 // border colour with the rest of the theme. Template source:
 // ~/.config/theme/templates/niri-theme.kdl.tpl
 include "~/.config/theme/current/niri-theme.kdl"
@@ -137,18 +137,18 @@ environment {
     // Qt apps look up `QT_QPA_PLATFORMTHEME` to pick their platform
     // theme module; qt6ct then renders the palette in
     // ~/.config/theme/current/qt-colors.conf and uses the icon_theme
-    // line in qt6ct.conf — both rewritten by qs-theme-set.
+    // line in qt6ct.conf — both rewritten by nirimaki-theme-set.
     QT_QPA_PLATFORMTHEME "qt6ct"
 }
 
 // Quickshell is the bar/shell.
 spawn-at-startup "quickshell"
 
-// Wallpaper — qs-wallpaper-apply starts swaybg on the first image
+// Wallpaper — nirimaki-wallpaper-apply starts swaybg on the first image
 // under ~/.config/theme/current/backgrounds/, with a solid-colour
 // fallback if the theme ships no images. Same script runs from
-// qs-theme-set after every swap so the wallpaper follows the theme.
-spawn-sh-at-startup "$HOME/.local/bin/qs-wallpaper-apply"
+// nirimaki-theme-set after every swap so the wallpaper follows the theme.
+spawn-sh-at-startup "$HOME/.local/bin/nirimaki-wallpaper-apply"
 
 // Idle: lock after 5 min, power off displays after 10 min, lock before suspend.
 // Niri auto-powers monitors back on at any input — no `resume` action needed.
@@ -236,7 +236,7 @@ window-rule {
 }
 
 // Inactive default opacity — 90 %, Omarchy parity. Per-app rules
-// further down override this (the qs-quake-term rule pins a fixed
+// further down override this (the nirimaki-quake-term rule pins a fixed
 // size, not opacity — terminals inherit the 0.97/0.9 default).
 window-rule {
     match is-active=false
@@ -289,22 +289,22 @@ window-rule {
     opacity 1.0
 }
 
-// Chromium webapps (qs-webapp-* app-id) — fully opaque. Webapp
+// Chromium webapps (nirimaki-webapp-* app-id) — fully opaque. Webapp
 // content is browser content; translucency would degrade text
 // rendering and the BrowserThemeColor accent stripe. The chrome
 // itself recolours live on theme swap via the managed-policy
-// path in qs-theme-set.
+// path in nirimaki-theme-set.
 window-rule {
-    match app-id=r#"^qs-webapp-"#
+    match app-id=r#"^nirimaki-webapp-"#
     opacity 1.0
 }
 
 // Layer-rule blur scoped to Quickshell dialog surfaces only.
 //   - `quickshell` matches the Bar's default namespace.
-//   - `qs-*` matches each dialog's own layer surface (Launcher,
+//   - `nirimaki-*` matches each dialog's own layer surface (Launcher,
 //     PowerMenu, SettingsMenu, KeybindSheet, all the pickers).
 //   - The dim scrim that every dialog draws across the screen sits on
-//     a SEPARATE layer surface with namespace `nirimaki-scrim` so
+//     a SEPARATE layer surface with namespace `dialog-scrim` so
 //     it does NOT match here — blur is only behind the dialog card,
 //     not behind the scrim. This matches Omarchy's walker look:
 //     blurred backdrop sits behind the dialog only, the rest of the
@@ -315,7 +315,7 @@ window-rule {
 // the actual workspace blurred behind the overlay, not just a
 // blurred wallpaper that hides their apps.
 layer-rule {
-    match namespace=r#"^(quickshell|qs-.*)$"#
+    match namespace=r#"^(quickshell|nirimaki-.*)$"#
     background-effect {
         blur true
         xray false
@@ -370,12 +370,12 @@ window-rule {
     default-window-height { fixed 640; }
 }
 
-// Quake-style drop-down terminal (Phase H6). qs-quake-toggle spawns a
-// single foot with --app-id=qs-quake-term; this rule pins it floating
+// Quake-style drop-down terminal (Phase H6). nirimaki-quake-toggle spawns a
+// single foot with --app-id=nirimaki-quake-term; this rule pins it floating
 // at a wider 1400×720, larger than the TUI rule above for a roomier
 // drop-down feel.
 window-rule {
-    match app-id="qs-quake-term"
+    match app-id="nirimaki-quake-term"
     open-floating true
     default-column-width { fixed 1400; }
     default-window-height { fixed 720; }

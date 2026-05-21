@@ -1,5 +1,8 @@
 #!/bin/bash
-# qs-audio-output-volume — adjust the default sink and pop up the OSD.
+# nirimaki:group=audio
+# nirimaki:summary=Step the default-sink volume + OSD pop
+# nirimaki:args=raise|lower|mute-toggle
+# nirimaki-audio-output-volume — adjust the default sink and pop up the OSD.
 # Port of Omarchy's `omarchy-audio-output-volume`.
 #
 # PATH is forced because niri's spawn-inherited PATH does not include

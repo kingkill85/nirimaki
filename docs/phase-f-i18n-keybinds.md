@@ -383,7 +383,7 @@ phase file matches reality.
   scrim on top so the centred password card stays readable
   against any image. `Theme.bg` is still the outer fallback if
   the symlink ever breaks.
-- **`qs-theme-set` bugfix.** Previously the theme swap removed
+- **`nirimaki-theme-set` bugfix.** Previously the theme swap removed
   the `wallpaper` symlink so each theme could start on its own
   first image. That broke the lock screen's `Image` source
   after every swap. Fix: instead of removing the symlink, point

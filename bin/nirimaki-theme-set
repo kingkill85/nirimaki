@@ -1,5 +1,8 @@
 #!/bin/bash
-# qs-theme-set — switch the active theme by name.
+# nirimaki:group=theme
+# nirimaki:summary=Switch the active theme by name (renders templates + live-reloads apps)
+# nirimaki:args=<theme-name>
+# nirimaki-theme-set — switch the active theme by name.
 #
 #   ~/.config/theme/themes/<name>/    sources (colors.toml, shell.toml,
 #                                     btop.theme, etc.)
@@ -104,8 +107,28 @@ if [[ -d $TEMPLATES_DIR ]]; then
     fi
   done <"$CURRENT_DIR/colors.toml"
 
+  # Collect templates: union of TEMPLATES_DIR + user-themed overrides.
+  # The user dir wins by basename — drop a `<name>.tpl` into
+  # ~/.config/nirimaki/themed/ and it replaces the shipped template
+  # for that file. New names there extend the set (e.g. add a
+  # `kitty.conf.tpl` to bring back kitty theming without touching
+  # the repo).
+  USER_THEMED="$HOME/.config/nirimaki/themed"
+  declare -A TPL_BY_BASE=()
+  shopt -s nullglob
   for tpl in "$TEMPLATES_DIR"/*.tpl; do
-    base=$(basename "$tpl" .tpl)
+    TPL_BY_BASE[$(basename "$tpl")]="$tpl"
+  done
+  if [[ -d $USER_THEMED ]]; then
+    for tpl in "$USER_THEMED"/*.tpl; do
+      TPL_BY_BASE[$(basename "$tpl")]="$tpl"
+    done
+  fi
+  shopt -u nullglob
+
+  for tpl_basename in "${!TPL_BY_BASE[@]}"; do
+    tpl="${TPL_BY_BASE[$tpl_basename]}"
+    base="${tpl_basename%.tpl}"
     case "$base" in
       btop.theme)
         # btop only looks in fixed theme dirs by filename; install
@@ -345,11 +368,20 @@ else
   rm -f "$CURRENT_DIR/wallpaper"   # theme ships no images
 fi
 
-if [[ -x $HOME/.local/bin/qs-wallpaper-apply ]]; then
-  setsid -f "$HOME/.local/bin/qs-wallpaper-apply" >/dev/null 2>&1 || true
+if [[ -x $HOME/.local/bin/nirimaki-wallpaper-apply ]]; then
+  setsid -f "$HOME/.local/bin/nirimaki-wallpaper-apply" >/dev/null 2>&1 || true
 fi
 
 # btop: no live reload mechanism; running btop keeps its old theme until
 # closed and reopened. Acceptable since btop is rarely long-running.
 
-echo "qs-theme-set: now using '$name'"
+# Run user hooks (~/.config/nirimaki/hooks/theme-set.d/*) so users can
+# bolt on side-effects (notify-send toast, lock-screen wallpaper
+# variant swap, …) without forking this script. Hook gets the new
+# theme name as $1. Silently no-ops if the hook runner isn't on PATH
+# (e.g. partial install).
+if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
+  "$HOME/.local/bin/nirimaki-hook-run" theme-set "$name" || true
+fi
+
+echo "nirimaki-theme-set: now using '$name'"

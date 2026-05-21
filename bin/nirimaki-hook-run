@@ -1,0 +1,51 @@
+#!/bin/bash
+# nirimaki:group=hook
+# nirimaki:summary=Run every executable in ~/.config/nirimaki/hooks/<event>.d/
+# nirimaki:args=<event> [args-passed-to-each-hook...]
+#
+# Drop-in extension point. Users put scripts at
+#   ~/.config/nirimaki/hooks/<event>.d/<name>
+# and they get exec'd, in `LC_ALL=C` filename sort order, with the
+# remaining args forwarded.
+#
+# Conventions (Omarchy-compatible):
+# - .sample files are skipped (template starting point, not active).
+# - Hooks must be executable (chmod +x) to fire.
+# - Each hook runs synchronously; a non-zero exit is logged but does
+#   NOT abort the chain — one buggy hook shouldn't take down the
+#   theme-set pipeline.
+# - The hook's stdout/stderr is forwarded to the caller (whose own
+#   stderr usually goes to journal — niri/qs/foot all log there).
+#
+# Defined events:
+#   theme-set        $1 = theme-name              (fired at end of theme-set)
+#   webapp-installed $1 = slug   $2 = url         (after webapp-install)
+#   webapp-removed   $1 = slug                    (after webapp-remove)
+#   post-update      (none)                       (placeholder for future)
+
+set -u
+
+event="${1:-}"
+if [[ -z $event ]]; then
+  echo "Usage: $(basename "$0") <event> [args...]" >&2
+  exit 1
+fi
+shift || true
+
+hook_dir="${XDG_CONFIG_HOME:-$HOME/.config}/nirimaki/hooks/${event}.d"
+[[ -d $hook_dir ]] || exit 0
+
+shopt -s nullglob
+mapfile -t hooks < <(printf '%s\n' "$hook_dir"/* | LC_ALL=C sort)
+shopt -u nullglob
+
+for hook in "${hooks[@]}"; do
+  base=$(basename -- "$hook")
+  # Skip sample / inactive templates.
+  case "$base" in
+    *.sample|*.disabled|.*) continue ;;
+  esac
+  [[ -x $hook ]] || continue
+  "$hook" "$@" || \
+    printf 'nirimaki-hook-run: %s exited %d (ignored)\n' "$base" "$?" >&2
+done

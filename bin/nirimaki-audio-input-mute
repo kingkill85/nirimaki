@@ -1,5 +1,7 @@
 #!/bin/bash
-# qs-audio-input-mute — toggle microphone mute and pop up the OSD.
+# nirimaki:group=audio
+# nirimaki:summary=Toggle the default microphone mute + OSD pop
+# nirimaki-audio-input-mute — toggle microphone mute and pop up the OSD.
 # Port of Omarchy's `omarchy-audio-input-mute` (sans keyboard-LED hook,
 # which doesn't apply on this desktop).
 #

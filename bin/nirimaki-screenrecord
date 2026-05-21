@@ -1,5 +1,7 @@
 #!/bin/bash
-# qs-screenrecord — toggle a wf-recorder session.
+# nirimaki:group=screenrecord
+# nirimaki:summary=Toggle a wf-recorder screen-recording session
+# nirimaki-screenrecord — toggle a wf-recorder session.
 # Inspired by omarchy-capture-screenrecording, stripped to what wf-recorder
 # (wlroots-native) actually needs. No webcam overlay, no ffmpeg post-pass.
 #

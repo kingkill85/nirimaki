@@ -158,7 +158,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-clipboard-picker"
+        dialogNamespace: "nirimaki-clipboard-picker"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

@@ -4,7 +4,7 @@ import Quickshell.Io
 
 // Recording-active indicator. Polls `pgrep -x wf-recorder` every 2 s and
 // only renders when a recording is in progress. Click → run
-// qs-screenrecord which sees the running process and toggles it off.
+// nirimaki-screenrecord which sees the running process and toggles it off.
 //
 // Modelled on Omarchy waybar's `custom/screenrecording-indicator`
 // (default/waybar/indicators/screen-recording.sh) — same `pgrep`-driven
@@ -74,7 +74,7 @@ Item {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: {
-                Quickshell.execDetached(["/home/michael/.local/bin/qs-screenrecord"]);
+                Quickshell.execDetached(["/home/michael/.local/bin/nirimaki-screenrecord"]);
                 Qt.callLater(() => root.refresh());
             }
         }

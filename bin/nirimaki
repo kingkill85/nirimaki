@@ -1,0 +1,137 @@
+#!/bin/bash
+# nirimaki:summary=Unified CLI — dispatches subcommands to bin/nirimaki-<group>-<action>
+# nirimaki:hidden=true
+#
+# Usage: nirimaki <group> [<action>] [args...]
+#
+# Resolves by stitching args with "-" from longest prefix down, e.g.
+#   nirimaki theme set tokyo-night
+#     → bin/nirimaki-theme-set-tokyo-night     (no)
+#     → bin/nirimaki-theme-set tokyo-night     (yes — exec with arg)
+#
+# Help generation scans every `bin/nirimaki-*` for `# nirimaki:key=value`
+# metadata in the first 40 lines:
+#   group   = top-level grouping (e.g. "theme")
+#   summary = one-line description shown in `nirimaki help`
+#   args    = usage hint shown in `nirimaki help <group>`
+#   hidden  = true → omit from help listings (this dispatcher does it)
+
+set -o pipefail
+
+BIN_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+SELF=$(basename -- "${BASH_SOURCE[0]}")
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: nirimaki <group> [<action>] [args...]
+       nirimaki help [<group>]
+
+Common groups:
+  theme      List / switch themes              (nirimaki theme list / set <name>)
+  webapp     Install / launch / remove webapps (nirimaki webapp install)
+  browser    Default browser + open default    (nirimaki browser default <name>)
+  audio      Volume / mute helpers
+  brightness Display brightness
+  wallpaper  Apply current theme wallpaper
+  quake      Toggle the drop-down terminal
+
+Run `nirimaki help` for the full list grouped by category.
+EOF
+}
+
+# Scan metadata header (first 40 lines) of a bin/nirimaki-* script.
+# Sets: META_group META_summary META_args META_hidden
+read_metadata() {
+  local file="$1" line key value
+  META_group=""; META_summary=""; META_args=""; META_hidden=""
+  local count=0
+  while IFS= read -r line; do
+    count=$((count + 1)); (( count > 40 )) && break
+    # Stop at first non-comment, non-blank, non-shebang line.
+    [[ $line == "#!"* ]] && continue
+    [[ -z ${line// } ]] && continue
+    [[ $line != \#* ]] && break
+    [[ $line =~ ^[[:space:]]*#[[:space:]]*nirimaki:([a-z_-]+)=(.*)$ ]] || continue
+    key="${BASH_REMATCH[1]}"; value="${BASH_REMATCH[2]}"
+    case "$key" in
+      group)   META_group="$value" ;;
+      summary) META_summary="$value" ;;
+      args)    META_args="$value" ;;
+      hidden)  META_hidden="$value" ;;
+    esac
+  done < "$file"
+}
+
+show_help() {
+  local filter_group="${1:-}"
+  local file base group summary args hidden
+  declare -A BY_GROUP=()
+  for file in "$BIN_DIR"/nirimaki-*; do
+    [[ -f $file && -x $file ]] || continue
+    read_metadata "$file"
+    [[ $META_hidden == "true" ]] && continue
+    base=$(basename -- "$file")
+    group="${META_group:-${base#nirimaki-}}"
+    group="${group%%-*}"
+    [[ -n $filter_group && $filter_group != "$group" ]] && continue
+    local cmd="${base#nirimaki-}"
+    cmd="${cmd//-/ }"
+    local line
+    printf -v line '  %-32s %s' "nirimaki $cmd${META_args:+ $META_args}" "$META_summary"
+    BY_GROUP[$group]+="$line"$'\n'
+  done
+
+  if [[ -n $filter_group ]]; then
+    if [[ -z ${BY_GROUP[$filter_group]:-} ]]; then
+      echo "nirimaki: unknown group '$filter_group'" >&2
+      return 1
+    fi
+    printf '%s\n' "${BY_GROUP[$filter_group]%$'\n'}"
+    return 0
+  fi
+
+  local g
+  for g in $(printf '%s\n' "${!BY_GROUP[@]}" | sort); do
+    echo
+    echo "${g^^}"
+    printf '%s\n' "${BY_GROUP[$g]%$'\n'}"
+  done
+}
+
+# Try to dispatch `nirimaki <args...>` to a real binary. Walks from the
+# longest joined prefix down to a single token. First match wins.
+dispatch() {
+  local args=("$@") joined attempt
+  local n=${#args[@]}
+  local i
+  for (( i = n; i >= 1; i-- )); do
+    joined=$(IFS=-; printf '%s' "${args[*]:0:i}")
+    attempt="$BIN_DIR/nirimaki-$joined"
+    if [[ -f $attempt && -x $attempt ]]; then
+      exec "$attempt" "${args[@]:i}"
+    fi
+  done
+  return 1
+}
+
+# --- main ---
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 1
+fi
+
+case "$1" in
+  -h|--help|help)
+    shift
+    show_help "$@"
+    exit 0
+    ;;
+esac
+
+if dispatch "$@"; then
+  : # exec already happened
+else
+  echo "nirimaki: no command matched '$*'" >&2
+  echo "Run 'nirimaki help' for the full list." >&2
+  exit 127
+fi

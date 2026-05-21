@@ -198,7 +198,7 @@ through several iterations; final state:
       (explicit on each rule because `is-floating=true` can race
       with `open-floating true` on launch)
 - **Layer-rule blur scoped to Quickshell** namespaces via
-  `match namespace=r#"^(quickshell|qs-.*)$"#`, with `xray false`.
+  `match namespace=r#"^(quickshell|nirimaki-.*)$"#`, with `xray false`.
   Slurp (`selection`) and swaybg (`wallpaper`) don't match, so
   screenshot region selection + bare wallpaper stay untouched.
 - **`draw-border-with-background false` globally** (niri#1823 fix

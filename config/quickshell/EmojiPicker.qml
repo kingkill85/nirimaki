@@ -144,7 +144,7 @@ Item {
     DialogShell {
         id: shell
         open: root.opened
-        dialogNamespace: "qs-emoji-picker"
+        dialogNamespace: "nirimaki-emoji-picker"
         cardWidth: root.cardWidth
         cardHeight: root.cardHeight
         cardColor: root.background

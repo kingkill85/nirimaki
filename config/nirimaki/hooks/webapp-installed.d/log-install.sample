@@ -1,0 +1,10 @@
+#!/bin/bash
+# Sample hook — appends a line to ~/.local/state/nirimaki/webapps.log
+# every time a new webapp is registered. Activate by removing the
+# `.sample` suffix and making it executable.
+#
+# Args: $1 = slug, $2 = url
+
+mkdir -p "$HOME/.local/state/nirimaki"
+printf '%s\t%s\t%s\n' "$(date -Iseconds)" "$1" "$2" \
+  >> "$HOME/.local/state/nirimaki/webapps.log"

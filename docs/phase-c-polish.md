@@ -49,15 +49,15 @@ in `basecamp/omarchy` on the in-progress `omarchy-shell` branch
 **Helper scripts (chmod 755) in `~/.local/bin/`** — ports of Omarchy's
 `bin/omarchy-osd` and `bin/omarchy-audio-*`, renamed `qs-*`:
 
-- `qs-osd` — `-i <icon> -p <progress> -m <message>` → builds JSON
+- `nirimaki-osd` — `-i <icon> -p <progress> -m <message>` → builds JSON
   payload with python3 (for safe message escaping) and calls
   `quickshell ipc call -- osd show "$payload"`.
-- `qs-audio-output-volume <raise|lower|mute-toggle|±N>` — calls `wpctl`,
-  reads back percent + MUTED state, then `qs-osd -i volume-{high,muted}
+- `nirimaki-audio-output-volume <raise|lower|mute-toggle|±N>` — calls `wpctl`,
+  reads back percent + MUTED state, then `nirimaki-osd -i volume-{high,muted}
   -p <percent>`. Includes the same 250 ms debounce on `mute-toggle` that
   Omarchy uses (some media keyboards double-fire).
-- `qs-audio-input-mute` — toggle `@DEFAULT_AUDIO_SOURCE@`, then
-  `qs-osd -i microphone[-muted] -m "Microphone {on,muted}"`.
+- `nirimaki-audio-input-mute` — toggle `@DEFAULT_AUDIO_SOURCE@`, then
+  `nirimaki-osd -i microphone[-muted] -m "Microphone {on,muted}"`.
 
 **Gotcha — `quickshell ipc call` and `--`:**
 
@@ -74,15 +74,15 @@ CLI11 parser. Insert `--` before the target:
 quickshell ipc call -- osd show "$payload"
 ```
 
-This is documented in `qs-osd` so future-me doesn't repeat the diagnosis.
+This is documented in `nirimaki-osd` so future-me doesn't repeat the diagnosis.
 
 **Niri keybind changes** in `~/.config/niri/config.kdl`:
 
 ```kdl
-XF86AudioRaiseVolume allow-when-locked=true { spawn "/home/michael/.local/bin/qs-audio-output-volume" "raise"; }
-XF86AudioLowerVolume allow-when-locked=true { spawn "/home/michael/.local/bin/qs-audio-output-volume" "lower"; }
-XF86AudioMute        allow-when-locked=true { spawn "/home/michael/.local/bin/qs-audio-output-volume" "mute-toggle"; }
-XF86AudioMicMute     allow-when-locked=true { spawn "/home/michael/.local/bin/qs-audio-input-mute"; }
+XF86AudioRaiseVolume allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "raise"; }
+XF86AudioLowerVolume allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "lower"; }
+XF86AudioMute        allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-output-volume" "mute-toggle"; }
+XF86AudioMicMute     allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-audio-input-mute"; }
 ```
 
 (Replaces the default direct `wpctl` invocations — they bypassed the OSD.)
@@ -91,7 +91,7 @@ XF86AudioMicMute     allow-when-locked=true { spawn "/home/michael/.local/bin/qs
 
 niri inherits PATH from the login session, which on this Arch box is
 `/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl`
-— no `~/.local/bin`. A bare `spawn "qs-audio-output-volume" "raise"` fails
+— no `~/.local/bin`. A bare `spawn "nirimaki-audio-output-volume" "raise"` fails
 silently (no audible volume change, no OSD). Two ways to fix:
 
 - **Absolute path in the keybind** (what's used above). Local to this
@@ -103,8 +103,8 @@ silently (no audible volume change, no OSD). Two ways to fix:
 Diagnose via `cat /proc/$(pgrep -x niri)/environ | tr '\0' '\n' | grep PATH`.
 
 **Same gotcha bites a second time inside the scripts.** The wrapper scripts
-themselves call other wrappers (e.g. `qs-audio-output-volume` calls
-`qs-osd` at the end). Those nested lookups also fail under niri's PATH
+themselves call other wrappers (e.g. `nirimaki-audio-output-volume` calls
+`nirimaki-osd` at the end). Those nested lookups also fail under niri's PATH
 because the spawned-script inherits niri's PATH. Each `qs-*` script
 exports PATH explicitly at the top:
 
@@ -114,7 +114,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Symptom of forgetting this: volume changes audibly (the first wpctl call
 runs because wpctl lives in `/usr/bin`), but no OSD bezel appears (the
-`qs-osd` lookup fails).
+`nirimaki-osd` lookup fails).
 
 **Brightness:** skipped for now — this is a 3×DP desktop with no laptop
 backlight, so `XF86MonBrightness*` keys are effectively no-ops until the
@@ -125,8 +125,8 @@ already supports `-i brightness` payloads when that lands.
 
 ```sh
 quickshell ipc show         # should list `target osd` with 4 functions
-qs-osd -i volume-high -p 42
-qs-audio-output-volume +1 && qs-audio-output-volume -1
+nirimaki-osd -i volume-high -p 42
+nirimaki-audio-output-volume +1 && nirimaki-audio-output-volume -1
 # (and watch the bottom-center bezel appear on every monitor for 1.2 s)
 niri validate
 ```
@@ -539,10 +539,10 @@ pulsing red bar widget while it runs.
 **Package:** `wf-recorder` (extra). Slurp + wl-clipboard from Step 21
 already cover the region picker and clipboard pipeline.
 
-**Helper script:** `~/.local/bin/qs-screenrecord` — toggles wf-recorder.
+**Helper script:** `~/.local/bin/nirimaki-screenrecord` — toggles wf-recorder.
 First press picks a region via `slurp -o -d`, starts wf-recorder in the
 background writing to `$XDG_VIDEOS_DIR/screenrecording-<date>.mp4`,
-stashes the filename in `$XDG_RUNTIME_DIR/qs-screenrecord.last`, fires a
+stashes the filename in `$XDG_RUNTIME_DIR/nirimaki-screenrecord.last`, fires a
 notify-send. Second press sends `SIGINT` to wf-recorder (the only signal
 that lets it finalize the MP4 cleanly), waits up to 5 s, falls back to
 `SIGKILL` if it didn't finish, and notifies the saved file.
@@ -559,7 +559,7 @@ and the Phase C list called for it explicitly.
 `pgrep -x wf-recorder` every 2 s; renders nothing when idle. While
 recording shows `󰻂` (nf-md-record_rec) in `Theme.urgent`, pulsing
 opacity 1.0 ↔ 0.55 every 700 ms. Click on the pill spawns the same
-`qs-screenrecord` script — clicking the widget acts as the stop key.
+`nirimaki-screenrecord` script — clicking the widget acts as the stop key.
 
 Registered in `qmldir`, slotted into the bar between `Media` and
 `Tray` in `Bar.qml`.
@@ -568,7 +568,7 @@ Registered in `qmldir`, slotted into the bar between `Media` and
 
 ```kdl
 Mod+Alt+R allow-when-locked=false hotkey-overlay-title="Toggle screen recording (wf-recorder)" {
-    spawn "/home/michael/.local/bin/qs-screenrecord";
+    spawn "/home/michael/.local/bin/nirimaki-screenrecord";
 }
 ```
 
@@ -800,8 +800,8 @@ After reboot, `groups | grep i2c` confirms membership, `lsmod | grep
 i2c_dev` confirms the module, and `ls /dev/i2c-*` lists buses. Then
 `ddcutil detect` enumerates each monitor with its bus number and EDID.
 
-**Helper script:** `~/.local/bin/qs-brightness-display`. Patterns the
-qs-audio-output-volume / qs-osd workflow:
+**Helper script:** `~/.local/bin/nirimaki-brightness-display`. Patterns the
+nirimaki-audio-output-volume / nirimaki-osd workflow:
 
 - Discover I²C bus numbers via `ddcutil detect --terse`.
 - Resolve the new brightness value (`raise` / `lower` = ±5, `±N`
@@ -810,16 +810,16 @@ qs-audio-output-volume / qs-osd workflow:
   detected monitor in parallel — DDC/CI commits take ~0.5–2 s per
   panel, so serial would be painful on the three displays.
 - Read the new percent off the first monitor and pass it to
-  `qs-osd -i brightness -p <pct>` so the bezel shows.
-- `PATH="$HOME/.local/bin:$PATH"` at the top so the nested `qs-osd`
+  `nirimaki-osd -i brightness -p <pct>` so the bezel shows.
+- `PATH="$HOME/.local/bin:$PATH"` at the top so the nested `nirimaki-osd`
   lookup works under niri's bare PATH — same [[feedback-niri-spawn-path]]
   issue as the volume scripts.
 
 **Niri keybinds** in `~/.config/niri/config.kdl`:
 
 ```kdl
-XF86MonBrightnessUp   allow-when-locked=true { spawn "/home/michael/.local/bin/qs-brightness-display" "raise"; }
-XF86MonBrightnessDown allow-when-locked=true { spawn "/home/michael/.local/bin/qs-brightness-display" "lower"; }
+XF86MonBrightnessUp   allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "raise"; }
+XF86MonBrightnessDown allow-when-locked=true { spawn "/home/michael/.local/bin/nirimaki-brightness-display" "lower"; }
 ```
 
 (Replaces the niri-default `brightnessctl --class=backlight` lines that
@@ -829,7 +829,7 @@ were no-ops on this hardware.)
 
 ```sh
 ddcutil detect | grep ^Display
-qs-brightness-display raise && qs-brightness-display lower
+nirimaki-brightness-display raise && nirimaki-brightness-display lower
 # bezel pops twice; physical screens visibly brighten/dim
 ```
 

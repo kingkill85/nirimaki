@@ -1,7 +1,9 @@
 #!/bin/bash
-# qs-quake-toggle — drop-down foot toggle (Quake-style), tmux-backed.
+# nirimaki:group=quake
+# nirimaki:summary=Toggle the drop-down foot terminal (tmux-backed quake session)
+# nirimaki-quake-toggle — drop-down foot toggle (Quake-style), tmux-backed.
 #
-# A single floating foot instance with app-id "qs-quake-term", running
+# A single floating foot instance with app-id "nirimaki-quake-term", running
 # `tmux new-session -A -s quake`. niri's window-rule (config.kdl) pins
 # it floating + sized + centred. Bound to Mod+grave (`) in keybinds.kdl.
 #
@@ -17,7 +19,7 @@
 
 set -euo pipefail
 
-WIN_APP_ID="qs-quake-term"
+WIN_APP_ID="nirimaki-quake-term"
 TMUX_SESSION="quake"
 
 for cmd in niri jq foot; do
