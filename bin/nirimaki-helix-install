@@ -1,0 +1,52 @@
+#!/bin/bash
+# nirimaki:group=helix
+# nirimaki:summary=Install Helix modal editor
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Helix" "Install"
+
+if command -v hx >/dev/null 2>&1 || command -v helix >/dev/null 2>&1; then
+  echo "helix is already installed."
+else
+  echo "Installing helix (Arch official; binary is \`hx\`)."
+fi
+
+nirimaki_sudo_prime
+sudo pacman -S --needed --noconfirm helix
+
+# Helix reads themes from ~/.config/helix/themes/. Drop a one-line
+# config.toml only if the user doesn't have their own yet — picks
+# up Nirimaki's ANSI-named palette via the terminal automatically.
+mkdir -p "$HOME/.config/helix"
+if [[ ! -f $HOME/.config/helix/config.toml ]]; then
+  cat > "$HOME/.config/helix/config.toml" <<'EOF'
+# Auto-seeded by nirimaki-helix-install. Edit freely.
+theme = "base16_default"
+
+[editor]
+line-number = "relative"
+mouse = true
+true-color = true
+bufferline = "multiple"
+
+[editor.cursor-shape]
+insert = "bar"
+normal = "block"
+select = "underline"
+
+[editor.indent-guides]
+render = true
+EOF
+fi
+
+echo
+echo "  ✓ Helix installed."
+echo "  → Run \`hx <file>\` to edit. Set as default via Settings → Default editor."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" helix-installed || true
+
+nirimaki_pause

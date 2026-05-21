@@ -1,0 +1,68 @@
+#!/bin/bash
+# nirimaki:group=steam
+# nirimaki:summary=Install Steam + enable multilib + 32-bit GPU drivers (~600 MB)
+# nirimaki:requires-sudo=true
+#
+# Side effect: enables the [multilib] repository in /etc/pacman.conf.
+# That's persistent — uninstall doesn't undo it (lots of unrelated
+# 32-bit packages may depend on multilib after the fact). If you
+# need a clean machine again, edit /etc/pacman.conf by hand.
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Steam" "Install"
+
+if pacman -Qi steam >/dev/null 2>&1; then
+  echo "steam is already installed."
+else
+  echo "Installing:"
+  echo "  - [multilib] repo enabled in /etc/pacman.conf (32-bit packages)"
+  echo "  - steam (Valve client)"
+  echo "  - 32-bit GPU stack: lib32-mesa, lib32-vulkan-icd-loader,"
+  echo "    lib32-vulkan-radeon (open-source AMD) — adjust manually"
+  echo "    if you're on NVIDIA / Intel"
+  echo "  - lib32-libpulse, lib32-alsa-plugins (audio)"
+fi
+
+nirimaki_sudo_prime
+
+# Enable multilib repo if not already active.
+if ! pacman-conf --repo-list 2>/dev/null | grep -qx multilib; then
+  echo
+  echo "Enabling [multilib] in /etc/pacman.conf…"
+  # Match the standard commented block:
+  #   #[multilib]
+  #   #Include = /etc/pacman.d/mirrorlist
+  # …and uncomment both lines.
+  sudo sed -i '/^\s*#\s*\[multilib\]/,/^\s*$/ {
+    s/^\s*#\s*\[multilib\]/[multilib]/
+    s|^\s*#\s*Include\s*=\s*/etc/pacman.d/mirrorlist|Include = /etc/pacman.d/mirrorlist|
+  }' /etc/pacman.conf
+
+  echo "Refreshing pacman databases (multilib now active)…"
+  sudo pacman -Sy
+fi
+
+echo
+echo "Installing Steam + lib32 GPU/audio stack…"
+sudo pacman -S --needed --noconfirm \
+  steam \
+  lib32-mesa lib32-vulkan-icd-loader lib32-vulkan-radeon \
+  lib32-libpulse lib32-alsa-plugins
+
+cat <<'NOTE'
+
+  ✓ Steam installed.
+  → Launch from the apps menu (Mod+Space) → Steam, or run `steam`.
+  → If you have NVIDIA / Intel: also install lib32-nvidia-utils /
+    lib32-vulkan-intel respectively (these vary by hardware,
+    they're not auto-detected here).
+  → Proton GE / MangoHud / gamescope are not installed — add via
+    pacman/AUR if you need them.
+NOTE
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" steam-installed || true
+
+nirimaki_pause

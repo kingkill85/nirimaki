@@ -1,0 +1,37 @@
+#!/bin/bash
+# nirimaki:group=vscode
+# nirimaki:summary=Remove VS Code
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "VS Code" "Remove"
+
+if ! command -v code >/dev/null 2>&1; then
+  echo "VS Code is not installed — nothing to do."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing visual-studio-code-bin. Your ~/.config/Code/ + ~/.vscode/"
+echo "(extensions, settings) stay in place — re-install picks them up."
+
+if   command -v paru >/dev/null 2>&1; then aur=paru
+elif command -v yay  >/dev/null 2>&1; then aur=yay
+else aur="" ; fi
+
+nirimaki_sudo_prime
+if [[ -n $aur ]]; then
+  $aur -Rns --noconfirm visual-studio-code-bin 2>/dev/null || true
+else
+  echo "(no AUR helper found — package removal skipped)"
+fi
+
+echo
+echo "  ✓ VS Code removed."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" vscode-removed || true
+
+nirimaki_pause

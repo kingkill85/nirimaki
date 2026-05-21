@@ -1,0 +1,32 @@
+#!/bin/bash
+# nirimaki:group=bitwarden
+# nirimaki:summary=Remove Bitwarden desktop + CLI
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Bitwarden" "Remove"
+
+if ! pacman -Qi bitwarden >/dev/null 2>&1 \
+     && ! pacman -Qi bitwarden-cli >/dev/null 2>&1; then
+  echo "bitwarden is not installed — nothing to do."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing bitwarden + bitwarden-cli."
+echo "Your encrypted vault data in ~/.config/Bitwarden is left in place"
+echo "(re-install will pick it back up)."
+
+nirimaki_sudo_prime
+
+sudo pacman -Rns --noconfirm bitwarden bitwarden-cli 2>/dev/null || true
+
+echo
+echo "  ✓ Bitwarden removed."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" bitwarden-removed || true
+
+nirimaki_pause

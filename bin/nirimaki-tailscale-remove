@@ -1,0 +1,50 @@
+#!/bin/bash
+# nirimaki:group=tailscale
+# nirimaki:summary=Remove Tailscale (drops daemon, package, admin webapp)
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Tailscale" "Remove"
+
+if ! command -v tailscale >/dev/null 2>&1; then
+  echo "tailscale is not installed — nothing to do."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing:"
+echo "  - tailscaled.service (disable + stop)"
+echo "  - tailscale package"
+echo "  - admin-console webapp (if present)"
+
+nirimaki_sudo_prime
+
+echo
+echo "Disconnecting + stopping daemon…"
+sudo tailscale down 2>/dev/null || true
+sudo systemctl disable --now tailscaled.service 2>/dev/null || true
+
+echo "Uninstalling tailscale…"
+sudo pacman -Rns --noconfirm tailscale 2>/dev/null || true
+
+# Drop the admin webapp if we registered one.
+desktop="$HOME/.local/share/applications/nirimaki-webapp-tailscale.desktop"
+icon="$HOME/.local/share/applications/icons/nirimaki-webapp-tailscale.png"
+data="$HOME/.cache/nirimaki-webapps/tailscale"
+if [[ -f $desktop ]]; then
+  echo "Dropping Tailscale webapp…"
+  rm -f -- "$desktop" "$icon"
+  rm -rf -- "$data"
+  command -v update-desktop-database >/dev/null 2>&1 \
+    && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
+fi
+
+echo
+echo "  ✓ Tailscale removed."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" tailscale-removed || true
+
+nirimaki_pause

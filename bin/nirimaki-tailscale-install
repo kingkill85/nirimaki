@@ -1,0 +1,61 @@
+#!/bin/bash
+# nirimaki:group=tailscale
+# nirimaki:summary=Install Tailscale mesh VPN + admin-console webapp
+# nirimaki:requires-sudo=true
+
+set -e
+
+# shellcheck source=nirimaki-feature-prelude
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Tailscale" "Install"
+
+if command -v tailscale >/dev/null 2>&1; then
+  echo "tailscale is already installed."
+  echo "Bringing the service up (idempotent)."
+else
+  echo "Installing:"
+  echo "  - tailscale (Arch official)"
+  echo "  - tailscaled.service (systemd, enabled + started)"
+  echo "  - Tailscale admin console as a Chromium webapp"
+fi
+
+nirimaki_sudo_prime
+
+sudo pacman -S --needed --noconfirm tailscale
+
+echo
+echo "Enabling tailscaled.service…"
+sudo systemctl enable --now tailscaled.service
+
+echo
+echo "Bringing Tailscale up (accepts subnet routes; opens browser for auth)…"
+# `tailscale up` blocks until auth — pipes the auth URL to stderr,
+# user opens it in the browser, daemon finishes. --accept-routes
+# joins the user's tailnet subnets immediately. Idempotent on re-run.
+sudo tailscale up --accept-routes || true
+
+# Install the admin console as a chromium webapp so users can manage
+# their tailnet from the apps menu without a browser bookmark.
+if command -v nirimaki-webapp-install >/dev/null 2>&1 \
+     && [[ ! -f $HOME/.local/share/applications/nirimaki-webapp-tailscale.desktop ]]; then
+  echo
+  echo "Registering 'Tailscale' webapp (admin console)…"
+  # Non-interactive: feed the prompts.
+  (
+    echo "Tailscale"
+    echo "https://login.tailscale.com/admin/machines"
+    echo ""  # icon URL fallback (favicon fetch handles it)
+    echo "N"  # don't pause for Enter at the end inside the nested call
+  ) | nirimaki-webapp-install >/dev/null 2>&1 || true
+fi
+
+echo
+echo "  ✓ Tailscale installed."
+echo "  → 'tailscale status' to see your tailnet."
+echo "  → Admin console: apps menu → Tailscale."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" tailscale-installed || true
+
+nirimaki_pause

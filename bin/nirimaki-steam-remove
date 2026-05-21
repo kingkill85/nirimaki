@@ -1,0 +1,39 @@
+#!/bin/bash
+# nirimaki:group=steam
+# nirimaki:summary=Remove Steam (leaves lib32 packages + multilib repo alone)
+# nirimaki:requires-sudo=true
+#
+# Doesn't disable [multilib] or remove lib32-* packages — other
+# things on the system may depend on them after install. If you
+# truly want a 32-bit-clean machine, edit /etc/pacman.conf by hand
+# and `sudo pacman -Rns $(pacman -Qq | grep ^lib32-)`.
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Steam" "Remove"
+
+if ! pacman -Qi steam >/dev/null 2>&1; then
+  echo "steam is not installed — nothing to do."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing the steam package."
+echo "Your ~/.local/share/Steam (game libraries, saves, screenshots)"
+echo "is preserved — re-install picks it up."
+echo
+echo "Leaving alone:"
+echo "  - lib32-* GPU/audio packages (other apps may need them)"
+echo "  - [multilib] repo (still useful for Wine, etc.)"
+
+nirimaki_sudo_prime
+sudo pacman -Rns --noconfirm steam 2>/dev/null || true
+
+echo
+echo "  ✓ Steam removed."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" steam-removed || true
+
+nirimaki_pause

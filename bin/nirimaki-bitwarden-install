@@ -1,0 +1,31 @@
+#!/bin/bash
+# nirimaki:group=bitwarden
+# nirimaki:summary=Install Bitwarden desktop + CLI password manager
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Bitwarden" "Install"
+
+if command -v bitwarden >/dev/null 2>&1; then
+  echo "bitwarden is already installed."
+else
+  echo "Installing:"
+  echo "  - bitwarden     (Arch official; desktop UI)"
+  echo "  - bitwarden-cli (Arch official; \`bw\` CLI for scripting)"
+fi
+
+nirimaki_sudo_prime
+
+sudo pacman -S --needed --noconfirm bitwarden bitwarden-cli
+
+echo
+echo "  ✓ Bitwarden installed."
+echo "  → Launch from the apps menu (Mod+Space) → Bitwarden."
+echo "  → CLI: \`bw login\` to authenticate, then \`bw get password <name>\`."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" bitwarden-installed || true
+
+nirimaki_pause

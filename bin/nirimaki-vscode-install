@@ -1,0 +1,56 @@
+#!/bin/bash
+# nirimaki:group=vscode
+# nirimaki:summary=Install VS Code (Microsoft branded, AUR visual-studio-code-bin)
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "VS Code" "Install"
+
+if command -v code >/dev/null 2>&1; then
+  echo "VS Code is already installed."
+else
+  echo "Installing visual-studio-code-bin (AUR) — the Microsoft build."
+  echo "If you'd rather the FOSS variant, install \`code\` from Arch"
+  echo "extra/ manually (loses the proprietary marketplace + branding)."
+fi
+
+# AUR helpers handle their own sudo internally.
+if   command -v paru >/dev/null 2>&1; then aur=paru
+elif command -v yay  >/dev/null 2>&1; then aur=yay
+else
+  echo "No AUR helper found (paru / yay). Install one, then retry." >&2
+  nirimaki_pause
+  exit 1
+fi
+
+nirimaki_sudo_prime
+$aur -S --needed --noconfirm visual-studio-code-bin
+
+# Use gnome-libsecret for password storage so the user isn't prompted
+# for a master password on every VS Code launch.
+mkdir -p "$HOME/.vscode"
+if [[ ! -f $HOME/.vscode/argv.json ]]; then
+  cat > "$HOME/.vscode/argv.json" <<'EOF'
+{
+  "password-store": "gnome-libsecret"
+}
+EOF
+fi
+
+# Turn off VS Code's own auto-updater — pacman/AUR manages updates now.
+mkdir -p "$HOME/.config/Code/User"
+if [[ ! -f $HOME/.config/Code/User/settings.json ]]; then
+  printf '{\n  "update.mode": "none"\n}\n' > "$HOME/.config/Code/User/settings.json"
+fi
+
+echo
+echo "  ✓ VS Code installed."
+echo "  → \`code <path>\` from a terminal, or pick from Mod+Space."
+echo "  → Set as default editor via Settings → Default editor."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" vscode-installed || true
+
+nirimaki_pause

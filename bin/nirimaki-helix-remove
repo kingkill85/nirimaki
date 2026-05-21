@@ -1,0 +1,29 @@
+#!/bin/bash
+# nirimaki:group=helix
+# nirimaki:summary=Remove Helix editor
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Helix" "Remove"
+
+if ! pacman -Qi helix >/dev/null 2>&1; then
+  echo "helix is not installed — nothing to do."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing helix. Your ~/.config/helix/ stays in place (re-install"
+echo "picks up your custom config + key bindings)."
+
+nirimaki_sudo_prime
+sudo pacman -Rns --noconfirm helix 2>/dev/null || true
+
+echo
+echo "  ✓ Helix removed."
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" helix-removed || true
+
+nirimaki_pause
