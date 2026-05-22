@@ -115,14 +115,16 @@ _pkg_paru_bootstrap() {
 
   # paru is either missing or broken. Remove every variant before we
   # build a fresh one — otherwise makepkg -si hits a "paru and paru-bin
-  # in conflict" abort. Fail loudly here rather than silently
-  # swallowing — if we can't remove, the subsequent install will fail
-  # anyway and the error is more useful at this point in the script.
+  # in conflict" abort. Tolerant of inconsistent pacman db state: if
+  # -Rns can't find the package even though -Q reported it, fall back
+  # to -Rdd which skips dep checks. The subsequent makepkg will fail
+  # loudly if anything's still wrong.
   for pkg in paru paru-bin paru-git; do
     if pacman -Q "$pkg" >/dev/null 2>&1; then
       warn "removing existing $pkg (will rebuild)"
-      sudo pacman -Rns --noconfirm "$pkg" \
-        || die "failed to remove $pkg — resolve manually and re-run"
+      if ! sudo pacman -Rns --noconfirm "$pkg" 2>/dev/null; then
+        sudo pacman -Rdd --noconfirm "$pkg" 2>/dev/null || warn "couldn't remove $pkg cleanly — proceeding anyway"
+      fi
     fi
   done
 
