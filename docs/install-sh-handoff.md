@@ -2,8 +2,17 @@
 
 The deferred `install.sh` (blank-Arch → working Nirimaki) is the
 next thing to build. Everything it needs to do is **already
-specified** in `docs/install-steps.md` (§0–§14, plus §13a keyring
-and §13b SDDM theme). That file is the source of truth.
+specified** in `docs/install-steps.md` (§0–§14, plus §2g/2h/2i,
+§11a/11b, §13a, §13b). That file is the source of truth.
+
+> **Spec re-audited 2026-05-22.** Three independent passes against
+> the phase docs found ~11 unanimously-missing items (packages,
+> mimeapps seed, fontconfig CJK regional rule, mkinitcpio HOOKS
+> rewrite + LUKS cmdline swap, UKI splash, bluez/i2c enables).
+> All folded into the spec — new sections §2g, §2h, §2i, §11a,
+> §11b. Three 2-of-3 items (systemd-networkd enable,
+> xdg-desktop-portal-{gnome,gtk}, nautilus) were flagged for human
+> review but NOT auto-added; revisit before writing `install.sh`.
 
 This doc just orients the next session — it doesn't re-spec the
 work.

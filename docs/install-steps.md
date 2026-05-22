@@ -71,18 +71,37 @@ sudo pacman -S --needed \
   sddm \
   swaybg swayidle \
   foot \
-  wiremix bluetui impala \
-  ddcutil wf-recorder cliphist wl-clipboard \
+  wiremix bluetui impala bluez bluez-utils \
+  ddcutil wf-recorder cliphist wl-clipboard wtype \
+  grim slurp satty \
+  pacman-contrib libnotify btop \
+  playerctl brightnessctl \
   pavucontrol blueman-manager \
   qt5ct qt6ct gnome-themes-extra yaru-icon-theme \
   fontconfig ttf-jetbrains-mono-nerd \
-  plymouth \
-  wtype
+  noto-fonts-cjk noto-fonts-emoji noto-fonts-extra \
+  plymouth
 ```
 
-`sddm` brings the Qt6 greeter (`sddm-greeter-qt6`) that the Nirimaki
-SDDM theme needs (see §13b). The `qt6-declarative` + `qt6-svg`
-runtime libs are pulled in as deps so no extra packages are needed.
+Notes per package family (re-audit 2026-05-22 folded in the
+packages each phase doc named that were missing here):
+
+- `sddm` — Qt6 greeter for §13b; `qt6-declarative` + `qt6-svg`
+  pull in as deps.
+- `bluez bluez-utils` — bluetooth daemon + CLI; the bluetooth
+  widget assumes the service is active (see §2i).
+- `grim slurp satty` — screenshot pipeline behind the
+  `Mod+Shift+S` keybind (phase B §21).
+- `pacman-contrib` — provides `checkupdates`, the only correct
+  way to count pending updates without locking pacman's DB; the
+  Updates topbar widget breaks without it.
+- `libnotify` — `notify-send` for theme/webapp/update hooks.
+- `btop` — SystemStats click launches it (phase B §14).
+- `playerctl brightnessctl` — referenced by default niri binds.
+- `noto-fonts-cjk noto-fonts-emoji noto-fonts-extra` — without
+  these, CJK / emoji / less-common scripts (Arabic, Hebrew,
+  Thai, Indic) render as tofu. See also §2g for the regional
+  preference rule.
 
 ### 2c. Terminal toolkit (Phase H)
 
@@ -143,6 +162,63 @@ The chmod is the only privileged step at theme-swap runtime.
 `nirimaki-theme-set` never sudoes; if the dir isn't writable, it
 silently degrades to "no live chromium reload" (newly-spawned
 chromium instances still pick up theming on launch).
+
+### 2g. Fontconfig regional preference (Phase A5)
+
+Without this, `fc-match "sans:lang=zh"` resolves to Noto CJK **JP**
+instead of **SC** — Chinese pages render with Japanese glyph forms
+(subtly wrong; native readers catch it instantly). Same issue for
+Korean → JP. Fix:
+
+```bash
+mkdir -p "$HOME/.config/fontconfig/conf.d"
+install -m 644 install/assets/99-noto-cjk-regional.conf \
+  "$HOME/.config/fontconfig/conf.d/99-noto-cjk-regional.conf"
+fc-cache -f
+```
+
+File contents are documented in `docs/phase-a-foundations.md §5`
+— six match blocks, sans/serif/mono × zh/ko, all using
+`mode="prepend" binding="strong"` to override Noto's own conf.
+
+### 2h. MIME defaults seed (Phase A3)
+
+`xdg-settings set default-web-browser` only populates the core
+scheme handlers. Many real-world HTML opens go through
+`application/xhtml+xml`, `application/x-extension-*`, or
+`x-scheme-handler/{about,unknown,chrome}` — install.sh must
+seed those into `~/.config/mimeapps.list` `[Default
+Applications]`. Full list in `docs/phase-a-foundations.md §3`;
+template lives at `install/assets/mimeapps.list.tpl` with the
+browser-`.desktop` name as a placeholder.
+
+```bash
+sed "s/__BROWSER__/$(xdg-settings get default-web-browser)/g" \
+  install/assets/mimeapps.list.tpl \
+  > "$HOME/.config/mimeapps.list"
+```
+
+Re-runnable: the file is owned by install.sh, the user can
+re-`xdg-settings` later and re-run install.sh's MIME step to
+re-template.
+
+### 2i. System enables + groups + modules
+
+One section for all the post-package privileged steps. Each is
+idempotent so re-running install.sh is safe.
+
+```bash
+# Bluetooth (Phase B §17): bluez ships disabled.
+sudo systemctl enable --now bluetooth
+
+# External-monitor brightness via DDC/CI (Phase C §36). The user
+# must be in the `i2c` group and `i2c-dev` must load at boot for
+# nirimaki-brightness-display to find /dev/i2c-*. **A reboot is
+# required after this** — `sudo modprobe i2c-dev` works once, but
+# the group change only applies to a fresh login session.
+sudo usermod -aG i2c "$USER"
+echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf >/dev/null
+```
 
 ---
 
@@ -309,8 +385,60 @@ sudo plymouth-set-default-theme qs-minimal
 sudo mkinitcpio -P
 ```
 
-Requires `mkinitcpio.conf` HOOKS already include `plymouth` after
-`systemd` (Phase D7 step).
+The `mkinitcpio -P` line above only works if §11a has already
+rewritten the HOOKS — otherwise plymouth has no hook to attach to.
+Run §11a first on a vanilla Arch install.
+
+### 11a. mkinitcpio HOOKS rewrite + LUKS cmdline switch (Phase D7)
+
+The Nirimaki Plymouth setup needs the **systemd-based** initramfs
+stack — vanilla Arch ships the `udev` variant. install.sh must
+rewrite `/etc/mkinitcpio.conf`:
+
+```bash
+# Required HOOKS line (idempotent — replaces whatever's currently there):
+sudo sed -i \
+  's|^HOOKS=.*|HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)|' \
+  /etc/mkinitcpio.conf
+```
+
+Key swaps vs vanilla:
+- `udev` → `systemd`  — needed for plymouth + sd-encrypt.
+- `keymap consolefont` → `sd-vconsole` — systemd analogue.
+- `encrypt` → `sd-encrypt` — talks to Plymouth's password prompt.
+
+**LUKS cmdline must switch too** — `cryptdevice=…:root` is the
+`encrypt` hook's syntax; `sd-encrypt` expects `rd.luks.name=`.
+Without this swap the box won't boot after the next `mkinitcpio -P`:
+
+```bash
+# On limine: /boot/limine/limine.conf
+# On systemd-boot: /boot/loader/entries/*.conf
+# Replace cryptdevice=UUID=<uuid>:root  →  rd.luks.name=<uuid>=root
+```
+
+This step is per-machine (the UUID isn't known until disk install
+time) — install.sh must read the current cryptdevice line, parse
+the UUID, and emit the replacement. Documented in
+`docs/phase-d-theming.md §D7` with the full sed pattern.
+
+### 11b. UKI splash replacement (Phase D9.2)
+
+systemd-boot UKIs embed a `.splash` PE section that fires
+*before* Plymouth (the moment the kernel is alive but the
+initramfs hasn't decrypted the disk yet). Default is Arch's blue
+hex pattern; we ship our own:
+
+```bash
+sudo install -Dm644 assets/splash.bmp /usr/share/nirimaki/splash.bmp
+sudo sed -i \
+  's|/usr/share/systemd/bootctl/splash-arch.bmp|/usr/share/nirimaki/splash.bmp|' \
+  /etc/mkinitcpio.d/linux.preset
+sudo mkinitcpio -P    # re-bakes the UKIs with the new splash
+```
+
+`splash.bmp` must be 24-bit BMP3 (no alpha). The repo ships one
+ready to go at `assets/splash.bmp`.
 
 ---
 
