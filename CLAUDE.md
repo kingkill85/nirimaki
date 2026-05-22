@@ -207,10 +207,11 @@ install* to do something `git pull` can't do for them. Examples:
 - Use `$NIRIMAKI_REPO` for repo-relative paths (exported by `nirimaki-update`, falls back to `~/.local/share/nirimaki` in `nirimaki-migrate` itself).
 - `set -e` is opt-in (not enforced by the runner).
 
-**Fresh installs:** migrations also run on the very first
-`nirimaki-update` after install.sh. Since they're idempotent, that's
-fine — but design them so re-doing what install.sh already did is
-cheap.
+**Fresh installs:** `install.sh`'s preflight pre-marks every
+currently-shipped migration as already-applied (mirrors omarchy's
+`install/preflight/migrations.sh`). install.sh does the work natively
+— migrations only fire for changes committed AFTER this install,
+which by definition have later timestamps and no marker yet.
 
 ## Git
 

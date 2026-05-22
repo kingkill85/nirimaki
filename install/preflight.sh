@@ -111,4 +111,21 @@ preflight() {
   else
     ok "Repo present at $share"
   fi
+
+  # 6. Mark all currently-shipped migrations as already-applied.
+  # install.sh does the work natively (better than migrations would —
+  # full sudo orchestration, dependency awareness). Migrations only
+  # need to run for changes added AFTER this install — those will have
+  # later timestamps and no marker yet. Mirrors omarchy's
+  # install/preflight/migrations.sh.
+  if [[ -d $REPO_DIR/migrations ]]; then
+    local migration_state="$HOME/.local/state/nirimaki/migrations"
+    mkdir -p "$migration_state"
+    shopt -s nullglob
+    for file in "$REPO_DIR"/migrations/*.sh; do
+      touch "$migration_state/$(basename "$file")"
+    done
+    shopt -u nullglob
+    ok "marked $(ls "$migration_state" 2>/dev/null | wc -l) migration(s) as applied"
+  fi
 }
