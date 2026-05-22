@@ -20,6 +20,17 @@ if [[ -n ${NIRIMAKI_PACKAGING_LOADED:-} ]]; then
 fi
 NIRIMAKI_PACKAGING_LOADED=1
 
+# Full system upgrade — must run before any package install, especially
+# before paru-bin bootstrap. Stale cloud/install-medium images often
+# carry an older libalpm than the AUR-built paru-bin expects, causing
+# "libalpm.so.X: cannot open shared object file" on the first paru call.
+# This step refreshes everything to a coherent ABI.
+_pkg_syu() {
+  section "Packages: full system upgrade (pacman -Syu)"
+  info "sudo pacman -Syu --noconfirm"
+  sudo pacman -Syu --noconfirm
+}
+
 # §2a — minimal pacman seed list from install/base.packages.
 _pkg_base() {
   section "Packages: base.packages (§2a)"
@@ -88,9 +99,16 @@ _pkg_terminal() {
 # `paru-bin` (binary) is chosen over `paru` (source) — faster, no Rust
 # toolchain needed on every host.
 _pkg_paru_bootstrap() {
-  if command -v paru >/dev/null 2>&1; then
-    ok "paru already installed: $(command -v paru)"
+  # Test that paru actually works, not just that the binary exists.
+  # An older paru-bin built against a now-replaced libalpm.so will fail
+  # to load — common after a system upgrade. We rebuild in that case.
+  if command -v paru >/dev/null 2>&1 && paru --version >/dev/null 2>&1; then
+    ok "paru already installed and working: $(command -v paru)"
     return 0
+  fi
+  if command -v paru >/dev/null 2>&1; then
+    warn "paru installed but broken (libalpm ABI mismatch?) — rebuilding"
+    sudo pacman -Rns --noconfirm paru-bin paru 2>/dev/null || true
   fi
   section "Bootstrap: paru-bin (AUR helper)"
   pacman_install base-devel git
@@ -246,6 +264,7 @@ _pkg_system_enables() {
 
 # Top-level entrypoint, called from install.sh.
 packaging() {
+  _pkg_syu
   _pkg_base
   _pkg_compositor
   _pkg_terminal
