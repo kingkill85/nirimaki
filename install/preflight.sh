@@ -50,6 +50,15 @@ preflight() {
   fi
   ok "Network reachable"
 
+  # 3b. git — the preflight repo-clone below needs it, and the
+  # archinstall "Minimal" profile doesn't ship it. One sudo prompt is
+  # already coming from sudo_prime in install.sh; we ride that.
+  if ! command -v git >/dev/null 2>&1; then
+    info "git not installed — pulling it now"
+    sudo pacman -Sy --noconfirm --needed git || die "couldn't install git — check pacman mirrors"
+    ok "git installed"
+  fi
+
   # 4. niri 26.04+ — we don't have niri yet on a blank box, so check
   # what pacman would install. Older builds can't expand `~` in the
   # include directive, which kills our config layout silently.

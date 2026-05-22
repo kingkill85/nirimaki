@@ -66,25 +66,38 @@ NIRIMAKI_REBOOT_REASON=()
 NIRIMAKI_NEEDS_RELOG=0
 export NIRIMAKI_NEEDS_REBOOT NIRIMAKI_REBOOT_REASON NIRIMAKI_NEEDS_RELOG
 
-trap 'rc=$?; echo; printf "\033[31m✗ Install failed (exit %d).\nFull log: %s\033[0m\n" "$rc" "$LOG_FILE" >&2' ERR
+trap 'rc=$?; sudo_cleanup; echo; printf "\033[31m✗ Install failed (exit %d).\nFull log: %s\033[0m\n" "$rc" "$LOG_FILE" >&2' ERR
+trap 'sudo_cleanup' EXIT
 
-# ---- 2. Banner -------------------------------------------------------
-cat <<'EOF'
-
-  _   _ _      _                _    _
- | \ | (_)_ __(_)_ __ ___   __ _| | _(_)
- |  \| | | '__| | '_ ` _ \ / _` | |/ / |
- | |\  | | |  | | | | | | | (_| |   <| |
- |_| \_|_|_|  |_|_| |_| |_|\__,_|_|\_\_|
-
- Omarchy-style desktop for Arch Linux on niri + Quickshell.
-
-EOF
-
-echo "Log: $LOG_FILE"
+# ---- 2. Clear + banner -----------------------------------------------
+# Logo lives at assets/logo.txt — same ASCII source the PNG variants
+# are rendered from. printed CYAN to match Quickshell's theme accent.
+clear
+if [[ -f "$REPO_DIR/assets/logo.txt" ]] 2>/dev/null; then
+  logo_path="$REPO_DIR/assets/logo.txt"
+elif [[ -f "$(dirname "$INSTALL_DIR")/assets/logo.txt" ]]; then
+  logo_path="$(dirname "$INSTALL_DIR")/assets/logo.txt"
+fi
+if [[ -n ${logo_path:-} ]]; then
+  printf '\n%s' "${C_CYA:-}"
+  cat "$logo_path"
+  printf '%s\n' "${C_RESET:-}"
+else
+  # Fallback — happens only when the repo wasn't yet on disk.
+  printf '\n  Nirimaki\n'
+fi
+echo "  Omarchy-style desktop for Arch Linux on niri + Quickshell."
+echo
+echo "  Log:  $LOG_FILE"
 echo
 
-# ---- 3. Pre-flight + sudo prime -------------------------------------
+# ---- 3. sudo + pre-flight -------------------------------------------
+# sudo_prime FIRST — preflight needs sudo to install git (Arch
+# "Minimal" profile doesn't ship it). The passwordless sudoers rule
+# lives until the EXIT trap runs sudo_cleanup, so the rest of the
+# install never prompts.
+sudo_prime
+
 # preflight may re-set REPO_DIR if it ends up cloning the repo into
 # place. Source it before the rest so the new value propagates.
 # shellcheck source=install/preflight.sh
@@ -95,8 +108,6 @@ preflight
 # a fresh copy to ~/.local/share/nirimaki/ and we started from
 # somewhere else.
 INSTALL_DIR="$REPO_DIR/install"
-
-sudo_prime
 
 # ---- 4. The work ----------------------------------------------------
 # shellcheck source=install/packaging.sh
@@ -129,12 +140,8 @@ plymouth_setup
 source "$INSTALL_DIR/verify.sh"
 verify
 
-# ---- 5. Stop the sudo heartbeat -------------------------------------
-if [[ -n ${NIRIMAKI_SUDO_HEARTBEAT_PID:-} ]]; then
-  kill "$NIRIMAKI_SUDO_HEARTBEAT_PID" 2>/dev/null || true
-fi
-
-# ---- 6. Reboot / re-login summary -----------------------------------
+# ---- 5. Reboot / re-login summary -----------------------------------
+# sudo_cleanup runs via the EXIT trap defined near the top.
 section "Install complete"
 echo
 echo "  Log:  $LOG_FILE"

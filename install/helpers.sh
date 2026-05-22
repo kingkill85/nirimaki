@@ -37,9 +37,16 @@ else
 fi
 
 info() { printf '%s\n' "${C_CYA}==>${C_RESET} $*" >&2; }
-ok()   { printf '%s\n' "${C_GRN}  ✓${C_RESET} $*" >&2; }
 warn() { printf '%s\n' "${C_YEL}  !${C_RESET} $*" >&2; }
 die()  { printf '%s\n' "${C_RED}  ✗${C_RESET} $*" >&2; exit 1; }
+
+# `ok` is silent by default — too spammy with one line per file copied.
+# Set NIRIMAKI_VERBOSE=1 to see them (useful for debugging install runs).
+ok() {
+  if [[ ${NIRIMAKI_VERBOSE:-0} == 1 ]]; then
+    printf '%s\n' "${C_GRN}  ✓${C_RESET} $*" >&2
+  fi
+}
 
 section() {
   printf '\n%s== %s ==%s\n' "$C_BOLD" "$*" "$C_RESET" >&2
@@ -48,44 +55,87 @@ section() {
 # sudo_prime — ask once, keep alive for the rest of the run.
 #
 # Most install steps need root for pacman / systemctl / mkinitcpio.
-# Prompting on each invocation makes the run feel laggy and breaks
-# the `script -qefc` log capture. Instead: prime sudo at the start,
-# then a background heartbeat refreshes the timestamp every 60s
-# until install.sh exits.
+# A 5-minute sudo timestamp + heartbeat isn't reliable: makepkg drops
+# into separate sudo invocations, sub-shells lose the parent's $$
+# matcher, and the timestamp's `tty_tickets` default makes pty
+# differences (script wrapper, makepkg, …) prompt again. Result on a
+# real run: 8+ password prompts.
+#
+# Omarchy's solution (mirrored here): write a temporary
+# /etc/sudoers.d/99-nirimaki-installer that lets $USER run anything
+# password-less, then remove it from the EXIT trap in install.sh.
+# One prompt total — the initial `sudo -v` to write the rule.
+#
+# Risk: if install.sh is killed -9 / OOM-killed, the rule lingers.
+# `nirimaki-update` could also clean it up later; for now we accept
+# the (small) risk in exchange for a usable installer.
 sudo_prime() {
   if [[ ${NIRIMAKI_SUDO_PRIMED:-0} == 1 ]]; then
     return 0
   fi
-  info "Priming sudo (you'll be asked once)…"
+  info "Need sudo once — installer drops a passwordless rule for the rest of the run."
   sudo -v || die "sudo authentication failed."
-  # Heartbeat — refreshes -v timestamp until parent shell exits.
-  (
-    while kill -0 "$$" 2>/dev/null; do
-      sudo -nv 2>/dev/null || exit 0
-      sleep 60
-    done
-  ) &
-  NIRIMAKI_SUDO_HEARTBEAT_PID=$!
-  export NIRIMAKI_SUDO_HEARTBEAT_PID
+  printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$USER" \
+    | sudo install -m 440 /dev/stdin /etc/sudoers.d/99-nirimaki-installer \
+    || die "failed to write sudoers rule"
   NIRIMAKI_SUDO_PRIMED=1
   export NIRIMAKI_SUDO_PRIMED
 }
 
-# pacman_install <pkg> [pkg…] — idempotent. `--needed` means already-
-# installed packages get skipped; `--noconfirm` keeps the run hands-off.
-pacman_install() {
-  (( $# > 0 )) || return 0
-  info "pacman -S --needed: $*"
-  sudo pacman -S --needed --noconfirm "$@"
+# sudo_cleanup — remove the temp sudoers rule. Idempotent; safe to
+# call from an EXIT trap that might fire multiple times in pathological
+# cases.
+sudo_cleanup() {
+  sudo rm -f /etc/sudoers.d/99-nirimaki-installer 2>/dev/null || true
 }
 
-# paru_install <pkg> [pkg…] — AUR variant. Requires paru on PATH
-# (packaging.sh bootstraps it before calling us).
+# pacman_install <pkg> [pkg…] — idempotent. `--needed` skips
+# already-installed packages, `--noconfirm` keeps the run hands-off.
+# Output is captured to a log file and only printed on failure —
+# otherwise the install.sh log is dominated by pacman's per-file
+# install chatter. Set NIRIMAKI_VERBOSE=1 to stream pacman directly.
+pacman_install() {
+  (( $# > 0 )) || return 0
+  info "pacman: $* (${#@} packages)"
+  if [[ ${NIRIMAKI_VERBOSE:-0} == 1 ]]; then
+    sudo pacman -S --needed --noconfirm "$@"
+    return $?
+  fi
+  local log; log=$(mktemp)
+  if sudo pacman -S --needed --noconfirm "$@" >"$log" 2>&1; then
+    rm -f "$log"
+  else
+    local rc=$?
+    echo >&2
+    printf '%s---- pacman -S failed (exit %d) — last 40 lines: ----%s\n' "$C_RED" "$rc" "$C_RESET" >&2
+    tail -40 "$log" >&2
+    rm -f "$log"
+    return "$rc"
+  fi
+}
+
+# paru_install <pkg> [pkg…] — AUR variant. Same output redirection
+# as pacman_install. paru's PKGBUILD-review prompts are bypassed by
+# `--skipreview --noconfirm`.
 paru_install() {
   (( $# > 0 )) || return 0
   command -v paru >/dev/null || die "paru not on PATH — bootstrap step skipped?"
-  info "paru -S --needed: $*"
-  paru -S --needed --noconfirm "$@"
+  info "paru: $* (${#@} packages)"
+  if [[ ${NIRIMAKI_VERBOSE:-0} == 1 ]]; then
+    paru -S --needed --noconfirm --skipreview "$@"
+    return $?
+  fi
+  local log; log=$(mktemp)
+  if paru -S --needed --noconfirm --skipreview "$@" >"$log" 2>&1; then
+    rm -f "$log"
+  else
+    local rc=$?
+    echo >&2
+    printf '%s---- paru -S failed (exit %d) — last 60 lines: ----%s\n' "$C_RED" "$rc" "$C_RESET" >&2
+    tail -60 "$log" >&2
+    rm -f "$log"
+    return "$rc"
+  fi
 }
 
 # read_pkglist <file> — yields one package name per line, ignoring
