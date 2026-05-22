@@ -1,17 +1,64 @@
 #!/bin/bash
 # nirimaki:summary=Pull the latest Nirimaki + refresh system / AUR packages
+# nirimaki:args=[-y]
 # nirimaki:requires-sudo=true
+#
+# nirimaki-update — the canonical "keep my system fresh" entrypoint.
+#
+# Flow (mirrors omarchy-update at a high level):
+#   1. Re-exec self under `script -qefc` so the entire session is
+#      captured to /tmp/nirimaki-update.log — invaluable when a
+#      pacman/paru run blows up and we need to see what happened.
+#   2. Confirmation prompt (skip with `-y`).
+#   3. Locate the Nirimaki git checkout via $NIRIMAKI_REPO →
+#      ~/.local/share/nirimaki/.git → dev-link fallback.
+#   4. Refresh archlinux-keyring first (stale keys are the #1 reason
+#      `pacman -Syu` fails silently on long-idle boxes).
+#   5. git pull --autostash on the repo.
+#   6. paru -Syu (else pacman -Syu) for the system + AUR.
+#   7. Refresh feature-state cache + reload niri config.
+#   8. Fire ~/.config/nirimaki/hooks/post-update.d/ hooks.
+#   9. Detect kernel / niri update → offer to reboot.
 
 set -e
 . "$HOME/.local/bin/nirimaki-feature-prelude"
 
+LOG_FILE="/tmp/nirimaki-update.log"
+
+# ---- 1. PTY-wrap for log capture ------------------------------------
+# Re-exec inside `script` so progress bars (pacman/paru) keep redrawing
+# (they detect a TTY) while the full session is saved for post-mortem.
+# Guarded with an env var so the inner shell doesn't loop.
+if [[ -z ${NIRIMAKI_UPDATE_LOGGED:-} ]]; then
+  cmd=$(printf '%q ' "$0" "$@")
+  exec env NIRIMAKI_UPDATE_LOGGED=1 script -qefc "$cmd" "$LOG_FILE"
+fi
+
+trap 'rc=$?; echo; printf "\033[0;31mUpdate failed (exit %d).\nThe full log is at %s — review it before retrying.\033[0m\n" "$rc" "$LOG_FILE"' ERR
+
 nirimaki_banner "Nirimaki" "Update"
 
-# Resolve the Nirimaki git checkout.
-#   - End-user install: ~/.local/share/nirimaki/ is the clone (.git inside).
-#   - Dev install: ~/.local/share/nirimaki/default → repo/default (symlink),
-#                  so the git root is two levels up from the resolved path.
-#   - Explicit override: $NIRIMAKI_REPO (matches the prelude's convention).
+# ---- 2. Confirmation ------------------------------------------------
+yes_flag=0
+[[ ${1:-} == "-y" ]] && yes_flag=1
+
+if (( ! yes_flag )); then
+  echo "About to update Nirimaki + the system."
+  echo "  • Do not interrupt once it starts."
+  echo "  • Be on power, or have a healthy battery."
+  echo
+  read -r -p "Continue? [Y/n] " ans
+  case ${ans,,} in
+    n|no) echo "Update cancelled."; nirimaki_pause; exit 0 ;;
+  esac
+  echo
+fi
+
+# ---- 3. Locate the Nirimaki git checkout ----------------------------
+#   - End-user install: ~/.local/share/nirimaki/ is the clone.
+#   - Dev install: ~/.local/share/nirimaki/default → repo/default
+#     (symlink set up by dev-link.sh).
+#   - Explicit override: $NIRIMAKI_REPO.
 repo="${NIRIMAKI_REPO:-}"
 if [[ -z $repo ]]; then
   share="$HOME/.local/share/nirimaki"
@@ -33,12 +80,24 @@ fi
 echo "Repo: $repo"
 echo
 
+# Prime sudo once so the keyring + pacman/paru steps don't each prompt.
+nirimaki_sudo_prime
+
+# ---- 4. archlinux-keyring refresh -----------------------------------
+# Always reinstall — the keyring can be updated without a package
+# version bump, and missing maintainer keys silently break -Syu.
+# Filters the noisy "is up to date -- reinstalling" warning that
+# Arch emits when the install is a no-op.
+echo "=> refresh archlinux-keyring"
+sudo pacman -Sy --noconfirm archlinux-keyring 2> >(grep -vE 'archlinux-keyring-[^ ]+ is up to date -- reinstalling$' >&2) >/dev/null
+echo
+
+# ---- 5. git pull ----------------------------------------------------
 echo "=> git pull --autostash"
 git -C "$repo" pull --autostash
 echo
 
-# System + AUR refresh. Prefer paru, fall back to pacman.
-nirimaki_sudo_prime
+# ---- 6. System + AUR refresh ----------------------------------------
 if command -v paru >/dev/null 2>&1; then
   echo "=> paru -Syu (system + AUR)"
   paru -Syu --noconfirm
@@ -48,15 +107,51 @@ else
 fi
 echo
 
-# Refresh feature-state cache so the SettingsMenu's install/remove
-# filter picks up anything that changed.
+# ---- 7. Feature-state cache + niri config reload --------------------
 if [[ -x $HOME/.local/bin/nirimaki-feature-state ]]; then
   "$HOME/.local/bin/nirimaki-feature-state" >/dev/null
 fi
 
-# Reload niri config in case default/niri/*.kdl changed.
 if command -v niri >/dev/null 2>&1; then
   niri msg action load-config-file 2>/dev/null || true
+fi
+
+# ---- 8. User post-update hooks --------------------------------------
+if [[ -x $HOME/.local/bin/nirimaki-hook-run ]]; then
+  "$HOME/.local/bin/nirimaki-hook-run" post-update || true
+fi
+
+# ---- 9. Reboot-needed detection -------------------------------------
+# Kernel: compare running `uname -r` against the directories under
+# /usr/lib/modules/. After a kernel update, the dir for the running
+# kernel is removed → mismatch → reboot recommended.
+needs_reboot=false
+reboot_reason=()
+
+running_kernel=$(uname -r)
+if [[ -d /usr/lib/modules && ! -d /usr/lib/modules/$running_kernel ]]; then
+  needs_reboot=true
+  reboot_reason+=("Linux kernel")
+fi
+
+# niri (running) was overwritten on disk: /proc/PID/exe gets the
+# " (deleted)" suffix once the executable inode is unlinked.
+niri_pid=$(pgrep -x niri 2>/dev/null | head -1 || true)
+if [[ -n $niri_pid ]]; then
+  niri_exe=$(readlink "/proc/$niri_pid/exe" 2>/dev/null || true)
+  if [[ $niri_exe == *"(deleted)"* ]]; then
+    needs_reboot=true
+    reboot_reason+=("niri")
+  fi
+fi
+
+if $needs_reboot; then
+  echo
+  printf '%s updated — a reboot is recommended.\n' "$(IFS=' + '; echo "${reboot_reason[*]}")"
+  read -r -p "Reboot now? [y/N] " ans
+  case ${ans,,} in
+    y|yes) systemctl reboot; exit 0 ;;
+  esac
 fi
 
 echo "Done."
