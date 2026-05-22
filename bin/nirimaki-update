@@ -97,6 +97,18 @@ echo "=> git pull --autostash"
 git -C "$repo" pull --autostash
 echo
 
+# ---- 5b. Run pending migrations -------------------------------------
+# System-side one-offs that the repo can't fix via git pull alone
+# (re-copy /usr/share files, rebuild initramfs, edit /etc/...). Each
+# migration runs at most once per box; state is tracked under
+# ~/.local/state/nirimaki/migrations/. See bin/nirimaki-migrate and
+# CLAUDE.md → "Migrations".
+if [[ -x $HOME/.local/bin/nirimaki-migrate ]]; then
+  echo "=> nirimaki-migrate"
+  NIRIMAKI_REPO="$repo" "$HOME/.local/bin/nirimaki-migrate"
+  echo
+fi
+
 # ---- 6. System + AUR refresh ----------------------------------------
 if command -v paru >/dev/null 2>&1; then
   echo "=> paru -Syu (system + AUR)"

@@ -169,6 +169,49 @@ it. The repo only owns `templates/` and `themes/` (the sources).
 - **Don't reformat untouched indentation** when editing — leaves
   noise in diffs.
 
+## Migrations — picking up changes on existing installs
+
+`install.sh` sets up a fresh box. But once a user is running Nirimaki,
+changes to **system-owned** files (Plymouth theme at `/usr/share/
+plymouth/themes/qs-minimal/`, SDDM theme at `/usr/share/sddm/themes/
+nirimaki/`, `/etc/mkinitcpio.conf` HOOKS, kernel cmdline, system
+services…) **aren't picked up by `git pull` alone** — those files
+were COPIED, not symlinked.
+
+The pattern (mirrors `basecamp/omarchy`):
+
+- Drop a one-off script at `migrations/<unix-timestamp>.sh` alongside
+  the change that requires it. Filename is `$(date +%s).sh`.
+- `bin/nirimaki-migrate` loops through them in filename order, runs
+  every unmarked one, and writes a state marker at
+  `~/.local/state/nirimaki/migrations/<filename>` so it never runs
+  twice. Failed migrations can be skipped → tracked under `.../skipped/`.
+- `bin/nirimaki-update` calls `nirimaki-migrate` between `git pull`
+  and `paru -Syu`, so every user picks up the change on their next
+  update.
+
+**When to add a migration:** any commit that needs an *existing
+install* to do something `git pull` can't do for them. Examples:
+
+| Change | Migration body |
+|---|---|
+| Plymouth asset edit | re-copy `assets/plymouth/*` → `/usr/share/plymouth/themes/qs-minimal/`, run `sudo mkinitcpio -P` |
+| SDDM theme edit | re-copy `default/sddm/nirimaki/*` → `/usr/share/sddm/themes/nirimaki/` |
+| New package | `paru -S --needed <pkg>` (or `pacman_install`) |
+| New systemd enable | `sudo systemctl enable --now <svc>` |
+| Kernel cmdline addition | sed the bootloader cmdline file + `mkinitcpio -P` if UKIs |
+
+**Conventions inside a migration:**
+- Print one banner line so the update log is scannable: `echo "Re-sync Plymouth …"`
+- Idempotent — assume it may run on a half-complete state.
+- Use `$NIRIMAKI_REPO` for repo-relative paths (exported by `nirimaki-update`, falls back to `~/.local/share/nirimaki` in `nirimaki-migrate` itself).
+- `set -e` is opt-in (not enforced by the runner).
+
+**Fresh installs:** migrations also run on the very first
+`nirimaki-update` after install.sh. Since they're idempotent, that's
+fine — but design them so re-doing what install.sh already did is
+cheap.
+
 ## Git
 
 - **No `git config --global` on this machine.** For commits, pass

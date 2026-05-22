@@ -1,0 +1,78 @@
+#!/bin/bash
+# nirimaki:summary=Run pending Nirimaki migrations (system-side changes for existing installs)
+#
+# nirimaki-migrate — the upgrade-side counterpart to install.sh.
+#
+# Why migrations exist:
+#   install.sh sets up a fresh box correctly. But once a user is
+#   running Nirimaki, changes to system-owned files (Plymouth theme,
+#   SDDM theme, mkinitcpio config, kernel cmdline, system services…)
+#   aren't picked up by `git pull` alone — those files were COPIED to
+#   /usr/share/... and /etc/... during install, not symlinked. The
+#   migrations/ dir is where we drop one-off scripts that re-sync
+#   those bits on existing installs.
+#
+# How it works (mirrors omarchy-migrate):
+#   - Each migration is `migrations/<unix-timestamp>.sh` — committed
+#     alongside the change that requires it.
+#   - State marker per migration at:
+#         $HOME/.local/state/nirimaki/migrations/<filename>
+#     Marker present = migration already ran on this box.
+#   - On every `nirimaki-update`, this script runs every unmarked
+#     migration in filename order, then writes its marker.
+#   - Skipped marker under .../skipped/ if a migration fails and the
+#     user opts to keep going.
+#
+# Conventions for writing a migration:
+#   - Idempotent: assume it may be run on a half-complete state.
+#   - Print a one-line banner so the update log is readable:
+#         echo "Re-sync Plymouth theme assets"
+#   - `set -e` is NOT set here — migrations choose their own error mode.
+#   - $NIRIMAKI_REPO is exported by nirimaki-update; fall back to the
+#     canonical clone path if invoked standalone.
+
+NIRIMAKI_REPO="${NIRIMAKI_REPO:-$HOME/.local/share/nirimaki}"
+export NIRIMAKI_REPO
+
+if [[ ! -d $NIRIMAKI_REPO/migrations ]]; then
+  exit 0
+fi
+
+STATE_DIR="$HOME/.local/state/nirimaki/migrations"
+mkdir -p "$STATE_DIR/skipped"
+
+ran_any=0
+shopt -s nullglob
+for file in "$NIRIMAKI_REPO"/migrations/*.sh; do
+  filename=$(basename "$file")
+
+  if [[ -f $STATE_DIR/$filename || -f $STATE_DIR/skipped/$filename ]]; then
+    continue
+  fi
+
+  echo
+  printf '\e[32m=> Running migration (%s)\e[0m\n' "${filename%.sh}"
+
+  if bash "$file"; then
+    touch "$STATE_DIR/$filename"
+    ran_any=1
+  else
+    rc=$?
+    echo
+    printf '\e[31m✗ Migration %s exited %d.\e[0m\n' "${filename%.sh}" "$rc"
+    read -r -p "Skip this migration and continue? [y/N] " ans
+    case "${ans,,}" in
+      y|yes)
+        touch "$STATE_DIR/skipped/$filename"
+        ;;
+      *)
+        exit "$rc"
+        ;;
+    esac
+  fi
+done
+shopt -u nullglob
+
+if (( ! ran_any )); then
+  echo "No pending migrations."
+fi
