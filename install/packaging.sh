@@ -112,10 +112,20 @@ _pkg_paru_bootstrap() {
     ok "paru already installed and working: $(command -v paru)"
     return 0
   fi
-  if command -v paru >/dev/null 2>&1; then
-    warn "paru installed but broken (libalpm ABI mismatch?) — rebuilding"
-    sudo pacman -Rns --noconfirm paru-bin paru 2>/dev/null || true
-  fi
+
+  # paru is either missing or broken. Remove every variant before we
+  # build a fresh one — otherwise makepkg -si hits a "paru and paru-bin
+  # in conflict" abort. Fail loudly here rather than silently
+  # swallowing — if we can't remove, the subsequent install will fail
+  # anyway and the error is more useful at this point in the script.
+  for pkg in paru paru-bin paru-git; do
+    if pacman -Q "$pkg" >/dev/null 2>&1; then
+      warn "removing existing $pkg (will rebuild)"
+      sudo pacman -Rns --noconfirm "$pkg" \
+        || die "failed to remove $pkg — resolve manually and re-run"
+    fi
+  done
+
   section "Bootstrap: paru (AUR helper, source build)"
   pacman_install base-devel git
 
