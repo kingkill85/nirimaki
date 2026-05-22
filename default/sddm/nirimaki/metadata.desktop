@@ -4,4 +4,4 @@ Description=Theme-following login screen — wallpaper + palette match the activ
 Author=Nirimaki
 Type=sddm-theme
 Version=1.0
-QtVersion=qt6
+QtVersion=6

@@ -158,6 +158,51 @@ _pm_luks_cmdline_swap() {
   fi
 }
 
+# Ensure `quiet splash` is on the kernel cmdline — Plymouth shows
+# nothing without them. Touches every bootloader cmdline file we
+# recognise (systemd-boot, limine, mkinitcpio UKI presets). Skips
+# files that already have both flags.
+_pm_cmdline_quiet_splash() {
+  section "Plymouth: ensure 'quiet splash' on kernel cmdline"
+  local f changed=0
+  for f in /etc/kernel/cmdline /etc/cmdline.d/*.conf \
+           /boot/loader/entries/*.conf /efi/loader/entries/*.conf \
+           /boot/limine.conf /boot/limine/limine.conf \
+           /etc/default/grub; do
+    [[ -f $f ]] || continue
+    # Skip if both already present.
+    if grep -qE '(^|[[:space:]])quiet([[:space:]]|$)' "$f" \
+      && grep -qE '(^|[[:space:]])splash([[:space:]]|$)' "$f"; then
+      ok "$f already has quiet+splash"
+      continue
+    fi
+    sudo cp -n "$f" "$f.nirimaki-bak"
+    # Append to the FIRST cmdline-bearing line. systemd-boot entries
+    # have `options …`, limine has `cmdline: …`, /etc/kernel/cmdline
+    # is the whole file, /etc/default/grub has GRUB_CMDLINE_LINUX=.
+    if [[ $f == /etc/kernel/cmdline ]] || [[ $f == /etc/cmdline.d/* ]]; then
+      grep -qE '(^|[[:space:]])quiet([[:space:]]|$)' "$f" || echo -n " quiet" | sudo tee -a "$f" >/dev/null
+      grep -qE '(^|[[:space:]])splash([[:space:]]|$)' "$f" || echo -n " splash" | sudo tee -a "$f" >/dev/null
+    elif [[ $f == /etc/default/grub ]]; then
+      sudo sed -i -E '/^GRUB_CMDLINE_LINUX(_DEFAULT)?=/{
+        /quiet/!s/="(.*)"$/="\1 quiet"/
+        /splash/!s/="(.*)"$/="\1 splash"/
+      }' "$f"
+    else
+      # systemd-boot `options …` or limine `cmdline: …`
+      sudo sed -i -E '/^[[:space:]]*(options|cmdline:)[[:space:]]/{
+        /quiet/!s/$/ quiet/
+        /splash/!s/$/ splash/
+      }' "$f"
+    fi
+    ok "added quiet+splash to $f (backup at $f.nirimaki-bak)"
+    changed=1
+  done
+  if (( ! changed )); then
+    warn "no recognised bootloader cmdline file found — Plymouth may not render"
+  fi
+}
+
 # 5. UKI splash replacement — only when the preset references the
 # stock Arch splash. systemd-boot non-UKI setups won't have this file,
 # and ad-hoc setups may already use a custom splash.
@@ -208,6 +253,7 @@ plymouth_setup() {
     info "No LUKS detected — installing splash + HOOKS rewrite without cmdline swap. SDDM autologin will NOT be enabled."
     _pm_hooks_rewrite
   fi
+  _pm_cmdline_quiet_splash
   _pm_uki_splash
   _pm_finalise
 }
