@@ -71,6 +71,14 @@ dependency. Plain `read` prompts for Name + URL → auto-fetches a
 (falls back to a manual URL/path prompt if 404). Slugifies the name
 to `[a-z0-9-]`, writes:
 
+> **Pass the FULL URL (scheme included) as the `domain` param,
+> not the bare host.** Google's service returns 404 for many
+> self-hosted subdomains (e.g. `gitlab.nupis.de`) when given a
+> bare host, but resolves them when given the full URL. Omarchy
+> does this; we initially didn't, and the result was missing
+> icons for any site Google's heuristic didn't pre-index by bare
+> domain. Fixed 2026-05-22.
+
 ```
 ~/.local/share/applications/nirimaki-webapp-<slug>.desktop
 ~/.local/share/applications/icons/nirimaki-webapp-<slug>.png

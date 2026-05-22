@@ -58,10 +58,14 @@ domain_of() {
 }
 
 fetch_favicon() {
-  # Args: domain  dest-png-path
+  # Args: url  dest-png-path
   # Returns 0 on success (file written + non-empty), 1 otherwise.
-  local domain="$1" dest="$2"
-  local svc="https://www.google.com/s2/favicons?domain=${domain}&sz=128"
+  # Passes the full URL (scheme included) as the `domain` param —
+  # Google's s2/favicons returns 404 for many subdomains given a bare
+  # host, but resolves them when given the full URL. Matches what
+  # omarchy-webapp-install does.
+  local url="$1" dest="$2"
+  local svc="https://www.google.com/s2/favicons?domain=${url}&sz=128"
   if curl -sSfL --max-time 10 -o "$dest" "$svc" 2>/dev/null && [[ -s $dest ]]; then
     return 0
   fi
@@ -96,7 +100,7 @@ mkdir -p "$APPS_DIR" "$ICONS_DIR"
 # --- icon ---
 domain=$(domain_of "$url")
 echo "fetching favicon for $domain …"
-if fetch_favicon "$domain" "$icon_file"; then
+if fetch_favicon "$url" "$icon_file"; then
   echo "  ok  $icon_file"
 else
   echo "  no favicon at $domain — supply one manually"
