@@ -94,10 +94,16 @@ _pkg_terminal() {
 # Per Open Decision #3: install.sh bootstraps paru rather than
 # requiring the user to install it first. Pattern is standard Arch:
 #   pacman -S --needed base-devel git
-#   git clone https://aur.archlinux.org/paru-bin.git /tmp/paru-bin
-#   cd /tmp/paru-bin && makepkg -si --noconfirm
-# `paru-bin` (binary) is chosen over `paru` (source) — faster, no Rust
-# toolchain needed on every host.
+#   git clone https://aur.archlinux.org/paru.git /tmp/paru
+#   cd /tmp/paru && makepkg -si --noconfirm
+#
+# `paru` (source) is chosen over `paru-bin` even though it pulls in
+# the Rust toolchain — paru-bin's published binary is linked against
+# whatever libalpm.so.X was current at upstream build time, and lags
+# behind Arch's libalpm bumps. That mismatch surfaces immediately as
+# "libalpm.so.X: cannot open shared object file" on the first paru
+# call after install.sh's `pacman -Syu`. Source build compiles
+# against the current system libalpm, so the ABI always matches.
 _pkg_paru_bootstrap() {
   # Test that paru actually works, not just that the binary exists.
   # An older paru-bin built against a now-replaced libalpm.so will fail
@@ -110,20 +116,22 @@ _pkg_paru_bootstrap() {
     warn "paru installed but broken (libalpm ABI mismatch?) — rebuilding"
     sudo pacman -Rns --noconfirm paru-bin paru 2>/dev/null || true
   fi
-  section "Bootstrap: paru-bin (AUR helper)"
+  section "Bootstrap: paru (AUR helper, source build)"
   pacman_install base-devel git
 
-  local build="/tmp/nirimaki-paru-bin"
+  local build="/tmp/nirimaki-paru"
   rm -rf "$build"
-  git clone --depth=1 https://aur.archlinux.org/paru-bin.git "$build"
+  git clone --depth=1 https://aur.archlinux.org/paru.git "$build"
   (
     cd "$build"
     # makepkg refuses to run as root; this script never runs as root
-    # (preflight bails) so we just invoke it directly.
+    # (preflight bails) so we just invoke it directly. The PKGBUILD
+    # lists rust as a makedepend → makepkg pulls it in automatically.
     makepkg -si --noconfirm
   )
   rm -rf "$build"
   command -v paru >/dev/null || die "paru bootstrap failed."
+  paru --version >/dev/null || die "paru installed but won't run — check libalpm version."
   ok "paru installed: $(command -v paru)"
 }
 
