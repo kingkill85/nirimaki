@@ -1,0 +1,7 @@
+[SddmGreeterTheme]
+Name=Nirimaki
+Description=Theme-following login screen — wallpaper + palette match the active Nirimaki theme, visually mirrors the lock screen.
+Author=Nirimaki
+Type=sddm-theme
+Version=1.0
+QtVersion=qt6

@@ -89,6 +89,12 @@ drop the key into `~/.config/niri/bindings.kdl` rebound to
 default/niri/       Upgrade-tracked niri defaults (input, looknfeel,
                     autostart, windows, bindings). Symlinked into
                     ~/.local/share/nirimaki/default/niri/ by dev-link.sh.
+default/sddm/       Upgrade-tracked SDDM theme (`nirimaki/Main.qml`
+                    + theme.conf + metadata.desktop). Copied to
+                    /usr/share/sddm/themes/nirimaki/ by
+                    install/login/sddm.sh; runtime state lives in
+                    a state/ subdir chowned to the user, refreshed
+                    by nirimaki-sddm-sync on every theme change.
 config/niri/        User-side seeds — copied (not symlinked) to
                     ~/.config/niri/ on first run. config.kdl is the
                     entry-point; monitors.kdl + the four override files

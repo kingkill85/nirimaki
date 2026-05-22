@@ -1,0 +1,51 @@
+#!/bin/bash
+# nirimaki:group=theme
+# nirimaki:summary=Sync active theme's wallpaper + palette to the SDDM theme state dir
+#
+# nirimaki-sddm-sync — copies ~/.config/theme/current/{wallpaper,
+# colors.toml} into the system-side Nirimaki SDDM theme so the login
+# screen matches the active theme at next reboot.
+#
+# Called from bin/nirimaki-theme-set at the end of every apply.
+# Silent no-op if the SDDM theme isn't installed (state/ missing) —
+# that way the script is safe to run in environments that don't have
+# the SDDM theme yet (e.g. a non-SDDM display manager, a fresh dev box
+# before install/login/sddm.sh has run).
+#
+# The state/ dir is chowned to $USER by install/login/sddm.sh so this
+# script needs no sudo and is fast (no polkit prompt on every theme
+# switch).
+
+set -euo pipefail
+
+SDDM_STATE="/usr/share/sddm/themes/nirimaki/state"
+THEME_DIR="$HOME/.config/theme/current"
+
+[[ -d $SDDM_STATE && -w $SDDM_STATE ]] || exit 0
+
+# Wallpaper: dereference symlink + copy. Skip if no current wallpaper
+# (theme ships no images and the BackgroundPicker hasn't run yet).
+if [[ -e $THEME_DIR/wallpaper ]]; then
+  src=$(readlink -f "$THEME_DIR/wallpaper")
+  [[ -f $src ]] && cp -f "$src" "$SDDM_STATE/wallpaper"
+fi
+
+# Palette: extract the four colours Main.qml binds to. Python over the
+# TOML because parsing it inline with sed/awk is fragile for the
+# inline-comment + quoted-value cases.
+if [[ -f $THEME_DIR/colors.toml ]]; then
+  python3 - "$THEME_DIR/colors.toml" "$SDDM_STATE/colors.json" <<'PY'
+import json, re, sys, pathlib
+src = pathlib.Path(sys.argv[1]).read_text()
+def grab(key):
+    m = re.search(rf'^\s*{key}\s*=\s*[\'"]?(#[0-9A-Fa-f]{{6}})', src, re.M)
+    return m.group(1) if m else None
+out = {
+    "bg":     grab("background") or "#101315",
+    "fg":     grab("foreground") or "#cacccc",
+    "accent": grab("accent")     or "#cacccc",
+    "urgent": grab("color1")     or "#a55555",
+}
+pathlib.Path(sys.argv[2]).write_text(json.dumps(out))
+PY
+fi

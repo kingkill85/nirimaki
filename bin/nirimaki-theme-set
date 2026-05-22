@@ -387,6 +387,13 @@ if [[ -x $HOME/.local/bin/nirimaki-wallpaper-apply ]]; then
   setsid -f "$HOME/.local/bin/nirimaki-wallpaper-apply" >/dev/null 2>&1 || true
 fi
 
+# SDDM login screen: mirror the active wallpaper + palette into
+# /usr/share/sddm/themes/nirimaki/state/. No-ops if the SDDM theme
+# isn't installed yet (state dir missing or not writable by us).
+if [[ -x $HOME/.local/bin/nirimaki-sddm-sync ]]; then
+  "$HOME/.local/bin/nirimaki-sddm-sync" >/dev/null 2>&1 || true
+fi
+
 # btop: no live reload mechanism; running btop keeps its old theme until
 # closed and reopened. Acceptable since btop is rarely long-running.
 

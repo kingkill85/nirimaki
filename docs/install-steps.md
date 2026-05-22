@@ -68,6 +68,7 @@ As of phase L (this consolidation):
 ```bash
 sudo pacman -S --needed \
   niri quickshell \
+  sddm \
   swaybg swayidle \
   foot \
   wiremix bluetui impala \
@@ -78,6 +79,10 @@ sudo pacman -S --needed \
   plymouth \
   wtype
 ```
+
+`sddm` brings the Qt6 greeter (`sddm-greeter-qt6`) that the Nirimaki
+SDDM theme needs (see §13b). The `qt6-declarative` + `qt6-svg`
+runtime libs are pulled in as deps so no extra packages are needed.
 
 ### 2c. Terminal toolkit (Phase H)
 
@@ -356,6 +361,73 @@ If install.sh decides to ship its own autostart on top, append to
 
 ---
 
+## 13a. gnome-keyring passwordless auto-unlock
+
+Without this, any session started by `sddm-autologin` ends up with a
+locked `login.keyring` — chromium, the webapps, slack, signal, etc.
+will fire an "Unlock keyring" prompt the first time they touch
+libsecret. Omarchy parity: pre-create an unencrypted Default keyring
++ strip `pam_gnome_keyring.so` from SDDM's PAM stack so a password-
+locked one never gets created.
+
+Ship `install/login/keyring.sh` (idempotent; requires sudo for the
+PAM edit) and call it once after `sddm` is installed:
+
+```bash
+bash install/login/keyring.sh
+```
+
+Mirrors `omarchy/install/login/default-keyring.sh` +
+`omarchy/install/login/sddm.sh`'s sed-strip step. See
+`install/login/keyring.sh` header for the full mechanism.
+
+---
+
+## 13b. SDDM theme (login screen follows active Nirimaki theme)
+
+The login greeter mirrors the lock screen — same clock + password
+card layout, same wallpaper, same palette. Theme state lives at
+`/usr/share/sddm/themes/nirimaki/state/{wallpaper,colors.json}`,
+written by `bin/nirimaki-sddm-sync` which is called from the tail
+of every `nirimaki-theme-set` run.
+
+Install step (idempotent; requires sudo):
+
+```bash
+bash install/login/sddm.sh
+nirimaki-sddm-sync     # seed state/ with the active theme
+sudo systemctl enable sddm.service
+```
+
+What `install/login/sddm.sh` does:
+
+1. Copies `default/sddm/nirimaki/{Main.qml,theme.conf,metadata.desktop}`
+   to `/usr/share/sddm/themes/nirimaki/`.
+2. Chowns `state/` inside that theme dir to `$USER` so
+   `nirimaki-sddm-sync` writes without sudo on every theme switch.
+   Same trade-off as `/etc/chromium/policies/managed/` in §2f — a
+   system-owned dir handed to the user for a single specific reason.
+3. Writes `/etc/sddm.conf.d/10-nirimaki.conf` containing
+   `[Theme] Current=nirimaki`. Left additive — any existing
+   `autologin.conf` is untouched.
+
+Preview without logging out:
+
+```bash
+sddm-greeter-qt6 --test-mode --theme /usr/share/sddm/themes/nirimaki/
+```
+
+Visually mirrors `config/quickshell/lock/LockSurface.qml`; both
+files should evolve together when the lock screen layout changes.
+SDDM has no Theme singleton — the QML parses
+`state/colors.json` via `XMLHttpRequest` at startup, then derives
+`fgDim` via `Qt.darker(fg, 1.65)` exactly like Quickshell's
+`Theme.qml`. User-switching is intentionally not exposed (matches
+Omarchy — autologin desktops never see the greeter unless the user
+explicitly logs out).
+
+---
+
 ## 14. Verification checklist
 
 ```bash
@@ -386,9 +458,6 @@ cat ~/.cache/nirimaki/state.json | python3 -m json.tool | head
 
 ## What's deferred to a later install.sh pass
 
-- **SDDM theme + autologin** — Phase 2 of the user-overrides arc.
-  Theme-tracking via polkit rule, autologin pre-seed, login screen
-  consistency. Scoped, not built yet.
 - **gh login**, **1Password CLI provisioning**, anything that needs
   network credentials — left to the user post-install.
 - **Per-machine state** never shipped: `~/.local/share/fish/bookmarks`,
