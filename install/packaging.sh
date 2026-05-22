@@ -119,7 +119,7 @@ _pkg_paru_bootstrap() {
   # -Rns can't find the package even though -Q reported it, fall back
   # to -Rdd which skips dep checks. The subsequent makepkg will fail
   # loudly if anything's still wrong.
-  for pkg in paru paru-bin paru-git; do
+  for pkg in paru paru-bin paru-git paru-debug paru-bin-debug paru-git-debug; do
     if pacman -Q "$pkg" >/dev/null 2>&1; then
       warn "removing existing $pkg (will rebuild)"
       if ! sudo pacman -Rns --noconfirm "$pkg" 2>/dev/null; then
