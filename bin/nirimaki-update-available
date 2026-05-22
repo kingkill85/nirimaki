@@ -1,0 +1,40 @@
+#!/bin/bash
+# nirimaki:summary=Count of Nirimaki commits available on the tracked upstream
+#
+# Single integer on stdout — count of HEAD..@{upstream} after a quiet
+# `git fetch`. Always exits 0 — silent failures (no network, repo
+# missing, no upstream tracked) yield 0 so the topbar widget treats
+# them as "nothing to do" rather than going dark.
+#
+# Consumed by config/quickshell/UpdatesService.qml.
+
+set -u
+
+zero() { echo 0; exit 0; }
+
+# Locate the Nirimaki git checkout. Same lookup as bin/nirimaki-update:
+#   - End-user install: ~/.local/share/nirimaki/.git
+#   - Dev install: ~/.local/share/nirimaki/default → repo/default symlink
+#   - Explicit override: $NIRIMAKI_REPO
+repo="${NIRIMAKI_REPO:-}"
+if [[ -z $repo ]]; then
+  share="$HOME/.local/share/nirimaki"
+  if [[ -d $share/.git ]]; then
+    repo="$share"
+  elif [[ -L $share/default ]]; then
+    resolved=$(readlink -f "$share/default" 2>/dev/null || true)
+    [[ -n $resolved ]] && repo=$(git -C "$resolved" rev-parse --show-toplevel 2>/dev/null || true)
+  fi
+fi
+[[ -z $repo || ! -d $repo/.git ]] && zero
+
+# Quiet fetch — failures leave the previous fetch state intact, which
+# is the right behaviour for a passive indicator (no network spam
+# warnings in the bar).
+git -C "$repo" fetch --quiet 2>/dev/null || true
+
+# @{u} = "tracked upstream of HEAD". If the branch isn't tracking
+# anything (rare for end-user installs but possible on a hand-cloned
+# dev checkout), rev-list fails → 0.
+count=$(git -C "$repo" rev-list HEAD..@{u} --count 2>/dev/null || echo 0)
+echo "${count:-0}"
