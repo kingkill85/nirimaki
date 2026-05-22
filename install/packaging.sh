@@ -57,7 +57,7 @@ _pkg_compositor() {
     pacman-contrib libnotify btop \
     playerctl brightnessctl \
     pavucontrol blueman \
-    qt5ct qt6ct gnome-themes-extra yaru-icon-theme \
+    qt5ct qt6ct gnome-themes-extra \
     fontconfig ttf-jetbrains-mono-nerd \
     noto-fonts-cjk noto-fonts-emoji noto-fonts-extra \
     plymouth \
@@ -112,7 +112,7 @@ _pkg_paru_bootstrap() {
 # §2d — AUR packages via paru.
 _pkg_aur() {
   section "Packages: AUR (§2d)"
-  paru_install pay-respects-bin
+  paru_install pay-respects-bin yaru-icon-theme
 }
 
 # §2e — non-repo tools (claude-code, pi). Delegates to the
