@@ -194,8 +194,10 @@ _pm_luks_cmdline_swap() {
       sudo sed -i -E "s|cryptdevice=[^[:space:]\"]+:root|rd.luks.name=$NIRIMAKI_LUKS_UUID=root|g" "$f"
       ok "rewrote cmdline in $f (backup at $f.nirimaki-bak)"
       changed=1
-    elif sudo grep -qE "rd.luks.name=$NIRIMAKI_LUKS_UUID=root" "$f"; then
-      ok "$f already uses rd.luks.name= (no change)"
+    elif sudo grep -qE "rd\.luks\.name=$NIRIMAKI_LUKS_UUID=root|rd\.luks\.uuid=$NIRIMAKI_LUKS_UUID" "$f"; then
+      # Both rd.luks.name=<uuid>=root and rd.luks.uuid=<uuid> are valid
+      # sd-encrypt cmdline forms. CachyOS installer ships the .uuid= form.
+      ok "$f already uses sd-encrypt syntax (no change)"
       changed=1
     fi
   done
@@ -223,10 +225,13 @@ _pm_cmdline_quiet_splash() {
            /boot/limine.conf /boot/limine/limine.conf \
            /etc/default/grub; do
     [[ -f $f ]] || continue
-    # Skip if both already present.
+    # Skip if both already present. Still count as "found" so the
+    # bottom warn-on-zero-changed doesn't false-fire when the cmdline
+    # was already correct (CachyOS installer ships quiet+splash by default).
     if grep -qE '(^|[[:space:]])quiet([[:space:]]|$)' "$f" \
       && grep -qE '(^|[[:space:]])splash([[:space:]]|$)' "$f"; then
       ok "$f already has quiet+splash"
+      changed=1
       continue
     fi
     sudo cp -n "$f" "$f.nirimaki-bak"
@@ -286,6 +291,19 @@ _pm_finalise() {
   section "Plymouth: set theme + mkinitcpio -P"
   run_quiet "plymouth-set-default-theme qs-minimal" -- sudo plymouth-set-default-theme qs-minimal
   run_quiet "mkinitcpio -P (rebuild initramfs)" -- sudo mkinitcpio -P
+
+  # CachyOS ships limine-mkinitcpio-hook, which stores the initramfs Limine
+  # actually loads at /boot/<machine-id>/<kernel>/initramfs-<kernel> — a
+  # SEPARATE file from the flat /boot/initramfs-*.img mkinitcpio -P writes.
+  # The hashed copy is re-synced only via the 90-mkinitcpio-install pacman
+  # hook, which doesn't fire when mkinitcpio is invoked outside a pacman
+  # transaction. Result: our Plymouth theme lands in the flat initramfs but
+  # not the one Limine boots, so the user sees CachyOS's theme at boot and
+  # ours at shutdown. limine-update re-runs the kernel/initramfs install
+  # logic and copies our theme into the hashed location.
+  if command -v limine-update >/dev/null 2>&1; then
+    run_quiet "limine-update (re-sync Limine-hashed initramfs)" -- sudo limine-update
+  fi
 
   # mkinitcpio rebuild typically lands a new kernel image → flag reboot.
   NIRIMAKI_NEEDS_REBOOT=1
