@@ -144,6 +144,21 @@ if [[ -d $TEMPLATES_DIR ]]; then
         # directly under the named "qs" slot.
         mkdir -p "$HOME/.config/btop/themes"
         out="$HOME/.config/btop/themes/qs.theme"
+        # btop also needs color_theme="qs" in btop.conf to pick up the
+        # file we just dropped — otherwise it falls back to "Default".
+        # Idempotent: only writes when the line is missing/wrong, so
+        # repeat theme swaps don't churn the file. btop fills in the
+        # rest of its defaults on first launch.
+        btop_conf="$HOME/.config/btop/btop.conf"
+        if [[ ! -f $btop_conf ]]; then
+          printf 'color_theme = "qs"\n' > "$btop_conf"
+        elif ! grep -qE '^[[:space:]]*color_theme[[:space:]]*=[[:space:]]*"qs"' "$btop_conf"; then
+          if grep -qE '^[[:space:]]*color_theme[[:space:]]*=' "$btop_conf"; then
+            sed -i -E 's|^[[:space:]]*color_theme[[:space:]]*=.*|color_theme = "qs"|' "$btop_conf"
+          else
+            printf 'color_theme = "qs"\n' >> "$btop_conf"
+          fi
+        fi
         ;;
       starship.toml)
         # starship looks at ~/.config/starship.toml only; render
