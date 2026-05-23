@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="assets/logo-amber.png" alt="Nirimaki" width="560">
+<img src="assets/logo-blue.png" alt="Nirimaki" width="560">
 
 **Niri + Maki.** An Omarchy-style desktop for Arch (and Arch-based distros), built on [niri] and [Quickshell].
 
-![License](https://img.shields.io/badge/license-MIT-e0af68?style=flat-square)
-![niri](https://img.shields.io/badge/niri-26.04+-e0af68?style=flat-square)
-![Quickshell](https://img.shields.io/badge/Quickshell-0.3-e0af68?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-7aa2f7?style=flat-square)
+![niri](https://img.shields.io/badge/niri-26.04+-7aa2f7?style=flat-square)
+![Quickshell](https://img.shields.io/badge/Quickshell-0.3-7aa2f7?style=flat-square)
 
 </div>
 

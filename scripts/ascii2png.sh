@@ -3,13 +3,15 @@
 # transparent PNG. Each input character becomes a rectangle, avoiding all
 # font/kerning artifacts of rendering ▀ ▄ █ via text.
 #
-# Usage: ascii2png.sh INPUT.txt OUTPUT.png [CELL_W] [CELL_H]
-#   CELL_W defaults to 16, CELL_H defaults to CELL_W (square cells).
-#   Pass CELL_H > CELL_W to stretch the wordmark vertically.
+# Usage: ascii2png.sh INPUT.txt OUTPUT.png [CELL_W] [CELL_H] [FILL]
+#   CELL_W defaults to 16, CELL_H defaults to 2*CELL_W (matches a terminal
+#     monospace cell — block characters then read with the same width-to-
+#     height proportions you see from `cat logo.txt`).
+#   FILL is any ImageMagick color spec (e.g. white, #7aa2f7). Default white.
 #
 # Supported source chars: █ ▀ ▄ ▌ ▐ (anything else is treated as blank).
 set -euo pipefail
-IN="$1"; OUT="$2"; CW="${3:-16}"; CH="${4:-$CW}"
+IN="$1"; OUT="$2"; CW="${3:-16}"; CH="${4:-$((CW * 2))}"; FILL="${5:-white}"
 
 mapfile -t LINES < "$IN"
 ROWS=${#LINES[@]}
@@ -40,5 +42,5 @@ for ((y=0; y<ROWS; y++)); do
   done
 done
 
-magick -size "${W}x${H}" xc:none -fill white -draw "$DRAW" "$OUT"
+magick -size "${W}x${H}" xc:none -fill "$FILL" -draw "$DRAW" "$OUT"
 echo "Wrote $OUT (${W}x${H})"
