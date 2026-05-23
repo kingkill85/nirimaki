@@ -34,9 +34,11 @@ _cfg_shell() {
     ok "login shell already fish"
   else
     info "switching login shell to fish (will take effect on next login)"
-    # chsh asks for the user's password unless PAM lets it through;
-    # we don't sudo this — it's the user's own account.
-    chsh -s /usr/bin/fish || warn "chsh failed — run 'chsh -s /usr/bin/fish' manually after install"
+    # chsh (setuid) prompts for the user's password via PAM even when
+    # called by the user themselves — our passwordless sudo doesn't
+    # cover it. Route through sudo instead so the install stays silent.
+    sudo chsh -s /usr/bin/fish "$USER" \
+      || warn "chsh failed — run 'sudo chsh -s /usr/bin/fish $USER' manually after install"
     NIRIMAKI_NEEDS_RELOG=1
   fi
 }

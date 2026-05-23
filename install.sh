@@ -60,6 +60,14 @@ INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/install" && pwd)"
 # shellcheck source=install/helpers.sh
 source "$INSTALL_DIR/helpers.sh"
 
+# ~/.local/bin must be on PATH so verify.sh can see claude / pi (both
+# installed there by bootstrap-extras.sh). Arch's default bash profile
+# doesn't auto-add it; do it ourselves for the rest of this run.
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+
 # Reboot bookkeeping — set by step scripts, read by the trailer.
 NIRIMAKI_NEEDS_REBOOT=0
 NIRIMAKI_REBOOT_REASON=()
@@ -149,15 +157,12 @@ echo
 
 if (( NIRIMAKI_NEEDS_REBOOT )); then
   reason="$(IFS=' + '; echo "${NIRIMAKI_REBOOT_REASON[*]}")"
-  echo "  A REBOOT is recommended:  $reason"
+  echo "  A REBOOT is required:  $reason"
   echo
-  read -r -p "  Reboot now? [y/N] " ans
-  case "${ans,,}" in
-    y|yes)
-      systemctl reboot
-      exit 0
-      ;;
-  esac
+  echo "  Rebooting in 5 seconds — press Ctrl+C to cancel..."
+  sleep 5
+  systemctl reboot
+  exit 0
 fi
 
 if (( NIRIMAKI_NEEDS_RELOG )); then
