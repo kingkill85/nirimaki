@@ -49,7 +49,13 @@ if [[ -z ${NIRIMAKI_INSTALL_LOGGED:-} ]]; then
     sudo chmod 600 "$LOG_FILE"
   fi
   cmd=$(printf '%q ' "$0" "$@")
-  exec env NIRIMAKI_INSTALL_LOGGED=1 script -qefc "$cmd" "$LOG_FILE"
+  # </dev/tty is critical for the `curl … | bash` flow: in that mode
+  # install.sh's stdin is the (closed) pipe from curl, which `script`
+  # would otherwise feed into the PTY — leaving sudo_prime's password
+  # prompt with no input. Redirecting from /dev/tty here gives the PTY
+  # real keyboard input. Harmless in the normal `bash install.sh` flow
+  # where stdin is already the tty.
+  exec env NIRIMAKI_INSTALL_LOGGED=1 script -qefc "$cmd" "$LOG_FILE" </dev/tty
 fi
 
 # ---- 1. Resolve repo root + source helpers --------------------------
