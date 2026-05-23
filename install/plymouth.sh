@@ -292,15 +292,33 @@ _pm_finalise() {
   NIRIMAKI_REBOOT_REASON+=("Plymouth + initramfs")
 }
 
+# When LUKS protects the disk, enable SDDM autologin — the LUKS pass-
+# phrase at boot is the real auth gate, the SDDM greeter would just be
+# a second password prompt for the same person. Mirrors the host setup
+# (verified working): User=$USER + Session=niri (NO .desktop suffix —
+# SDDM auto-appends it).
+_pm_sddm_autologin() {
+  section "SDDM: enable autologin (LUKS protects the disk)"
+  sudo mkdir -p /etc/sddm.conf.d
+  sudo tee /etc/sddm.conf.d/autologin.conf >/dev/null <<EOF
+[Autologin]
+User=$USER
+Session=niri
+Relogin=false
+EOF
+  ok "wrote /etc/sddm.conf.d/autologin.conf (User=$USER, Session=niri)"
+}
+
 plymouth_setup() {
   _pm_install_theme
 
   if _pm_luks_detect; then
-    info "LUKS detected (uuid=${NIRIMAKI_LUKS_UUID:-?}) — will swap cryptdevice→rd.luks.name."
+    info "LUKS detected (uuid=${NIRIMAKI_LUKS_UUID:-?}) — will swap cryptdevice→rd.luks.name + enable SDDM autologin."
     _pm_hooks_rewrite
     _pm_luks_cmdline_swap
+    _pm_sddm_autologin
   else
-    info "No LUKS detected — installing splash + HOOKS rewrite without cmdline swap. SDDM autologin will NOT be enabled."
+    info "No LUKS detected — installing splash + HOOKS rewrite without cmdline swap. SDDM autologin NOT enabled."
     _pm_hooks_rewrite
   fi
   _pm_cmdline_quiet_splash
