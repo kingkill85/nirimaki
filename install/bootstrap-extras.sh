@@ -17,9 +17,17 @@ else
 fi
 
 # --- pi (earendil-works) ---
+# pi's installer runs an interactive picker (install / reinstall /
+# uninstall) whenever it can open /dev/tty — which is always true under
+# our `script -qefc` log wrapper. Pre-install nodejs + npm via pacman
+# (see install/base.packages) so pi's preflight passes, then run the
+# installer under `setsid` to detach the controlling tty so it falls
+# through to its no-TTY defaults (install fresh / reinstall existing).
 if command -v pi >/dev/null 2>&1; then
   echo "pi already installed at $(command -v pi) — skipping."
 else
-  echo "Installing pi via pi.dev/install.sh…"
-  curl -fsSL https://pi.dev/install.sh | sh
+  echo "Installing pi via pi.dev/install.sh (non-interactive)…"
+  curl -fsSL https://pi.dev/install.sh -o /tmp/pi-install.sh
+  setsid sh /tmp/pi-install.sh </dev/null
+  rm -f /tmp/pi-install.sh
 fi

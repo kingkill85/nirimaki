@@ -6,6 +6,10 @@
 # Standard tools the user always gets, no menu entry:
 #   - mise:     version manager for the Install → Development menu
 #   - opencode: AI coding assistant (Arch extra)
+#   - nodejs / npm: pre-installed so pi's bootstrap-extras installer
+#                   doesn't fall into its interactive "Install Node.js
+#                   with standalone Node.js? [Y/n]" prompt (pi has no
+#                   pacman/Arch path, only apt/apk/homebrew/standalone).
 #
 # Compositor / shell / theme packages are listed inline in
 # install/packaging.sh §2b–§2c, not here — keeping this file short
@@ -13,3 +17,5 @@
 
 mise
 opencode
+nodejs
+npm
