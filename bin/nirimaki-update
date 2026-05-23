@@ -87,9 +87,11 @@ nirimaki_sudo_prime
 # Always reinstall — the keyring can be updated without a package
 # version bump, and missing maintainer keys silently break -Syu.
 # Filters the noisy "is up to date -- reinstalling" warning that
-# Arch emits when the install is a no-op.
+# Arch emits when the install is a no-op. Force LC_ALL=C so the
+# filter still matches on non-English locales (German pacman says
+# "ist aktuell -- Reinstalliere", etc.).
 echo "=> refresh archlinux-keyring"
-sudo pacman -Sy --noconfirm archlinux-keyring 2> >(grep -vE 'archlinux-keyring-[^ ]+ is up to date -- reinstalling$' >&2) >/dev/null
+sudo LC_ALL=C pacman -Sy --noconfirm archlinux-keyring 2> >(grep -vE 'archlinux-keyring-[^ ]+ is up to date -- reinstalling$' >&2) >/dev/null
 echo
 
 # ---- 5. git pull ----------------------------------------------------
