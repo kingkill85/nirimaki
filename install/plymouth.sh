@@ -30,7 +30,7 @@ NIRIMAKI_PLYMOUTH_LOADED=1
 
 # 1. Install the theme files.
 _pm_install_theme() {
-  section "Plymouth: install qs-minimal theme (§11)"
+  section "Plymouth: install qs-minimal theme"
   sudo install -d /usr/share/plymouth/themes/qs-minimal
   # `install -m 644` per file rather than `cp` to set perms deterministically.
   local src
@@ -100,7 +100,7 @@ _pm_luks_detect() {
 # Idempotent — sed match-and-replace handles re-runs cleanly.
 # Backs up first so a misparse is recoverable.
 _pm_hooks_rewrite() {
-  section "Plymouth: mkinitcpio HOOKS rewrite (§11a)"
+  section "Plymouth: mkinitcpio HOOKS rewrite"
   local conf=/etc/mkinitcpio.conf
   local target='HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)'
   local current
@@ -207,7 +207,7 @@ _pm_cmdline_quiet_splash() {
 # stock Arch splash. systemd-boot non-UKI setups won't have this file,
 # and ad-hoc setups may already use a custom splash.
 _pm_uki_splash() {
-  section "Plymouth: UKI splash replacement (§11b)"
+  section "Plymouth: UKI splash replacement"
   sudo install -Dm644 "$REPO_DIR/assets/splash.bmp" /usr/share/nirimaki/splash.bmp
 
   local preset=/etc/mkinitcpio.d/linux.preset

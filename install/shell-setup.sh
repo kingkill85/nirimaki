@@ -22,7 +22,7 @@ NIRIMAKI_SHELL_SETUP_LOADED=1
 # we follow that pattern. If fisher's installer ever changes its
 # canonical URL we'll need to update this block.
 _sh_fisher() {
-  section "Shell: fisher bootstrap + plugin install (§7)"
+  section "Shell: fisher bootstrap + plugin install"
   if ! command -v fish >/dev/null 2>&1; then
     warn "fish not installed — skipping fisher bootstrap"
     return 0
@@ -40,7 +40,7 @@ _sh_fisher() {
 # §8 — LazyVim headless sync. Quiet timeout so a hung mirror doesn't
 # wedge install.sh forever.
 _sh_lazyvim() {
-  section "Shell: LazyVim headless plugin sync (§8)"
+  section "Shell: LazyVim headless plugin sync"
   if ! command -v nvim >/dev/null 2>&1; then
     warn "nvim not installed — skipping LazyVim sync"
     return 0
@@ -54,7 +54,7 @@ _sh_lazyvim() {
 
 # §9 — tldr offline cache. Tealdeer's `--update`, ~2 MB.
 _sh_tldr() {
-  section "Shell: tldr offline cache (§9)"
+  section "Shell: tldr offline cache"
   if ! command -v tldr >/dev/null 2>&1; then
     warn "tldr not installed — skipping cache update"
     return 0

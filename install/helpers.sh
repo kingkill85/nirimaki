@@ -55,10 +55,10 @@ section() {
 # _start_heartbeat / _stop_heartbeat — bracket a slow command with a
 # single ⏳ line that overwrites itself every N seconds (default 15s).
 # Lets the user see "still alive (1m 12s)" while output is suppressed.
-# NIRIMAKI_HEARTBEAT=<seconds> tunes the interval; setting it to 0
-# disables the heartbeat entirely.
+# Deliberately short — the info() line above already names what's
+# running, so the heartbeat just confirms it hasn't died.
+# NIRIMAKI_HEARTBEAT=<seconds> tunes the interval; 0 disables.
 _start_heartbeat() {
-  local label="$1"
   local interval="${NIRIMAKI_HEARTBEAT:-15}"
   [[ $interval -gt 0 ]] || return 0
   [[ -t 2 ]] || return 0    # no TTY → no \r overwrite, skip
@@ -67,8 +67,8 @@ _start_heartbeat() {
     while sleep "$interval"; do
       local now=$EPOCHSECONDS
       local elapsed=$((now - start))
-      printf '\r%s  ⏳ %s (%dm %02ds)%s' \
-        "$C_DIM" "$label" "$((elapsed/60))" "$((elapsed%60))" "$C_RESET" >&2
+      printf '\r\033[2K%s  ⏳ working… (%dm %02ds)%s' \
+        "$C_DIM" "$((elapsed/60))" "$((elapsed%60))" "$C_RESET" >&2
     done
   ) &
   _heartbeat_pid=$!
@@ -91,15 +91,17 @@ run_quiet() {
   [[ "${1:-}" == "--" ]] && shift
   local start=$EPOCHSECONDS
   local log; log=$(mktemp)
-  _start_heartbeat "$label"
+  _start_heartbeat
   if "$@" >"$log" 2>&1; then
     _stop_heartbeat
     local elapsed=$((EPOCHSECONDS - start))
     rm -f "$log"
-    printf '%s  ✓ %s (%ds)%s\n' "$C_GRN" "$label" "$elapsed" "$C_RESET" >&2
+    printf '%s  ✓ done (%ds)%s\n' "$C_GRN" "$elapsed" "$C_RESET" >&2
   else
     local rc=$?
     _stop_heartbeat
+    # Label IS shown on failure so the user knows which command died
+    # (heartbeat/success deliberately hide it for cleanliness).
     printf '%s  ✗ %s failed (exit %d) — last 40 lines:%s\n' "$C_RED" "$label" "$rc" "$C_RESET" >&2
     tail -40 "$log" >&2
     rm -f "$log"

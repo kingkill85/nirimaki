@@ -21,7 +21,7 @@ NIRIMAKI_CONFIG_LOADED=1
 
 # §3 — fish as the login shell.
 _cfg_shell() {
-  section "Configure: fish as login shell (§3)"
+  section "Configure: fish as login shell"
   if ! grep -qx /usr/bin/fish /etc/shells; then
     echo /usr/bin/fish | sudo tee -a /etc/shells >/dev/null
     ok "added /usr/bin/fish to /etc/shells"
@@ -89,7 +89,7 @@ _link_file() {
 }
 
 _cfg_links() {
-  section "Configure: seed + symlink (§4)"
+  section "Configure: seed + symlink"
 
   # The repo lives at $REPO_DIR — which on end-user installs is
   # already ~/.local/share/nirimaki. Make sure default/ and bin/ are
@@ -182,7 +182,7 @@ _cfg_links() {
 # Anything the user adds BELOW this block keeps winning (bash sources
 # top-to-bottom).
 _cfg_bashrc() {
-  section "Configure: ~/.bashrc — load default/bash/rc (§5)"
+  section "Configure: ~/.bashrc — load default/bash/rc"
   local rc="$HOME/.bashrc"
   local marker="# Nirimaki — load shared bash defaults"
   if [[ -f $rc ]] && grep -qF "$marker" "$rc"; then
@@ -209,7 +209,7 @@ EOF
 # §6 — ~/.gitconfig delta + niceties. Idempotent: only writes blocks
 # that aren't already there.
 _cfg_gitconfig() {
-  section "Configure: ~/.gitconfig delta block (§6)"
+  section "Configure: ~/.gitconfig delta block"
   local gc="$HOME/.gitconfig"
   if [[ -f $gc ]] && grep -qE '^\[delta\]' "$gc"; then
     ok "delta block already in $gc"

@@ -67,10 +67,10 @@ preflight() {
   if [[ -z $niri_ver ]]; then
     warn "niri not in any enabled repo (extra/community). Enable extra/ before continuing."
   else
-    local major minor
-    major="$(printf '%s' "$niri_ver" | cut -d. -f1)"
-    minor="$(printf '%s' "$niri_ver" | cut -d. -f2)"
-    if (( major < 26 )) || { (( major == 26 )) && (( minor < 4 )); }; then
+    # pacman -Si prints "Version: 26.04-1" (pkgver-pkgrel). Hand-rolled
+    # `cut -d. -f2` parsed "04-1" and bash arithmetic evaluated it as
+    # 04 minus 1 = 3 < 4 → false negative. Use pacman's vercmp instead.
+    if (( $(vercmp "$niri_ver" 26.04) < 0 )); then
       warn "niri $niri_ver is older than 26.04 — the user-side config uses '~' in include= which needs 26.04+."
     else
       ok "niri $niri_ver available"

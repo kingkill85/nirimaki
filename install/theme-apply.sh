@@ -26,7 +26,7 @@ NIRIMAKI_THEME_APPLY_LOADED=1
 # Idempotent: if the file already contains a Nirimaki marker, leave
 # it alone — the user may have customised `style=` or `icon_theme=`.
 _th_qtct() {
-  section "Theme: qt5ct + qt6ct config seed (§12)"
+  section "Theme: qt5ct + qt6ct config seed"
   local marker="# nirimaki-managed"
   for variant in qt5ct qt6ct; do
     local file="$HOME/.config/$variant/$variant.conf"
@@ -58,7 +58,7 @@ EOF
 # harmless (theme-set tolerates a missing socket). The on-disk artefacts
 # are what matter; first session start picks them up.
 _th_apply() {
-  section "Theme: initial apply — tokyo-night (§10)"
+  section "Theme: initial apply — tokyo-night"
   local theme_set="$HOME/.local/bin/nirimaki-theme-set"
   if [[ ! -x $theme_set ]]; then
     warn "nirimaki-theme-set not on PATH yet — config.sh should have linked it. Skipping."

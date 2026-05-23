@@ -27,13 +27,12 @@ NIRIMAKI_PACKAGING_LOADED=1
 # This step refreshes everything to a coherent ABI.
 _pkg_syu() {
   section "Packages: full system upgrade (pacman -Syu)"
-  info "sudo pacman -Syu --noconfirm"
-  sudo pacman -Syu --noconfirm
+  run_quiet "pacman -Syu" -- sudo pacman -Syu --noconfirm
 }
 
 # §2a — minimal pacman seed list from install/base.packages.
 _pkg_base() {
-  section "Packages: base.packages (§2a)"
+  section "Packages: base.packages"
   local list=()
   while IFS= read -r line; do
     [[ -n $line ]] && list+=("$line")
@@ -56,7 +55,7 @@ _pkg_base() {
 #   - noto-fonts-cjk/emoji/extra — CJK + emoji + less-common scripts.
 #     §2g (fontconfig) tunes CJK regional preference on top.
 _pkg_compositor() {
-  section "Packages: compositor + shell + GUI baseline (§2b)"
+  section "Packages: compositor + shell + GUI baseline"
   pacman_install \
     niri quickshell \
     sddm \
@@ -78,7 +77,7 @@ _pkg_compositor() {
 
 # §2c — terminal toolkit (phase H).
 _pkg_terminal() {
-  section "Packages: terminal toolkit (§2c)"
+  section "Packages: terminal toolkit"
   pacman_install \
     fish starship \
     eza bat fzf zoxide ripgrep fd git-delta \
@@ -146,14 +145,14 @@ _pkg_paru_bootstrap() {
 
 # §2d — AUR packages via paru.
 _pkg_aur() {
-  section "Packages: AUR (§2d)"
+  section "Packages: AUR"
   paru_install pay-respects-bin yaru-icon-theme
 }
 
 # §2e — non-repo tools (claude-code, pi). Delegates to the
 # bootstrap-extras.sh that already exists in the repo.
 _pkg_bootstrap_extras() {
-  section "Packages: bootstrap-extras (§2e — claude-code + pi)"
+  section "Packages: bootstrap-extras"
   bash "$REPO_DIR/install/bootstrap-extras.sh"
 }
 
@@ -168,7 +167,7 @@ _pkg_bootstrap_extras() {
 # Zen is AUR/external and may not be present. Fall back to Firefox,
 # which we just installed.
 _pkg_browsers() {
-  section "Packages: browsers + chromium policy dir + default browser (§2f)"
+  section "Packages: browsers + chromium policy dir + default browser"
   pacman_install chromium firefox
 
   info "Granting /etc/chromium/policies/managed to the user (live-theme reload)"
@@ -189,7 +188,7 @@ _pkg_browsers() {
 # Without this, fc-match resolves lang=zh to Noto CJK JP (wrong glyphs).
 # The shipped file in install/assets/ has all 6 match blocks.
 _pkg_fontconfig() {
-  section "Packages: fontconfig regional CJK preference (§2g)"
+  section "Packages: fontconfig regional CJK preference"
   install -Dm644 \
     "$REPO_DIR/install/assets/99-noto-cjk-regional.conf" \
     "$HOME/.config/fontconfig/conf.d/99-noto-cjk-regional.conf"
@@ -214,7 +213,7 @@ _pkg_fontconfig() {
 # overwriting. Keep it simple here: write our block, append any
 # preexisting other sections.
 _pkg_mimeapps() {
-  section "Packages: mimeapps default seed (§2h)"
+  section "Packages: mimeapps default seed"
   local browser tpl out tmp
   browser="$(xdg-settings get default-web-browser 2>/dev/null || true)"
   if [[ -z $browser ]]; then
@@ -251,7 +250,7 @@ _pkg_mimeapps() {
 #      NM disabled. Default Arch ships neither enabled, so enabling
 #      networkd here is safe on a fresh box.
 _pkg_system_enables() {
-  section "System enables (§2i)"
+  section "System enables"
 
   info "enable+start bluetooth"
   sudo systemctl enable --now bluetooth
