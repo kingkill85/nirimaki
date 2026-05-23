@@ -5,11 +5,13 @@
 // boot/resume, hidden while password is being typed.
 //
 // Theme colours hard-coded — Plymouth runs before /home is decrypted
-// so we can't read ~/.config/theme/current at runtime. Values match
-// the shell's default-theme background #101315 and foreground #cacccc.
+// so we can't read ~/.config/theme/current at runtime. Pure black
+// background so the UEFI/UKI-stub → Plymouth handoff has no visible
+// colour shift (the stub always leaves the screen black around the
+// splash). Foreground stays at #cacccc.
 
-Window.SetBackgroundTopColor   (0.0627, 0.0745, 0.0824);
-Window.SetBackgroundBottomColor(0.0627, 0.0745, 0.0824);
+Window.SetBackgroundTopColor   (0.0, 0.0, 0.0);
+Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
 
 logo.image  = Image("logo.png");
 logo.sprite = Sprite(logo.image);
