@@ -128,17 +128,23 @@ _cfg_links() {
   mkdir -p "$HOME/.config/tmux"
   seed_user_file "$REPO_DIR/config/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf"
 
-  # fish: config.fish is user-owned (loads last, wins). conf.d/
-  # completions/ functions/ themes/ are repo-owned symlinks. The
-  # fish_plugins file is copied not symlinked so fisher's update can
-  # mutate it without writing back through a symlink into the repo.
+  # fish: config.fish + fish_plugins are OVERWRITTEN unconditionally on
+  # every install.sh run. Some distros (CachyOS, ...) pre-seed their own
+  # ~/.config/fish/config.fish with the user's home as part of the
+  # base install — seed-once would let that distro default win and our
+  # config never lands. On vanilla Arch neither file exists yet, so
+  # cp -f just creates them. Users who customise post-install own those
+  # edits at their own risk; install.sh is meant for fresh boxes.
+  # conf.d/ completions/ functions/ themes/ are repo-owned symlinks
+  # (_link_dir already backs up existing dirs to .pre-install).
   mkdir -p "$HOME/.config/fish"
-  seed_user_file "$REPO_DIR/config/fish/config.fish" "$HOME/.config/fish/config.fish"
+  cp -f "$REPO_DIR/config/fish/config.fish"  "$HOME/.config/fish/config.fish"
+  cp -f "$REPO_DIR/config/fish/fish_plugins" "$HOME/.config/fish/fish_plugins"
+  ok "wrote ~/.config/fish/{config.fish,fish_plugins}"
   for fish_dir in conf.d completions functions themes; do
     [[ -d "$REPO_DIR/config/fish/$fish_dir" ]] || continue
     _link_dir "$REPO_DIR/config/fish/$fish_dir" "$HOME/.config/fish/$fish_dir"
   done
-  seed_user_file "$REPO_DIR/config/fish/fish_plugins" "$HOME/.config/fish/fish_plugins"
 
   # nirimaki-* helpers: per-file symlinks into ~/.local/bin so the
   # PATH order stays predictable.

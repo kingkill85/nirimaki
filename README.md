@@ -35,8 +35,12 @@ From a freshly-installed Arch box (`archinstall` with the **Minimal** profile is
 enough — install.sh handles the rest):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/kingkill85/nirimaki/main/boot.sh)
+curl -fsSL https://raw.githubusercontent.com/kingkill85/nirimaki/main/boot.sh | bash
 ```
+
+Works in any shell. (CachyOS and some other Arch-based distros default to fish,
+which doesn't grok bash's `<(…)` process substitution — the pipe form sidesteps
+that.)
 
 That's the whole thing. `boot.sh` installs `git`, clones the repo to
 `~/.local/share/nirimaki/`, and hands off to `install.sh` — which prompts for

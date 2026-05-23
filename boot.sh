@@ -1,14 +1,15 @@
 #!/bin/bash
 # boot.sh — one-liner bootstrap from a blank Arch box.
 #
-# Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/kingkill85/nirimaki/main/boot.sh)
+# Usage (works in any shell — bash, fish, zsh):
+#   curl -fsSL https://raw.githubusercontent.com/kingkill85/nirimaki/main/boot.sh | bash
 #
-#   or, equivalently (works on minimal Arch where curl IS present but
-#   bash's process substitution might trip you up):
-#
+#   or, the two-step form if you want to inspect first:
 #   curl -fsSL https://raw.githubusercontent.com/kingkill85/nirimaki/main/boot.sh -o /tmp/boot.sh
 #   bash /tmp/boot.sh
+#
+#   NOTE: `bash <(curl ...)` is bash-only — fish (CachyOS default) chokes on
+#   process substitution. Use the pipe form above instead.
 #
 # What it does:
 #   1. Installs git via pacman (Arch "Minimal" archinstall doesn't
