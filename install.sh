@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh — blank-Arch → working Nirimaki, top-level entrypoint.
+# install.sh — blank Arch or Arch-based box → working Nirimaki, top-level entrypoint.
 #
 # Quickstart (clone-yourself flow):
 #
@@ -62,7 +62,8 @@ source "$INSTALL_DIR/helpers.sh"
 
 # ~/.local/bin must be on PATH so verify.sh can see claude / pi (both
 # installed there by bootstrap-extras.sh). Arch's default bash profile
-# doesn't auto-add it; do it ourselves for the rest of this run.
+# (and most derivatives') doesn't auto-add it; do it ourselves for the
+# rest of this run.
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) ;;
   *) export PATH="$HOME/.local/bin:$PATH" ;;
@@ -94,15 +95,15 @@ else
   # Fallback — happens only when the repo wasn't yet on disk.
   printf '\n  Nirimaki\n'
 fi
-echo "  Omarchy-style desktop for Arch Linux on niri + Quickshell."
+echo "  Omarchy-style desktop for Arch & Arch-based on niri + Quickshell."
 echo
 echo "  Log:  $LOG_FILE"
 echo
 
 # ---- 3. sudo + pre-flight -------------------------------------------
-# sudo_prime FIRST — preflight needs sudo to install git (Arch
-# "Minimal" profile doesn't ship it). The passwordless sudoers rule
-# lives until the EXIT trap runs sudo_cleanup, so the rest of the
+# sudo_prime FIRST — preflight needs sudo to install git (Arch Minimal
+# + some Arch-based distros don't ship it). The passwordless sudoers
+# rule lives until the EXIT trap runs sudo_cleanup, so the rest of the
 # install never prompts.
 sudo_prime
 

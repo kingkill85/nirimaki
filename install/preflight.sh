@@ -3,7 +3,8 @@
 # starts touching the system.
 #
 # What we check (in order):
-#   1. We're on Arch (or an Arch derivative — /etc/arch-release exists).
+#   1. We're on Arch or an Arch-based distro (CachyOS, EndeavourOS, …
+#      — anything with /etc/arch-release).
 #   2. We're NOT running as root. install.sh has to know the target
 #      user for chsh, ~/.config seeding, sudo prompts, etc. — running
 #      it under sudo would leave files owned by root.
@@ -26,11 +27,12 @@ NIRIMAKI_PREFLIGHT_LOADED=1
 preflight() {
   section "Pre-flight"
 
-  # 1. Arch check
+  # 1. Arch / Arch-based check. /etc/arch-release is present on vanilla
+  # Arch, CachyOS, EndeavourOS, and friends — that's our gate.
   if [[ ! -f /etc/arch-release ]]; then
-    die "Nirimaki targets Arch Linux. /etc/arch-release not found — refusing to install."
+    die "Nirimaki targets Arch and Arch-based distros (CachyOS, EndeavourOS, …). /etc/arch-release not found — refusing to install."
   fi
-  ok "Arch Linux detected"
+  ok "Arch / Arch-based distro detected"
 
   # 2. Non-root check. EUID 0 = running under sudo or as root user.
   if [[ $EUID -eq 0 ]]; then

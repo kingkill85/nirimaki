@@ -1,5 +1,5 @@
 #!/bin/bash
-# boot.sh — one-liner bootstrap from a blank Arch box.
+# boot.sh — one-liner bootstrap from a blank Arch or Arch-based box.
 #
 # Usage (works in any shell — bash, fish, zsh):
 #   curl -fsSL https://raw.githubusercontent.com/kingkill85/nirimaki/main/boot.sh | bash
@@ -12,8 +12,8 @@
 #   process substitution. Use the pipe form above instead.
 #
 # What it does:
-#   1. Installs git via pacman (Arch "Minimal" archinstall doesn't
-#      ship git, and the rest of install.sh needs it).
+#   1. Installs git via pacman (Arch Minimal + some Arch-based distros
+#      don't ship git out of the box, and the rest of install.sh needs it).
 #   2. Clones the repo to ~/.local/share/nirimaki (the canonical
 #      location install.sh expects).
 #   3. Hands off to install.sh, which does the actual work.
@@ -33,7 +33,8 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 if [[ ! -f /etc/arch-release ]]; then
-  echo "Nirimaki targets Arch Linux — /etc/arch-release not found, refusing." >&2
+  echo "Nirimaki targets Arch and Arch-based distros (CachyOS, EndeavourOS, …)." >&2
+  echo "/etc/arch-release not found — refusing." >&2
   exit 1
 fi
 

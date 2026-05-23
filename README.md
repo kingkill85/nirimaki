@@ -2,7 +2,7 @@
 
 <img src="assets/logo-amber.png" alt="Nirimaki" width="560">
 
-**Niri + Maki.** An Omarchy-style desktop for Arch Linux, built on [niri] and [Quickshell].
+**Niri + Maki.** An Omarchy-style desktop for Arch (and Arch-based distros), built on [niri] and [Quickshell].
 
 ![License](https://img.shields.io/badge/license-MIT-e0af68?style=flat-square)
 ![niri](https://img.shields.io/badge/niri-26.04+-e0af68?style=flat-square)
@@ -24,23 +24,25 @@ niri's scrolling-column world: **niri + maki**, the rolled sushi answer to
 Omarchy's plate. Same opinionated baseline (themes, dialogs, lock screen,
 pickers, sane keybinds), different compositor underneath.
 
-Drop it on a fresh Arch install — themed, working, multi-monitor desktop
-in one command. No hand-stitching ten dotfile sources together first.
+Drop it on a fresh Arch or Arch-based install (CachyOS, EndeavourOS, and
+friends — anything with `/etc/arch-release` and `pacman`) — themed, working,
+multi-monitor desktop in one command. No hand-stitching ten dotfile sources
+together first.
 
 ---
 
 ## Install
 
-From a freshly-installed Arch box (`archinstall` with the **Minimal** profile is
-enough — install.sh handles the rest):
+From a freshly-installed Arch or Arch-based box — vanilla Arch (`archinstall`
+Minimal is enough), CachyOS, EndeavourOS, etc. install.sh handles the rest:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/kingkill85/nirimaki/main/boot.sh | bash
 ```
 
-Works in any shell. (CachyOS and some other Arch-based distros default to fish,
-which doesn't grok bash's `<(…)` process substitution — the pipe form sidesteps
-that.)
+The pipe form runs cleanly under any login shell — CachyOS and a handful
+of other Arch-based distros default to fish, which doesn't grok bash's
+`<(…)` process substitution.
 
 That's the whole thing. `boot.sh` installs `git`, clones the repo to
 `~/.local/share/nirimaki/`, and hands off to `install.sh` — which prompts for
@@ -190,7 +192,7 @@ repo-file boundary, and other gotchas.
 
 ```
 boot.sh         curl-pipe bootstrap (installs git, clones, runs install.sh)
-install.sh      blank-Arch → working Nirimaki, top-level
+install.sh      blank box → working Nirimaki, top-level
 install/        per-phase install scripts (helpers, preflight, packaging,
                 config, shell-setup, theme-apply, login, plymouth, verify)
 migrations/     run-once upgrade scripts for system-owned changes
