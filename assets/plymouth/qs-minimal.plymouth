@@ -1,6 +1,6 @@
 [Plymouth Theme]
 Name=qs-minimal
-Description=Nirimaki minimal boot splash — Nirimaki logo + progress bar
+Description=Blank dark screen with centred password bullets
 ModuleName=script
 
 [script]
