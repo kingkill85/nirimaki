@@ -52,6 +52,61 @@ section() {
   printf '\n%s== %s ==%s\n' "$C_BOLD" "$*" "$C_RESET" >&2
 }
 
+# _start_heartbeat / _stop_heartbeat — bracket a slow command with a
+# single ⏳ line that overwrites itself every N seconds (default 15s).
+# Lets the user see "still alive (1m 12s)" while output is suppressed.
+# NIRIMAKI_HEARTBEAT=<seconds> tunes the interval; setting it to 0
+# disables the heartbeat entirely.
+_start_heartbeat() {
+  local label="$1"
+  local interval="${NIRIMAKI_HEARTBEAT:-15}"
+  [[ $interval -gt 0 ]] || return 0
+  [[ -t 2 ]] || return 0    # no TTY → no \r overwrite, skip
+  local start=$EPOCHSECONDS
+  (
+    while sleep "$interval"; do
+      local now=$EPOCHSECONDS
+      local elapsed=$((now - start))
+      printf '\r%s  ⏳ %s (%dm %02ds)%s' \
+        "$C_DIM" "$label" "$((elapsed/60))" "$((elapsed%60))" "$C_RESET" >&2
+    done
+  ) &
+  _heartbeat_pid=$!
+}
+_stop_heartbeat() {
+  [[ -n ${_heartbeat_pid:-} ]] || return 0
+  kill "$_heartbeat_pid" 2>/dev/null || true
+  wait "$_heartbeat_pid" 2>/dev/null || true
+  # Clear the heartbeat line so the next output starts clean.
+  printf '\r\033[2K' >&2
+  _heartbeat_pid=
+}
+
+# run_quiet "<label>" -- <cmd...> — run a noisy command silently,
+# show a heartbeat while it works, print ✓ + elapsed time on success,
+# or ✗ + tail of captured output on failure. Use for any command that
+# spams stdout/stderr but doesn't already have output suppression.
+run_quiet() {
+  local label="$1"; shift
+  [[ "${1:-}" == "--" ]] && shift
+  local start=$EPOCHSECONDS
+  local log; log=$(mktemp)
+  _start_heartbeat "$label"
+  if "$@" >"$log" 2>&1; then
+    _stop_heartbeat
+    local elapsed=$((EPOCHSECONDS - start))
+    rm -f "$log"
+    printf '%s  ✓ %s (%ds)%s\n' "$C_GRN" "$label" "$elapsed" "$C_RESET" >&2
+  else
+    local rc=$?
+    _stop_heartbeat
+    printf '%s  ✗ %s failed (exit %d) — last 40 lines:%s\n' "$C_RED" "$label" "$rc" "$C_RESET" >&2
+    tail -40 "$log" >&2
+    rm -f "$log"
+    return "$rc"
+  fi
+}
+
 # sudo_prime — ask once, keep alive for the rest of the run.
 #
 # Most install steps need root for pacman / systemctl / mkinitcpio.
@@ -101,17 +156,7 @@ pacman_install() {
     sudo pacman -S --needed --noconfirm "$@"
     return $?
   fi
-  local log; log=$(mktemp)
-  if sudo pacman -S --needed --noconfirm "$@" >"$log" 2>&1; then
-    rm -f "$log"
-  else
-    local rc=$?
-    echo >&2
-    printf '%s---- pacman -S failed (exit %d) — last 40 lines: ----%s\n' "$C_RED" "$rc" "$C_RESET" >&2
-    tail -40 "$log" >&2
-    rm -f "$log"
-    return "$rc"
-  fi
+  run_quiet "pacman -S $*" -- sudo pacman -S --needed --noconfirm "$@"
 }
 
 # paru_install <pkg> [pkg…] — AUR variant. Same output redirection
@@ -125,17 +170,7 @@ paru_install() {
     paru -S --needed --noconfirm --skipreview "$@"
     return $?
   fi
-  local log; log=$(mktemp)
-  if paru -S --needed --noconfirm --skipreview "$@" >"$log" 2>&1; then
-    rm -f "$log"
-  else
-    local rc=$?
-    echo >&2
-    printf '%s---- paru -S failed (exit %d) — last 60 lines: ----%s\n' "$C_RED" "$rc" "$C_RESET" >&2
-    tail -60 "$log" >&2
-    rm -f "$log"
-    return "$rc"
-  fi
+  run_quiet "paru -S $*" -- paru -S --needed --noconfirm --skipreview "$@"
 }
 
 # read_pkglist <file> — yields one package name per line, ignoring

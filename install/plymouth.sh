@@ -231,11 +231,8 @@ _pm_uki_splash() {
 # 6. Set default plymouth theme + rebuild initramfs (always last).
 _pm_finalise() {
   section "Plymouth: set theme + mkinitcpio -P"
-  sudo plymouth-set-default-theme qs-minimal
-  ok "default Plymouth theme = qs-minimal"
-  info "rebuilding initramfs (mkinitcpio -P) — this can take a minute"
-  sudo mkinitcpio -P
-  ok "initramfs rebuilt"
+  run_quiet "plymouth-set-default-theme qs-minimal" -- sudo plymouth-set-default-theme qs-minimal
+  run_quiet "mkinitcpio -P (rebuild initramfs)" -- sudo mkinitcpio -P
 
   # mkinitcpio rebuild typically lands a new kernel image → flag reboot.
   NIRIMAKI_NEEDS_REBOOT=1

@@ -133,14 +133,11 @@ _pkg_paru_bootstrap() {
 
   local build="/tmp/nirimaki-paru"
   rm -rf "$build"
-  git clone --depth=1 https://aur.archlinux.org/paru.git "$build"
-  (
-    cd "$build"
-    # makepkg refuses to run as root; this script never runs as root
-    # (preflight bails) so we just invoke it directly. The PKGBUILD
-    # lists rust as a makedepend → makepkg pulls it in automatically.
-    makepkg -si --noconfirm
-  )
+  run_quiet "git clone aur/paru" -- git clone --depth=1 https://aur.archlinux.org/paru.git "$build"
+  # makepkg refuses to run as root; this script never runs as root
+  # (preflight bails) so we just invoke it directly. The PKGBUILD
+  # lists rust as a makedepend → makepkg pulls it in automatically.
+  run_quiet "makepkg -si paru (rust build, ~2-3 min)" -- bash -c "cd '$build' && makepkg -si --noconfirm"
   rm -rf "$build"
   command -v paru >/dev/null || die "paru bootstrap failed."
   paru --version >/dev/null || die "paru installed but won't run — check libalpm version."
@@ -150,7 +147,7 @@ _pkg_paru_bootstrap() {
 # §2d — AUR packages via paru.
 _pkg_aur() {
   section "Packages: AUR (§2d)"
-  info "yaru-icon-theme builds the full Yaru source tree from sass — expect ~3–5 minutes with no console output (paru output is captured to log; set NIRIMAKI_VERBOSE=1 to stream it)."
+  info "yaru-icon-theme compiles the full Yaru source tree from sass — expect ~3–5 min (set NIRIMAKI_VERBOSE=1 to stream paru's output)."
   paru_install pay-respects-bin yaru-icon-theme
 }
 
