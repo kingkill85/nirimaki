@@ -150,6 +150,7 @@ _pkg_paru_bootstrap() {
 # §2d — AUR packages via paru.
 _pkg_aur() {
   section "Packages: AUR (§2d)"
+  info "yaru-icon-theme builds the full Yaru source tree from sass — expect ~3–5 minutes with no console output (paru output is captured to log; set NIRIMAKI_VERBOSE=1 to stream it)."
   paru_install pay-respects-bin yaru-icon-theme
 }
 
