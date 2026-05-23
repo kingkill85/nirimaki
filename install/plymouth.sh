@@ -41,56 +41,106 @@ _pm_install_theme() {
   ok "theme files installed under /usr/share/plymouth/themes/qs-minimal/"
 }
 
-# 2. LUKS detection.
+# 2. LUKS detection + UUID resolution.
 #
-# We check four sources and call it LUKS-active if ANY shows a crypt
-# device for root. False positives are safer than false negatives —
-# rewriting cmdline on a non-LUKS box does nothing dangerous, but
-# skipping it on a LUKS box can render the next boot unable to find
-# its root device.
+# We need the *LUKS volume UUID* (from cryptsetup luksUUID), which is
+# stored in the LUKS header. The kernel cmdline may refer to the crypt
+# partition via several different identifiers though:
+#
+#   cryptdevice=UUID=<filesystem-uuid>:root      ← old encrypt hook
+#   cryptdevice=PARTUUID=<gpt-partition-uuid>:root  ← archinstall+limine
+#   cryptdevice=LABEL=<label>:root
+#   cryptdevice=/dev/disk/by-uuid/<...>:root
+#   cryptdevice=/dev/vda2:root
+#   rd.luks.name=<luks-uuid>=root                ← sd-encrypt
+#   rd.luks.uuid=<luks-uuid>                     ← sd-encrypt
+#
+# Only the rd.luks.* forms expose the LUKS UUID directly. Everything
+# else points at the block device via *some* identifier — we resolve
+# it to a /dev path with `findfs`, then ask cryptsetup for the LUKS
+# UUID. PARTUUID ≠ LUKS UUID; treating them as the same was the bug
+# that put PARTUUID installs into emergency mode.
 #
 # Returns:
-#   0 if LUKS detected
+#   0 if LUKS detected AND UUID resolved
 #   1 otherwise
-# Sets NIRIMAKI_LUKS_UUID if it could parse the UUID.
+# Sets NIRIMAKI_LUKS_UUID on success.
+
+# Resolve a cryptdevice= source ID to its LUKS volume UUID.
+# $1 = the bit between cryptdevice= and :root (e.g. "PARTUUID=abc",
+# "UUID=xxx", "/dev/vda2"). Echoes the LUKS UUID on stdout; non-zero
+# rc if it couldn't be resolved.
+_pm_resolve_luks_uuid() {
+  local src="$1" dev=""
+  case "$src" in
+    UUID=*|PARTUUID=*|LABEL=*|PARTLABEL=*)
+      dev=$(sudo findfs "$src" 2>/dev/null || true)
+      ;;
+    /dev/*)
+      dev="$src"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  [[ -n $dev && -b $dev ]] || return 1
+  sudo cryptsetup isLuks "$dev" 2>/dev/null || return 1
+  sudo cryptsetup luksUUID "$dev" 2>/dev/null
+}
+
 _pm_luks_detect() {
   NIRIMAKI_LUKS_UUID=""
+  local raw=""
 
   # a) /proc/cmdline — what the running kernel was given.
   if grep -qE '(^|[[:space:]])(cryptdevice|rd\.luks\.name|rd\.luks\.uuid)=' /proc/cmdline 2>/dev/null; then
-    NIRIMAKI_LUKS_UUID="$(awk '
-      {
-        for (i = 1; i <= NF; i++) {
-          if (match($i, /cryptdevice=UUID=([^: ]+)/, m)) { print m[1]; exit }
-          if (match($i, /cryptdevice=\/dev\/disk\/by-uuid\/([^: ]+)/, m)) { print m[1]; exit }
-          if (match($i, /rd\.luks\.name=([^= ]+)=root/, m)) { print m[1]; exit }
-          if (match($i, /rd\.luks\.uuid=([^ ]+)/, m)) { print m[1]; exit }
-        }
-      }
-    ' /proc/cmdline)"
-    return 0
+    raw=$(grep -oE 'cryptdevice=[^[:space:]"]+:root|rd\.luks\.name=[^[:space:]"]+=root|rd\.luks\.uuid=[^[:space:]"]+' /proc/cmdline | head -1)
   fi
 
-  # b) /etc/crypttab non-comment entries — long-term truth.
-  if [[ -f /etc/crypttab ]] && grep -qE '^[^#[:space:]]+[[:space:]]+UUID=' /etc/crypttab; then
-    NIRIMAKI_LUKS_UUID="$(awk '$1 !~ /^#/ && $2 ~ /^UUID=/ { sub("UUID=", "", $2); print $2; exit }' /etc/crypttab)"
-    return 0
+  # b) Bootloader config — scanned even if /proc/cmdline matched, so we
+  # can pick up an updated cmdline that hasn't been booted yet.
+  if [[ -z $raw ]]; then
+    local f
+    for f in /etc/kernel/cmdline /etc/cmdline.d/*.conf \
+             /boot/loader/entries/*.conf /efi/loader/entries/*.conf \
+             /boot/limine.conf /boot/limine/limine.conf \
+             /etc/default/grub; do
+      [[ -f $f ]] || continue
+      raw=$(sudo grep -oE 'cryptdevice=[^[:space:]"]+:root|rd\.luks\.name=[^[:space:]"]+=root|rd\.luks\.uuid=[^[:space:]"]+' "$f" 2>/dev/null | head -1)
+      [[ -n $raw ]] && break
+    done
   fi
 
-  # c) Any bootloader config file mentioning cryptdevice= / rd.luks.name=.
-  local f
-  for f in /etc/kernel/cmdline /etc/cmdline.d/*.conf \
-           /boot/loader/entries/*.conf /efi/loader/entries/*.conf \
-           /boot/limine.conf /boot/limine/limine.conf \
-           /etc/default/grub; do
-    [[ -f $f ]] || continue
-    if grep -qE '(cryptdevice|rd\.luks\.name|rd\.luks\.uuid)=' "$f"; then
-      NIRIMAKI_LUKS_UUID="$(grep -oE 'cryptdevice=UUID=[^: [:space:]"]+|rd\.luks\.name=[^= ]+=root|rd\.luks\.uuid=[^ "]+' "$f" \
-        | head -1 \
-        | sed -E 's|cryptdevice=UUID=||; s|rd\.luks\.name=||; s|=root$||; s|rd\.luks\.uuid=||')"
-      return 0
+  # c) /etc/crypttab — fallback for setups where cmdline doesn't carry it.
+  if [[ -z $raw && -f /etc/crypttab ]]; then
+    local src
+    src=$(awk '$1 !~ /^#/ && NF >= 2 { print $2; exit }' /etc/crypttab)
+    if [[ -n $src ]]; then
+      NIRIMAKI_LUKS_UUID=$(_pm_resolve_luks_uuid "$src" || true)
+      [[ -n $NIRIMAKI_LUKS_UUID ]] && return 0
     fi
-  done
+  fi
+
+  [[ -n $raw ]] || return 1
+
+  # rd.luks.name=<luks-uuid>=root — UUID is already the LUKS UUID.
+  if [[ $raw == rd.luks.name=* ]]; then
+    NIRIMAKI_LUKS_UUID="${raw#rd.luks.name=}"
+    NIRIMAKI_LUKS_UUID="${NIRIMAKI_LUKS_UUID%=root}"
+    return 0
+  fi
+  # rd.luks.uuid=<luks-uuid>
+  if [[ $raw == rd.luks.uuid=* ]]; then
+    NIRIMAKI_LUKS_UUID="${raw#rd.luks.uuid=}"
+    return 0
+  fi
+  # cryptdevice=<source>:root — resolve source → device → LUKS UUID.
+  if [[ $raw == cryptdevice=* ]]; then
+    local src="${raw#cryptdevice=}"
+    src="${src%:root}"
+    NIRIMAKI_LUKS_UUID=$(_pm_resolve_luks_uuid "$src" || true)
+    [[ -n $NIRIMAKI_LUKS_UUID ]] && return 0
+  fi
 
   return 1
 }
@@ -132,16 +182,19 @@ _pm_luks_cmdline_swap() {
            /boot/limine.conf /boot/limine/limine.conf \
            /etc/default/grub; do
     [[ -f $f ]] || continue
-    if grep -qE "cryptdevice=(UUID=)?$NIRIMAKI_LUKS_UUID:root" "$f"; then
+    # Match cryptdevice=<anything>:root — covers UUID=, PARTUUID=, LABEL=,
+    # /dev/disk/by-*, raw /dev/...  paths. We always emit the LUKS volume
+    # UUID (resolved upstream by _pm_resolve_luks_uuid), which is what
+    # sd-encrypt's rd.luks.name= requires.
+    if sudo grep -qE 'cryptdevice=[^[:space:]"]+:root' "$f"; then
       sudo cp -n "$f" "$f.nirimaki-bak"
-      # Swap cryptdevice=UUID=<uuid>:root → rd.luks.name=<uuid>=root.
       # root=/dev/mapper/root is typically already on the cmdline next
       # to cryptdevice= (encrypt hook needs it explicitly), so we don't
       # add it — that would duplicate the arg.
-      sudo sed -i -E "s|cryptdevice=(UUID=)?$NIRIMAKI_LUKS_UUID:root|rd.luks.name=$NIRIMAKI_LUKS_UUID=root|g" "$f"
+      sudo sed -i -E "s|cryptdevice=[^[:space:]\"]+:root|rd.luks.name=$NIRIMAKI_LUKS_UUID=root|g" "$f"
       ok "rewrote cmdline in $f (backup at $f.nirimaki-bak)"
       changed=1
-    elif grep -qE "rd.luks.name=$NIRIMAKI_LUKS_UUID=root" "$f"; then
+    elif sudo grep -qE "rd.luks.name=$NIRIMAKI_LUKS_UUID=root" "$f"; then
       ok "$f already uses rd.luks.name= (no change)"
       changed=1
     fi
