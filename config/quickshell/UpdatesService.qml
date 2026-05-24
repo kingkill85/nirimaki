@@ -72,6 +72,19 @@ QtObject {
         onFileChanged: root.refreshLocal()
     }
 
+    // ---- Inotify on prod-copy main ref ----
+    // `git pull` (inside nirimaki-update) rewrites this loose ref, so a
+    // write means "HEAD just moved — the commits-behind count is stale".
+    // Without this, the bar would linger showing the old nirimakiCount
+    // until the next 1 h _remoteTimer tick, which is jarring right after
+    // the user just ran the updater.
+    property FileView _nirimakiHead: FileView {
+        path: Quickshell.env("HOME") + "/.local/share/nirimaki/.git/refs/heads/main"
+        watchChanges: true
+        printErrors: false
+        onFileChanged: root.refreshRemote()
+    }
+
     // ---- Processes ----
     property Process _pacmanProc: Process {
         command: ["bash", "-c", "checkupdates 2>/dev/null | wc -l"]
