@@ -96,7 +96,7 @@
                                          "setup.edit.input", "setup.edit.windows",
                                          "setup.edit.autostart",
                                          "setup.edit.foot", "setup.edit.tmux",
-                                         "setup.edit.fish"] },
+                                         "setup.edit.fish", "setup.edit.plugins"] },
   "setup.edit.monitors":  { "icon": "󰍹", "labelKey": "settings.setup.edit.monitors",
                             "action": { "type": "exec",
                                         "cmd": ["$HOME/.local/bin/nirimaki-edit", "monitors"] } },
@@ -121,6 +121,9 @@
   "setup.edit.fish":      { "icon": "󰈺", "labelKey": "settings.setup.edit.fish",
                             "action": { "type": "exec",
                                         "cmd": ["$HOME/.local/bin/nirimaki-edit", "fish"] } },
+  "setup.edit.plugins":   { "icon": "󰂖", "labelKey": "settings.setup.edit.plugins",
+                            "action": { "type": "exec",
+                                        "cmd": ["$HOME/.local/bin/nirimaki-edit", "plugins"] } },
 
   "install":  { "icon": "󰏗", "labelKey": "settings.install",
                 "children": ["install.webapp", "install.service",

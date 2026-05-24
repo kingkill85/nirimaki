@@ -1,0 +1,11 @@
+{
+  "id": "audio",
+  "name": "Audio",
+  "description": "Output volume pill + mute / scroll-to-adjust.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "after": "system-stats",
+  "entry": "main.qml",
+  "api": 1
+}

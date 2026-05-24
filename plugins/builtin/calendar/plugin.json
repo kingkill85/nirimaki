@@ -1,0 +1,10 @@
+{
+  "id": "calendar",
+  "name": "Calendar",
+  "description": "Time + date label with a calendar dropdown.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.center",
+  "entry": "main.qml",
+  "api": 1
+}

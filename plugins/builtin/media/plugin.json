@@ -1,0 +1,10 @@
+{
+  "id": "media",
+  "name": "Media",
+  "description": "MPRIS now-playing with play/pause/skip controls.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "entry": "main.qml",
+  "api": 1
+}

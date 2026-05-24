@@ -1,0 +1,10 @@
+{
+  "id": "notification-toast",
+  "name": "Notification toast",
+  "description": "Per-screen toast stack for incoming notifications.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "toast",
+  "entry": "main.qml",
+  "api": 1
+}

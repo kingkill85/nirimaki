@@ -1,0 +1,11 @@
+{
+  "id": "background-picker",
+  "name": "Background picker",
+  "description": "Grid of wallpapers from the current theme's backgrounds/.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "overlay",
+  "entry": "main.qml",
+  "ipc": "background-picker",
+  "api": 1
+}

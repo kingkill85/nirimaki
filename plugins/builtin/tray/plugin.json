@@ -1,0 +1,11 @@
+{
+  "id": "tray",
+  "name": "System tray",
+  "description": "SNI / StatusNotifierItem system tray.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "after": "screen-record",
+  "entry": "main.qml",
+  "api": 1
+}

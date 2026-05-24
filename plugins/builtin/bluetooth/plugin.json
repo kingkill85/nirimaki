@@ -1,0 +1,11 @@
+{
+  "id": "bluetooth",
+  "name": "Bluetooth",
+  "description": "Bluetooth status pill + device picker.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "after": "notifications",
+  "entry": "main.qml",
+  "api": 1
+}

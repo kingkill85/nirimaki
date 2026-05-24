@@ -1,0 +1,11 @@
+{
+  "id": "keybind-sheet",
+  "name": "Keybind cheat sheet",
+  "description": "Parses keybinds.kdl and shows every bind grouped by section.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "overlay",
+  "entry": "main.qml",
+  "ipc": "keybind-sheet",
+  "api": 1
+}

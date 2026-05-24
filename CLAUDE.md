@@ -25,6 +25,10 @@ session:
 ```
 ~/.local/share/nirimaki/default/ -> default/                  (upgrade-tracked
                                                               niri defaults)
+~/.local/share/nirimaki/plugins/builtin/ -> plugins/builtin/  (upgrade-tracked
+                                                              first-party plugins)
+~/.config/nirimaki/plugins.json  SEEDED as `{}` once          (user-owned;
+                                                              per-plugin overrides)
 ~/.config/niri/                  COPIED from config/niri/    (USER-OWNED;
                                                               seeded once, never
                                                               overwritten)
@@ -82,6 +86,163 @@ drop the key into `~/.config/niri/bindings.kdl` rebound to
   shell.qml` — quickshell resolves the real path and the Shell ID
   stops matching `quickshell ipc call` lookups (which key off the
   literal `~/.config/...` path the user passed).
+
+## Plugin system (Phase K)
+
+The bar widgets, dialog overlays, bezels and toasts are **plugins** —
+QML drop-ins with a `plugin.json` manifest. The host is now down to 11
+files: shell.qml + Bar.qml (host surfaces), DialogShell + MenuView +
+PopupBus (UI primitives), Theme + I18n + NiriService + NotificationService
++ UpdatesService (services), Plugins.qml (loader). Everything that
+*looks like a widget* — clock, audio, network, launcher, settings menu,
+power menu, OSD, notification toast, etc. — is a plugin under
+`plugins/builtin/`. 25 first-party plugins ship today.
+
+### How plugins are discovered
+
+`Plugins.qml` (singleton) scans two roots on startup:
+
+```
+~/.local/share/nirimaki/plugins/builtin/<id>/plugin.json   first-party (upgrade-tracked)
+~/.config/nirimaki/plugins/<id>/plugin.json                third-party (user-installed)
+```
+
+The built-in dir is symlinked from `plugins/builtin/` in the repo by
+both `dev-link.sh` (dev) and `install/config.sh` (production install,
+in the non-canonical-repo branch only — when REPO_DIR is the canonical
+`~/.local/share/nirimaki`, the path already resolves directly).
+
+### Manifest shape
+
+```jsonc
+{
+  "id": "voxtype",
+  "name": "Voxtype",
+  "description": "...",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.center",       // bar.left | bar.center | bar.right
+                               // | overlay | bezel | toast | event
+  "after":  "updates",         // sort hint within mount (id-ref)
+  "before": "other-id",        // alternative to `after`
+  "entry":  "main.qml",        // default — Loader looks here
+  "api":    1,                 // plugin host API major (refuse mismatch)
+  "requires": {
+    "binary": "voxtype",       // command -v gate; missing → silent skip
+    "install_hint": "..."      // shown in Settings Menu when missing
+  }
+}
+```
+
+### User override — `~/.config/nirimaki/plugins.json`
+
+niri-style per-plugin override. Seeded as `{}` on install / dev-link,
+never overwritten. Schema is one entry per plugin id:
+
+```jsonc
+{
+  "voxtype": false,                                        // disabled
+  "weather": { "mount": "bar.left", "after": "active-window" },
+  "calendar": { "after": "updates" }                       // reorder only
+}
+```
+
+- Missing entry → use the manifest's declared default.
+- `false` / `null` → disabled (not loaded).
+- Object → override manifest fields (last-wins per field).
+
+There is NO shipped `default/plugins.json`. Defaults are computed from
+the plugin manifests themselves; a new built-in plugin appears
+automatically without the user needing to "merge" anything.
+
+### Standard-library primitives
+
+The shell host exposes reusable QML primitives that plugins (and core
+components) can compose without reimplementing common patterns. Today:
+
+| Primitive | Pattern |
+|---|---|
+| `DialogShell` | Two-surface scrim + card; niri's compositor blur scoped to the card only |
+| `PopupBus` | Single-popup gate — opening one popup dismisses any other |
+| `MenuView` | Drilldown menu engine — search, keyboard nav, breadcrumb, visibleWhen gating. Data-in (tree, installedState, placeholder), signals-out (actionRequested, closeRequested). Used by `SettingsMenu`; any plugin that wants its own settings-style panel imports this. |
+| `Plugins` | Plugin loader + registry singleton |
+
+Pattern when adding a new primitive: extract from a concrete consumer
+(like MenuView came out of SettingsMenu), keep it data-in / signals-out
+(no hardcoded singletons it doesn't import via `qs`), and register in
+`qmldir`. Future candidates: `BarPill` (the hoverable rounded-rect pattern
+every right-Row widget reimplements), `BarPopover` (anchor-to-pill popover
+card), `Bezel` (transient overlay used by OSD / toast).
+
+### Where plugins consume host singletons
+
+Plugin QML files use Quickshell's native module import:
+
+```qml
+import qs   // resolves to the shell root folder (where shell.qml + qmldir live)
+```
+
+This works regardless of where the plugin file lives on disk — `qs`
+is anchored on shell.qml's directory, not the importing file's
+directory. So plugins reference `Theme.fg`, `NiriService.runAction()`,
+`I18n.t()` exactly like any in-tree shell file does. Subfolders are
+accessible via dotted paths (`import qs.foo.bar`).
+
+The previous step-0 design used an `_host` symlink + relative imports;
+it worked but created duplicate singletons (URLs differed, so QML saw
+them as two separate modules). The `qs` import dedups properly via
+module identity. No symlinks needed.
+
+### Host mount pattern
+
+Two different host patterns depending on the mount point's nature:
+
+**Bar mounts (`bar.left` / `bar.center` / `bar.right`)** — laid out in a
+Row inside the per-screen Bar PanelWindow. Repeater works because the
+delegates have a layout parent. Loader uses `onLoaded` + feature-detect
+to inject `barWindow` and `outputName` only into plugins that declare
+them:
+
+```qml
+Repeater {
+    model: Plugins.byMount["bar.left"] || []
+    delegate: Loader {
+        required property var modelData
+        anchors.verticalCenter: parent.verticalCenter
+        source: Plugins.entryUrl(modelData)
+        onLoaded: {
+            if (!item) return;
+            if ("barWindow"  in item) item.barWindow  = bar;
+            if ("outputName" in item) item.outputName = bar.modelData.name;
+        }
+    }
+}
+```
+
+**Top-level mounts (`overlay` / `bezel` / `toast`)** — live directly
+under `ShellRoot` (no layout container). Quickshell's `Variants` is the
+right instantiator here; `Repeater` doesn't reliably activate Loaders
+at ShellRoot level. Plugins handle their own per-screen multiplexing
+internally if they need it (Osd / NotificationToast both wrap their
+PanelWindow in `Variants { model: Quickshell.screens }`).
+
+```qml
+Variants {
+    model: Plugins.byMount["overlay"] || []
+    delegate: Loader {
+        required property var modelData
+        active: true
+        source: Plugins.entryUrl(modelData)
+    }
+}
+```
+
+Settings Menu integration (toggle UI / install third-party) is
+deferred. For now voxtype's runtime install still goes through the
+existing `install.ai.voxtype` flow — the loader's `requires.binary`
+check picks up the new binary on next reload, so voxtype is configured
+in standard but invisible until installed.
+
 
 ## Repo layout
 

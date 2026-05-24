@@ -1,0 +1,11 @@
+{
+  "id": "updates",
+  "name": "Updates",
+  "description": "Pending pacman/AUR update count with a dropdown listing them.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.center",
+  "after": "weather",
+  "entry": "main.qml",
+  "api": 1
+}

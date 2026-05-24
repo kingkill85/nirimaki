@@ -1,0 +1,10 @@
+{
+  "id": "workspaces",
+  "name": "Workspaces",
+  "description": "niri workspace strip — current + adjacent workspaces, scroll/click to switch.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.left",
+  "entry": "main.qml",
+  "api": 1
+}

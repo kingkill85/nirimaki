@@ -1,0 +1,11 @@
+{
+  "id": "emoji-picker",
+  "name": "Emoji picker",
+  "description": "Searchable emoji picker; copies to clipboard.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "overlay",
+  "entry": "main.qml",
+  "ipc": "emoji-picker",
+  "api": 1
+}

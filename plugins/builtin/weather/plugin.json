@@ -1,0 +1,11 @@
+{
+  "id": "weather",
+  "name": "Weather",
+  "description": "Current temperature pill with a forecast dropdown (open-meteo).",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.center",
+  "after": "calendar",
+  "entry": "main.qml",
+  "api": 1
+}

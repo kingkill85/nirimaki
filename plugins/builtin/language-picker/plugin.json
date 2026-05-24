@@ -1,0 +1,11 @@
+{
+  "id": "language-picker",
+  "name": "Language picker",
+  "description": "Switch the shell's UI locale.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "overlay",
+  "entry": "main.qml",
+  "ipc": "language-picker",
+  "api": 1
+}

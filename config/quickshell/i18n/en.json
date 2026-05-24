@@ -47,6 +47,7 @@
   "settings.setup.edit.foot":       "Foot (terminal)",
   "settings.setup.edit.tmux":       "Tmux",
   "settings.setup.edit.fish":       "Fish (shell)",
+  "settings.setup.edit.plugins":    "Plugins",
   "settings.install":                  "Install",
   "settings.install.webapp":           "Web App",
   "settings.install.font":             "Font",

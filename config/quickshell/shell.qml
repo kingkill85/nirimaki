@@ -12,7 +12,8 @@ ShellRoot {
     // this becomes redundant but harmless.
     QtObject { property string _eager: I18n.locale }
 
-    // One Bar per screen.
+    // One Bar per screen. Bar widgets are plugins (see plugins/builtin/);
+    // shell.qml just provides the per-screen Bar host.
     Variants {
         model: Quickshell.screens
         delegate: Bar {}
@@ -58,46 +59,38 @@ ShellRoot {
         }
     }
 
-    // Notification toast stack — one per screen.
+    // ---- Plugin hosts ----
+    // Three top-level mount surfaces; the loader instantiates whichever
+    // plugins are configured + installed for each mount type. Overlays
+    // are full-screen IPC-triggered dialogs (Launcher, PowerMenu, …),
+    // bezels are transient OSD-style overlays, toasts are per-screen
+    // passive surfaces. Each plugin's main.qml owns its own scrim,
+    // DialogShell, Variants-per-screen as appropriate.
+
     Variants {
-        model: Quickshell.screens
-        delegate: NotificationToast {}
+        model: Plugins.byMount["overlay"] || []
+        delegate: Loader {
+            required property var modelData
+            active: true
+            source: Plugins.entryUrl(modelData)
+        }
     }
 
-    // Single Launcher (overlay, IPC-triggered).
-    Launcher {}
+    Variants {
+        model: Plugins.byMount["bezel"] || []
+        delegate: Loader {
+            required property var modelData
+            active: true
+            source: Plugins.entryUrl(modelData)
+        }
+    }
 
-    // OSD bezel for volume / mute / brightness. IPC-driven; see bin/nirimaki-osd.
-    Osd {}
-
-    // Clipboard history picker. IPC-triggered (Mod+Period).
-    ClipboardPicker {}
-
-    // Power / session menu (Lock / Suspend / Logout / Restart / Shutdown).
-    PowerMenu {}
-
-    // Emoji picker. IPC-triggered (Mod+E).
-    EmojiPicker {}
-
-    // Theme picker — pick an entry under ~/.config/theme/themes/ and
-    // apply via nirimaki-theme-set. IPC-triggered (Mod+Shift+T).
-    ThemePicker {}
-
-    // Background picker — grid of images under the current theme's
-    // backgrounds/. Writes a symlink + restarts swaybg via
-    // nirimaki-wallpaper-apply. IPC-triggered (Mod+Shift+B).
-    BackgroundPicker {}
-
-    // Keybind cheat sheet — parses keybinds.kdl + shows every bind
-    // grouped by section. IPC-triggered (F1 / Mod+Shift+/).
-    KeybindSheet {}
-
-    // Unified settings menu — Omarchy-style drilldown over Style /
-    // Setup / System. IPC-triggered (Mod+Alt+Space).
-    SettingsMenu {}
-
-    // Language picker. Writes ~/.config/quickshell/locale; I18n
-    // singleton picks that up first when resolving the active locale.
-    // Reachable via Settings → Setup → Language.
-    LanguagePicker {}
+    Variants {
+        model: Plugins.byMount["toast"] || []
+        delegate: Loader {
+            required property var modelData
+            active: true
+            source: Plugins.entryUrl(modelData)
+        }
+    }
 }

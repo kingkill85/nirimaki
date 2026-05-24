@@ -1,0 +1,11 @@
+{
+  "id": "active-window",
+  "name": "Active Window",
+  "description": "Focused-window title with maximize-column and close affordances.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.left",
+  "after": "workspaces",
+  "entry": "main.qml",
+  "api": 1
+}

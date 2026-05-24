@@ -100,10 +100,11 @@ _cfg_links() {
   # config.kdl `include`s; ~/.local/share/nirimaki/bin/ is referenced
   # in default/niri/bindings.kdl.)
   if [[ "$REPO_DIR" != "$HOME/.local/share/nirimaki" ]]; then
-    _link_dir "$REPO_DIR/default" "$HOME/.local/share/nirimaki/default"
-    _link_dir "$REPO_DIR/bin"     "$HOME/.local/share/nirimaki/bin"
+    _link_dir "$REPO_DIR/default"         "$HOME/.local/share/nirimaki/default"
+    _link_dir "$REPO_DIR/bin"             "$HOME/.local/share/nirimaki/bin"
+    _link_dir "$REPO_DIR/plugins/builtin" "$HOME/.local/share/nirimaki/plugins/builtin"
   else
-    ok "repo at canonical path — no default/ + bin/ symlinks needed"
+    ok "repo at canonical path — no default/ + bin/ + plugins/ symlinks needed"
   fi
 
   # Pure repo-owned dirs: dir-symlink.
@@ -157,6 +158,42 @@ _cfg_links() {
   done
   shopt -u nullglob
   ok "linked nirimaki-* helpers into ~/.local/bin"
+
+  # User-owned plugin overrides file: seeded once with a comment
+  # header explaining the schema; never overwritten. Edit via
+  # Settings → Setup → Edit → Plugins, or `nirimaki edit plugins`.
+  # See Plugins.qml for parser behaviour (strips `_*` keys).
+  if [[ ! -e "$HOME/.config/nirimaki/plugins.json" ]]; then
+    mkdir -p "$HOME/.config/nirimaki"
+    cat > "$HOME/.config/nirimaki/plugins.json" <<'EOF'
+{
+  "_comment": [
+    "User plugin overrides — niri-style last-wins per plugin id.",
+    "",
+    "Format:  { \"<plugin-id>\": <override>, ... }",
+    "Override values:",
+    "  false                              — disabled (won't load)",
+    "  { \"mount\": \"bar.left\" }            — move to a different mount",
+    "  { \"after\": \"calendar\" }            — reorder within current mount",
+    "  { \"before\": \"updates\" }            — alternative to `after`",
+    "",
+    "Missing entry → use the manifest defaults from",
+    "  ~/.local/share/nirimaki/plugins/builtin/<id>/plugin.json",
+    "",
+    "Examples:",
+    "  \"voxtype\":  false",
+    "  \"weather\":  { \"mount\": \"bar.left\", \"after\": \"active-window\" }",
+    "  \"calendar\": { \"after\": \"updates\" }",
+    "",
+    "Open this file via Settings → Setup → Edit → Plugins, or directly:",
+    "  nirimaki edit plugins",
+    "",
+    "Saves take effect immediately — the loader watches the file."
+  ]
+}
+EOF
+    ok "seeded ~/.config/nirimaki/plugins.json"
+  fi
 
   # ~/.config/nirimaki/ samples — per-file symlinks so user-added
   # active hooks coexist in the same dirs.

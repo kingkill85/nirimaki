@@ -1,0 +1,11 @@
+{
+  "id": "theme-picker",
+  "name": "Theme picker",
+  "description": "Browse and apply themes from ~/.config/theme/themes/.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "overlay",
+  "entry": "main.qml",
+  "ipc": "theme-picker",
+  "api": 1
+}

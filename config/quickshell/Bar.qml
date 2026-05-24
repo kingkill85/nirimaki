@@ -3,6 +3,15 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 
+// One per screen. The three Rows are pure plugin hosts now —
+// no hardcoded widgets. Order within each section is set by the
+// per-plugin `mount` + `after`/`before` fields in plugin.json,
+// re-orderable by the user via ~/.config/nirimaki/plugins.json.
+//
+// setSource passes init props down so plugins can declare
+// `property var barWindow` (for popover positioning) and
+// `property string outputName` (workspaces et al.) — silently
+// ignored by plugins that don't declare them.
 PanelWindow {
     id: bar
     required property ShellScreen modelData
@@ -17,54 +26,51 @@ PanelWindow {
     color: Theme.bg
     exclusionMode: ExclusionMode.Auto
 
+    // Single template for every mount. setSource would reject unknown
+    // properties — we use onLoaded with a feature-detect instead so
+    // plugins only opt into the host context they actually need.
+    // Plugins declare `property var barWindow` and/or `property string
+    // outputName` when relevant.
+    Component {
+        id: pluginLoader
+
+        Loader {
+            required property var modelData
+            anchors.verticalCenter: parent.verticalCenter
+            source: Plugins.entryUrl(modelData)
+            onLoaded: {
+                if (!item) return;
+                if ("barWindow"  in item) item.barWindow  = bar;
+                if ("outputName" in item) item.outputName = bar.modelData.name;
+            }
+        }
+    }
+
     Item {
         anchors.fill: parent
 
-        // Left section
         Row {
             id: leftRow
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             spacing: Theme.gap
 
-            Workspaces {
-                id: workspaces
-                outputName: bar.modelData.name
-            }
-
-            ActiveWindow {
-                id: activeWindow
-                anchors.verticalCenter: parent.verticalCenter
+            Repeater {
+                model: Plugins.byMount["bar.left"] || []
+                delegate: pluginLoader
             }
         }
 
-        // Center section, ordered like Omarchy waybar's modules-center:
-        // clock → weather → update.
         Row {
             anchors.centerIn: parent
             spacing: Theme.gap
 
-            Calendar {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            Weather {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            Updates {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            Voxtype {
-                anchors.verticalCenter: parent.verticalCenter
+            Repeater {
+                model: Plugins.byMount["bar.center"] || []
+                delegate: pluginLoader
             }
         }
 
-        // Right section
         Row {
             id: rightRow
             anchors.right: parent.right
@@ -72,41 +78,9 @@ PanelWindow {
             anchors.rightMargin: Theme.padX
             spacing: Theme.gap
 
-            Media {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            ScreenRecord {
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Tray {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            Notifications {
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Bluetooth {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            Network {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            SystemStats {
-                anchors.verticalCenter: parent.verticalCenter
-                barWindow: bar
-            }
-
-            Audio {
-                anchors.verticalCenter: parent.verticalCenter
+            Repeater {
+                model: Plugins.byMount["bar.right"] || []
+                delegate: pluginLoader
             }
         }
     }

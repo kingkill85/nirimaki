@@ -10,6 +10,7 @@
 #   foot                                   → ~/.config/foot/foot.ini
 #   tmux                                   → ~/.config/tmux/tmux.conf
 #   fish                                   → ~/.config/fish/config.fish
+#   plugins                                → ~/.config/nirimaki/plugins.json
 #
 # Editor resolution order:
 #   1. $EDITOR (if set + on PATH)
@@ -35,6 +36,8 @@ case "$target" in
     file="$HOME/.config/tmux/tmux.conf" ;;
   fish)
     file="$HOME/.config/fish/config.fish" ;;
+  plugins)
+    file="$HOME/.config/nirimaki/plugins.json" ;;
   "")
     cat >&2 <<'EOF'
 Usage: nirimaki edit <target>
@@ -49,6 +52,7 @@ Targets:
   foot        ~/.config/foot/foot.ini
   tmux        ~/.config/tmux/tmux.conf
   fish        ~/.config/fish/config.fish
+  plugins     ~/.config/nirimaki/plugins.json
 EOF
     exit 1 ;;
   *)

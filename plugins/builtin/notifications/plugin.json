@@ -1,0 +1,11 @@
+{
+  "id": "notifications",
+  "name": "Notifications",
+  "description": "Notification bell + recent history.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "after": "tray",
+  "entry": "main.qml",
+  "api": 1
+}

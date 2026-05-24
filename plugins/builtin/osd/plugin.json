@@ -1,0 +1,11 @@
+{
+  "id": "osd",
+  "name": "OSD bezel",
+  "description": "On-screen display for volume / brightness / mic changes.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bezel",
+  "entry": "main.qml",
+  "ipc": "osd",
+  "api": 1
+}

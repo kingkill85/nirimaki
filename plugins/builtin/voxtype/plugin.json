@@ -1,0 +1,15 @@
+{
+  "id": "voxtype",
+  "name": "Voxtype",
+  "description": "Push-to-talk dictation indicator. Reads state from $XDG_RUNTIME_DIR/voxtype/state.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.center",
+  "after": "updates",
+  "entry": "main.qml",
+  "api": 1,
+  "requires": {
+    "binary": "voxtype",
+    "install_hint": "Install voxtype to enable push-to-talk dictation."
+  }
+}

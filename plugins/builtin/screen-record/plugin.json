@@ -1,0 +1,11 @@
+{
+  "id": "screen-record",
+  "name": "Screen recording",
+  "description": "Live recording indicator (wf-recorder).",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "after": "media",
+  "entry": "main.qml",
+  "api": 1
+}

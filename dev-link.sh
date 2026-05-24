@@ -13,6 +13,8 @@
 # What it links / seeds:
 #   ~/.local/share/nirimaki/default/ → repo/default/        (dir symlink)
 #   ~/.local/share/nirimaki/bin/     → repo/bin/            (dir symlink)
+#   ~/.local/share/nirimaki/plugins/builtin/ → repo/plugins/builtin/  (dir symlink)
+#   ~/.config/nirimaki/plugins.json  SEEDED as `{}` once    (user-owned)
 #   ~/.config/quickshell/            → repo/config/quickshell/
 #   ~/.config/nvim/                  → repo/config/nvim/
 #   ~/.config/theme/templates/       → repo/config/theme/templates/
@@ -113,6 +115,13 @@ echo "== Linking repo defaults under ~/.local/share/nirimaki/ =="
 # we symlink so edits show up live.
 mkdir -p "$HOME/.local/share/nirimaki"
 link_path "$REPO_DIR/default"                "$HOME/.local/share/nirimaki/default"
+# Plugin tree: built-ins ship under repo/plugins/ and the loader scans
+# ~/.local/share/nirimaki/plugins/builtin/. Plugin QML files use
+# `import qs` (Quickshell's native module import) to reach Theme /
+# I18n / NiriService — `qs` always resolves to the shell root folder
+# regardless of where the importing file lives.
+mkdir -p "$HOME/.local/share/nirimaki/plugins"
+link_path "$REPO_DIR/plugins/builtin"        "$HOME/.local/share/nirimaki/plugins/builtin"
 
 echo "== Linking purely-repo-owned config dirs =="
 link_path "$REPO_DIR/config/quickshell"      "$HOME/.config/quickshell"
@@ -207,6 +216,46 @@ for tool in "$REPO_DIR"/bin/nirimaki* "$REPO_DIR"/bin/nirimaki; do
   chmod +x "$tool"
   link_path "$tool" "$HOME/.local/bin/$(basename "$tool")"
 done
+
+# User-owned plugin overrides file. Starts as `{}` — only contains
+# entries when the user has overridden a plugin's default mount/order
+# or disabled one. Settings Menu writes to this file when toggling
+# plugins; manual edits are also fine. Per-plugin keys, niri-style
+# last-wins on the plugin id (see Plugins.qml header).
+echo "== Seeding ~/.config/nirimaki/plugins.json (with comment header) =="
+if [[ ! -e "$HOME/.config/nirimaki/plugins.json" ]]; then
+  mkdir -p "$HOME/.config/nirimaki"
+  cat > "$HOME/.config/nirimaki/plugins.json" <<'EOF'
+{
+  "_comment": [
+    "User plugin overrides — niri-style last-wins per plugin id.",
+    "",
+    "Format:  { \"<plugin-id>\": <override>, ... }",
+    "Override values:",
+    "  false                              — disabled (won't load)",
+    "  { \"mount\": \"bar.left\" }            — move to a different mount",
+    "  { \"after\": \"calendar\" }            — reorder within current mount",
+    "  { \"before\": \"updates\" }            — alternative to `after`",
+    "",
+    "Missing entry → use the manifest defaults from",
+    "  ~/.local/share/nirimaki/plugins/builtin/<id>/plugin.json",
+    "",
+    "Examples:",
+    "  \"voxtype\":  false",
+    "  \"weather\":  { \"mount\": \"bar.left\", \"after\": \"active-window\" }",
+    "  \"calendar\": { \"after\": \"updates\" }",
+    "",
+    "Open this file via Settings → Setup → Edit → Plugins, or directly:",
+    "  nirimaki edit plugins",
+    "",
+    "Saves take effect immediately — the loader watches the file."
+  ]
+}
+EOF
+  printf '  seed %s\n' "$HOME/.config/nirimaki/plugins.json"
+else
+  printf '  keep %s\n' "$HOME/.config/nirimaki/plugins.json"
+fi
 
 # Per-file links into ~/.config/nirimaki/ for hooks samples, the
 # menu.json sample, and the themed README. Per-file (not whole-dir)

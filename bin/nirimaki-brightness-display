@@ -40,7 +40,7 @@ mapfile -t buses < <(ddcutil detect --terse 2>/dev/null \
                       | awk '/^I2C bus:/ { sub(".*-", "", $NF); print $NF }')
 
 if [[ ${#buses[@]} -eq 0 ]]; then
-    qs-osd -i brightness -m "No DDC/CI display"
+    nirimaki-osd -i brightness -m "No DDC/CI display"
     exit 1
 fi
 
@@ -74,4 +74,4 @@ for bus in "${buses[@]}"; do
 done
 wait
 
-qs-osd -i brightness -p "$new"
+nirimaki-osd -i brightness -p "$new"

@@ -1,0 +1,11 @@
+{
+  "id": "network",
+  "name": "Network",
+  "description": "Wi-Fi / Ethernet status pill + details popover.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "after": "bluetooth",
+  "entry": "main.qml",
+  "api": 1
+}
