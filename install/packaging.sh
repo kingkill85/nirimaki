@@ -163,20 +163,25 @@ _pkg_bootstrap_extras() {
 # user so nirimaki-theme-set can write chromium-policy.json without
 # sudo. Mirrors Omarchy's install/config/theme.sh.
 #
-# xdg-settings can fail if the .desktop file isn't installed yet —
-# Zen is AUR/external and may not be present. Fall back to Firefox,
-# which we just installed.
+# Zen is the primary browser of the Nirimaki baseline (matches the
+# rest of the stack: nirimaki-browser-launch defaults to it,
+# nirimaki-webapp-launch falls back from chromium to zen). The AUR
+# package ships its desktop file as `zen.desktop` (binary
+# /opt/zen-browser-bin/zen-bin); older/forked builds use
+# `zen-browser.desktop`. Firefox is the last-resort fallback.
 _pkg_browsers() {
   section "Packages: browsers + chromium policy dir + default browser"
   pacman_install chromium firefox
+  paru_install zen-browser-bin
 
   info "Granting /etc/chromium/policies/managed to the user (live-theme reload)"
   sudo mkdir -p /etc/chromium/policies/managed
   sudo chmod a+rw /etc/chromium/policies/managed
   ok "/etc/chromium/policies/managed writable by user"
 
-  info "Setting initial default browser (Zen if available, else Firefox)"
-  if ! xdg-settings set default-web-browser zen-browser.desktop 2>/dev/null; then
+  info "Setting initial default browser (Zen, fallback Firefox)"
+  if ! xdg-settings set default-web-browser zen.desktop 2>/dev/null \
+    && ! xdg-settings set default-web-browser zen-browser.desktop 2>/dev/null; then
     xdg-settings set default-web-browser firefox.desktop \
       || warn "xdg-settings failed to set firefox.desktop — leaving system default"
   fi
