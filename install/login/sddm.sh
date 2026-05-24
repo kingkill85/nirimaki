@@ -37,9 +37,19 @@ sudo chmod 755 "$THEME_DST/state"
 
 # 3. SDDM picks the theme via a separate conf file so existing
 #    autologin.conf is left alone.
+#
+# DisplayServer=wayland is the Nirimaki default: SDDM's greeter runs
+# on Wayland (Nirimaki's theme is QML, renders natively). The X11
+# default leaves an orphan /usr/lib/Xorg ... vt2 process holding
+# DISPLAY :0 after login, which collides with xwayland-satellite's
+# preferred slot — keeping things Wayland-only frees :0 for X11
+# clients (Steam, Wine, etc.) routed through niri's XWayland bridge.
 echo "  writing /etc/sddm.conf.d/10-nirimaki.conf …"
 sudo mkdir -p /etc/sddm.conf.d
 sudo tee /etc/sddm.conf.d/10-nirimaki.conf >/dev/null <<'EOF'
+[General]
+DisplayServer=wayland
+
 [Theme]
 Current=nirimaki
 EOF

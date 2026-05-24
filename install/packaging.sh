@@ -58,6 +58,7 @@ _pkg_compositor() {
   section "Packages: compositor + shell + GUI baseline"
   pacman_install \
     niri quickshell \
+    xwayland-satellite \
     sddm \
     swaybg swayidle \
     foot \

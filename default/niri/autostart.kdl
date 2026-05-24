@@ -18,7 +18,19 @@ environment {
     // ~/.config/theme/current/qt-colors.conf and uses the icon_theme
     // line in qt6ct.conf — both rewritten by nirimaki-theme-set.
     QT_QPA_PLATFORMTHEME "qt6ct"
+
+    // XWayland — niri has no built-in X11 support, so X11 clients
+    // (Steam, Wine, older Electron, etc.) go through xwayland-satellite
+    // (spawned below). DISPLAY :0 matches the value satellite advertises
+    // when it grabs the first free X display slot at startup.
+    DISPLAY ":0"
 }
+
+// xwayland-satellite — niri's recommended XWayland integration. Without
+// it, $DISPLAY is unset and X11 apps fail to start. Must spawn before
+// anything that depends on X11 (steam-runtime, wine, GIMP, GTK3 apps
+// that fall back to X11 for menus, …).
+spawn-at-startup "xwayland-satellite"
 
 // Quickshell is the bar/shell.
 spawn-at-startup "quickshell"
