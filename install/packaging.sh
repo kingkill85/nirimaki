@@ -67,7 +67,7 @@ _pkg_compositor() {
     grim slurp satty \
     pacman-contrib libnotify btop \
     playerctl brightnessctl \
-    pavucontrol blueman \
+    pavucontrol \
     qt5ct qt6ct gnome-themes-extra \
     fontconfig ttf-jetbrains-mono-nerd \
     noto-fonts-cjk noto-fonts-emoji noto-fonts-extra \
@@ -192,15 +192,20 @@ _pkg_browsers() {
 # §2f.5 — strip CachyOS preinstalls that conflict with Nirimaki's stack.
 #
 # CachyOS ships with packages that compete with Nirimaki's chosen
-# baseline — most visibly alacritty, which duplicates foot's role
-# (Nirimaki's keybinds, helpers, and theming all target foot). On
-# vanilla Arch these are absent, so the conditional check makes this
-# a no-op there.
+# baseline:
+#   - alacritty: duplicates foot's role (keybinds, helpers, theming
+#     all target foot).
+#   - blueman: GTK bluetooth applet that adds a second tray icon
+#     alongside Nirimaki's own Bluetooth Bar widget, and competes
+#     with bluetui (the TUI we wire from the SettingsMenu and the
+#     bar's bluetooth click handler).
+# On vanilla Arch these are absent, so the conditional check makes
+# this a no-op there.
 _pkg_strip_cachyos_conflicts() {
   section "Packages: strip CachyOS preinstall conflicts"
   local pkg
   local removed=0
-  for pkg in alacritty; do
+  for pkg in alacritty blueman; do
     if pacman -Qq "$pkg" >/dev/null 2>&1; then
       info "removing preinstall: $pkg"
       run_quiet "pacman -R $pkg" -- sudo pacman -R --noconfirm "$pkg"
