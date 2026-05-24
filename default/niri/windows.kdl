@@ -155,3 +155,16 @@ window-rule {
     default-column-width { fixed 460; }
     default-window-height { fixed 800; }
 }
+
+// Steam games — open fullscreen. Steam stamps every launched game
+// with app-id "steam_app_<appid>"; the launcher itself stays "steam"
+// so the floating rule above still applies to the client. Many games
+// (Unity / Unreal titles especially) default to windowed mode and
+// don't request fullscreen on their own — niri would otherwise tile
+// them into a column next to whatever else is on the workspace.
+// Override per-game in ~/.config/niri/windows.kdl with
+// `match app-id="steam_app_<id>"` + `open-fullscreen false`.
+window-rule {
+    match app-id=r#"^steam_app_"#
+    open-fullscreen true
+}
