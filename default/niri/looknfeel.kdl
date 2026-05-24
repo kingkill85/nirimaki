@@ -18,6 +18,16 @@ hotkey-overlay {
     skip-at-startup
 }
 
+// Disable the top-left hot-corner that pops niri's Overview. Way too
+// easy to trigger by accident when reaching for the active-window
+// pill or the menu bar on the leftmost monitor. Mod+O still opens
+// the Overview deliberately.
+gestures {
+    hot-corners {
+        off
+    }
+}
+
 // Ask clients to drop their client-side decorations. Apps that
 // specifically need CSD (Nautilus header bar etc.) get it via the
 // `prefer-no-csd false` window-rule in windows.kdl. This also makes

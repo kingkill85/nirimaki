@@ -47,7 +47,7 @@ binds {
     // ===== Pickers =====
     // Omarchy uses the Mod+Ctrl+<key> family for pickers.
     Mod+Ctrl+V           hotkey-overlay-title="Clipboard manager"   { spawn "quickshell" "ipc" "call" "--" "clipboard-picker"  "toggle"; }
-    Mod+Ctrl+E           hotkey-overlay-title="Emoji picker"        { spawn "quickshell" "ipc" "call" "--" "emoji-picker"      "toggle"; }
+    Mod+E                hotkey-overlay-title="Emoji picker"        { spawn "quickshell" "ipc" "call" "--" "emoji-picker"      "toggle"; }
     Mod+Ctrl+Space       hotkey-overlay-title="Background picker"   { spawn "quickshell" "ipc" "call" "--" "background-picker" "toggle"; }
     Mod+Shift+Ctrl+Space hotkey-overlay-title="Theme picker"        { spawn "quickshell" "ipc" "call" "--" "theme-picker"      "toggle"; }
     Mod+Escape           hotkey-overlay-title="Power menu"          { spawn "quickshell" "ipc" "call" "--" "power-menu"        "toggle"; }
