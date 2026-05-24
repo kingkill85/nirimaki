@@ -17,13 +17,22 @@ set -e
 . "$HOME/.local/bin/nirimaki-feature-prelude"
 nirimaki_banner "Steam" "Install"
 
+is_cachyos() {
+  [[ -r /etc/os-release ]] && grep -q '^ID=cachyos' /etc/os-release
+}
+
 if pacman -Qi steam >/dev/null 2>&1; then
-  echo "steam is already installed."
+  echo "steam is already installed (refreshing gaming extras)."
 else
   echo "Installing:"
   echo "  - [multilib] repo (enabled if not already on)"
   echo "  - steam (Valve client)"
   echo "  - 32-bit GPU stack — auto-detected via lspci"
+  echo "  - gamemode + mangohud (and lib32 variants) — universal gaming layer"
+  if is_cachyos; then
+    echo "  - cachyos-gaming-meta — proton-cachyos-slr, wine-cachyos-opt,"
+    echo "    umu-launcher, protontricks, winetricks, vulkan-tools, lib32 audio/GL"
+  fi
 fi
 
 nirimaki_sudo_prime
@@ -55,12 +64,46 @@ sudo pacman -S --needed --noconfirm steam
 echo
 nirimaki-gaming-gpu-lib32
 
+# Universal gaming layer — gamemode (per-process governor / niceness;
+# wrap a game in `gamemoderun %command%`) + mangohud (Vulkan overlay
+# for FPS/temps/CPU/GPU; toggle with `MANGOHUD=1 %command%`). lib32
+# variants are pulled because 32-bit Steam children need to see them.
+echo
+echo "Installing gaming layer (gamemode + mangohud, 64+32 bit)…"
+sudo pacman -S --needed --noconfirm \
+  gamemode lib32-gamemode \
+  mangohud lib32-mangohud
+
+# CachyOS adds proton-cachyos-slr (Steam-runtime variant of their Proton
+# fork, exposes PROTON_FSR4_UPGRADE / PROTON_DLSS_UPGRADE / PROTON_XESS_
+# UPGRADE / PROTON_DXVK_LOWLATENCY / PROTON_NVIDIA_LIBS), wine-cachyos-opt
+# for non-Steam titles, umu-launcher for Lutris/Heroic glue, plus the
+# common lib32 audio/GL plumbing many older games need. All bundled
+# into cachyos-gaming-meta; only available on the cachyos repo.
+if is_cachyos; then
+  echo
+  echo "Installing cachyos-gaming-meta (Proton-CachyOS + Wine + umu + lib32 audio/GL)…"
+  sudo pacman -S --needed --noconfirm cachyos-gaming-meta
+fi
+
 cat <<'NOTE'
 
   ✓ Steam installed with matching 32-bit GPU stack.
+  ✓ gamemode + mangohud installed (64 + 32 bit).
+NOTE
+if is_cachyos; then
+  cat <<'NOTE'
+  ✓ cachyos-gaming-meta installed — Proton-CachyOS available in
+    Steam: Properties → Compatibility → "Proton-CachyOS".
+NOTE
+fi
+cat <<'NOTE'
+  → Useful Steam launch options (Properties → General → Launch Options):
+      gamemoderun %command%             — per-process governor + niceness
+      MANGOHUD=1 %command%              — show FPS/temps overlay
+      MANGOHUD=1 gamemoderun %command%  — both, common combo
+      PROTON_FSR4_UPGRADE=1 %command%   — vanilla FSR4 (CachyOS-Proton only)
   → Steam is launching now in the background.
-  → Proton-GE / MangoHud / gamescope are not installed by default —
-    add via pacman/AUR if you need them.
 NOTE
 
 # Auto-launch Steam (Omarchy parity: setsid + gtk-launch so it
