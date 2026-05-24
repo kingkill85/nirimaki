@@ -66,13 +66,24 @@ nirimaki-gaming-gpu-lib32
 
 # Universal gaming layer — gamemode (per-process governor / niceness;
 # wrap a game in `gamemoderun %command%`) + mangohud (Vulkan overlay
-# for FPS/temps/CPU/GPU; toggle with `MANGOHUD=1 %command%`). lib32
-# variants are pulled because 32-bit Steam children need to see them.
+# for FPS/temps/CPU/GPU; toggle with `MANGOHUD=1 %command%`) +
+# ananicy-cpp (auto-nices interactive processes based on rules; tiny
+# ~12 MB daemon, system-wide responsiveness boost — keeps games
+# snappy when backups / indexers / compiles fight for CPU). lib32
+# variants of gamemode/mangohud are pulled because 32-bit Steam
+# children need to see them; ananicy-cpp is system-level, no lib32
+# counterpart needed.
 echo
-echo "Installing gaming layer (gamemode + mangohud, 64+32 bit)…"
+echo "Installing gaming layer (gamemode + mangohud + ananicy-cpp)…"
 sudo pacman -S --needed --noconfirm \
   gamemode lib32-gamemode \
-  mangohud lib32-mangohud
+  mangohud lib32-mangohud \
+  ananicy-cpp
+
+if ! systemctl is-enabled ananicy-cpp.service >/dev/null 2>&1; then
+  echo "Enabling ananicy-cpp.service…"
+  sudo systemctl enable --now ananicy-cpp.service
+fi
 
 # CachyOS adds proton-cachyos-slr (Steam-runtime variant of their Proton
 # fork, exposes PROTON_FSR4_UPGRADE / PROTON_DLSS_UPGRADE / PROTON_XESS_
