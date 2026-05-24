@@ -20,6 +20,18 @@ Item {
     property int selectedIndex: 0
     property var entries: []   // [{ code, name }]
 
+    // Latched once the picker has been opened — keeps the lazy-loaded
+    // content tree alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+    onOpenedChanged: {
+        if (opened) {
+            _everLoaded = true;
+            PopupBus.show(root);
+        } else {
+            PopupBus.hide(root);
+        }
+    }
+
     readonly property color accent:     Theme.accent
     readonly property color background: Theme.cardBg
     readonly property color foreground: Theme.fg
@@ -60,7 +72,8 @@ Item {
         for (let i = 0; i < displayModel.count; i++) {
             if (displayModel.get(i).code === I18n.locale) { selectedIndex = i; break; }
         }
-        Qt.callLater(() => keyCatcher.forceActiveFocus());
+        // Focus is grabbed inside the content Component via Connections
+        // on root.opened.
     }
     function closeMenu()  { opened = false }
     function toggleMenu() { opened ? closeMenu() : open() }
@@ -160,10 +173,33 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        Item {
-            id: keyCatcher
+        // Lazy-load the picker's interior — first open builds the
+        // language ListView; rarely used so on-demand is a clean win.
+        Loader {
+            id: contentLoader
             anchors.fill: parent
-            focus: true
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
+        Item {
+            anchors.fill: parent
+
+            Component.onCompleted: Qt.callLater(() => keyCatcher.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => keyCatcher.forceActiveFocus());
+                }
+            }
+
+            Item {
+                id: keyCatcher
+                anchors.fill: parent
+                focus: true
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
@@ -280,5 +316,7 @@ Item {
                     }
                 }
             }
+        }
+        }
         }
     }

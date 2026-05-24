@@ -108,9 +108,18 @@ Item {
                 popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
                        + (pill.width - implicitWidth) / 2;
                 PopupBus.show(root);
+                Qt.callLater(() => keyCatcher.forceActiveFocus());
             } else {
                 PopupBus.hide(root);
+                if (root.popupOpen) root.popupOpen = false;
             }
+        }
+
+        Item {
+            id: keyCatcher
+            anchors.fill: parent
+            focus: true
+            Keys.onEscapePressed: root.popupOpen = false
         }
 
         implicitWidth:  340

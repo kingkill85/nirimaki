@@ -20,6 +20,18 @@ Item {
     property int selectedIndex: 0
     property var themeNames: []         // alphabetically sorted
 
+    // Latched once the picker has been opened — keeps the lazy-loaded
+    // content tree alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+    onOpenedChanged: {
+        if (opened) {
+            _everLoaded = true;
+            PopupBus.show(root);
+        } else {
+            PopupBus.hide(root);
+        }
+    }
+
     readonly property color accent:     Theme.accent
     readonly property color background: Theme.cardBg
     readonly property color foreground: Theme.fg
@@ -52,7 +64,8 @@ Item {
         for (let i = 0; i < displayModel.count; i++) {
             if (displayModel.get(i).name === cur) { selectedIndex = i; break; }
         }
-        Qt.callLater(() => keyCatcher.forceActiveFocus());
+        // Focus is grabbed inside the content Component via Connections
+        // on root.opened.
     }
 
     function closeMenu() { opened = false }
@@ -84,15 +97,16 @@ Item {
         else if (selectedIndex >= displayModel.count) selectedIndex = displayModel.count - 1;
         else if (selectedIndex < 0) selectedIndex = 0;
         Qt.callLater(() => {
-            if (displayModel.count > 0)
-                rowList.positionViewAtIndex(selectedIndex, ListView.Contain);
+            if (contentLoader.item && displayModel.count > 0)
+                contentLoader.item.scrollToSelected();
         });
     }
 
+    // ListView position follows selectedIndex via Connections inside
+    // the content Component below.
     function select(delta) {
         if (displayModel.count === 0) return;
         selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count;
-        rowList.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
 
     function setFilter(next) {
@@ -146,10 +160,42 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        Item {
-            id: keyCatcher
+        // Lazy-load the picker's interior — the ListView with theme
+        // rows only builds on first open.
+        Loader {
+            id: contentLoader
             anchors.fill: parent
-            focus: true
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
+        Item {
+            anchors.fill: parent
+
+            function scrollToSelected() {
+                if (root.selectedIndex >= 0)
+                    rowList.positionViewAtIndex(root.selectedIndex, ListView.Contain);
+            }
+
+            Component.onCompleted: Qt.callLater(() => keyCatcher.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => keyCatcher.forceActiveFocus());
+                }
+                function onSelectedIndexChanged() {
+                    if (root.selectedIndex >= 0)
+                        rowList.positionViewAtIndex(root.selectedIndex, ListView.Contain);
+                }
+            }
+
+            Item {
+                id: keyCatcher
+                anchors.fill: parent
+                focus: true
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
@@ -264,5 +310,7 @@ Item {
                     }
                 }
             }
+        }
+        }
         }
     }

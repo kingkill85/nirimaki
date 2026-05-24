@@ -15,11 +15,25 @@ Item {
 
     property bool opened: false
 
+    // Drives the lazy-loaded ListView's currentIndex + TextInput's text
+    // from outside the content Component (which isolates inner ids).
+    property int currentIndex: 0
+    property string searchText: ""
+
+    // Latched once the launcher has been opened — keeps the lazy-loaded
+    // content tree alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+
     onOpenedChanged: {
         if (opened) {
-            search.text = "";
-            list.currentIndex = 0;
-            Qt.callLater(() => search.forceActiveFocus());
+            _everLoaded = true;
+            searchText = "";
+            currentIndex = 0;
+            PopupBus.show(root);
+            // Focus is grabbed inside the content Component via
+            // Connections on root.opened — see Loader below.
+        } else {
+            PopupBus.hide(root);
         }
     }
 
@@ -28,7 +42,7 @@ Item {
         DesktopEntries.applications ? DesktopEntries.applications.values : []
 
     readonly property var filtered: {
-        const term = search.text.toLowerCase().trim();
+        const term = searchText.toLowerCase().trim();
         const arr = entries.filter(e => e && !e.noDisplay);
         if (!term) {
             return arr.slice().sort((a, b) =>
@@ -56,7 +70,7 @@ Item {
     }
 
     function launchSelected() {
-        const e = filtered[list.currentIndex];
+        const e = filtered[currentIndex];
         if (!e) return;
         // .desktop entries with `Terminal=true` (nvim, htop, btop, etc.)
         // expect to be launched inside a terminal emulator. Quickshell's
@@ -76,8 +90,9 @@ Item {
     function move(delta) {
         const n = filtered.length;
         if (n === 0) return;
-        list.currentIndex = (list.currentIndex + delta + n) % n;
-        list.positionViewAtIndex(list.currentIndex, ListView.Contain);
+        currentIndex = (currentIndex + delta + n) % n;
+        // ListView position follows currentIndex via Connections inside
+        // the content Component below.
     }
 
     DialogShell {
@@ -91,6 +106,33 @@ Item {
         cardRadius: Theme.radius
 
         onCloseRequested: root.opened = false
+
+        // Lazy-load the launcher's interior — the ListView + delegate
+        // tree only builds on first open. DesktopEntries itself is
+        // lazy via Quickshell, so the bar pays nothing at startup.
+        Loader {
+            id: contentLoader
+            anchors.fill: parent
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
+        Item {
+            anchors.fill: parent
+
+            Component.onCompleted: Qt.callLater(() => search.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => search.forceActiveFocus());
+                }
+                function onCurrentIndexChanged() {
+                    list.positionViewAtIndex(root.currentIndex, ListView.Contain);
+                }
+            }
 
         Column {
             anchors.fill: parent
@@ -117,7 +159,14 @@ Item {
                     clip: true
                     focus: true
 
-                    onTextChanged: list.currentIndex = 0
+                    // Mirror typed text into root.searchText so the
+                    // outer `filtered` getter can read it. On root.open()
+                    // searchText is reset to "" and reflected back here.
+                    text: root.searchText
+                    onTextChanged: {
+                        if (root.searchText !== text) root.searchText = text;
+                        root.currentIndex = 0;
+                    }
                     onAccepted:    root.launchSelected()
 
                     Keys.onEscapePressed:  root.opened = false
@@ -144,7 +193,7 @@ Item {
                 height: parent.height - Theme.menuHeaderHeight - Theme.menuSpacing
                 clip: true
                 model: root.filtered
-                currentIndex: 0
+                currentIndex: root.currentIndex
                 boundsBehavior: Flickable.StopAtBounds
                 spacing: Theme.menuRowSpacing
 
@@ -205,14 +254,16 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         hoverEnabled: true
-                        onEntered: list.currentIndex = index
+                        onEntered: root.currentIndex = index
                         onClicked: {
-                            list.currentIndex = index;
+                            root.currentIndex = index;
                             root.launchSelected();
                         }
                     }
                 }
             }
+        }
+        }
         }
     }
 

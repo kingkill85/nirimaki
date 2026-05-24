@@ -149,6 +149,11 @@
   "network.link":         "Verbindung",
   "network.duplex":       "Duplex",
 
+  "updates.title": "Updates",
+  "updates.one":   "Update verfügbar",
+  "updates.many":  "Updates verfügbar",
+  "updates.run":   "Update ausführen",
+
   "stats.system": "System",
   "stats.cpu":    "CPU",
   "stats.memory": "Speicher",

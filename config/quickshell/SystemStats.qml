@@ -33,9 +33,7 @@ Item {
     }
 
     function refresh() {
-        cpuProc.running  = true;
-        memProc.running  = true;
-        loadProc.running = true;
+        if (!statsProc.running) statsProc.running = true;
     }
 
     function showPopup()    { hideTimer.stop(); popupOpen = true; }
@@ -43,6 +41,13 @@ Item {
 
     onButtonHoveredChanged: buttonHovered ? showPopup() : scheduleHide()
     onPopupHoveredChanged:  popupHovered  ? hideTimer.stop() : scheduleHide()
+
+    // The bar pill is a static chip glyph — sparkline / numbers only
+    // appear inside the popup. So idle CPU is pure waste: poll fast
+    // (2 s) while the popup is open, off otherwise. First open shows
+    // current values with an empty sparkline; history fills as the
+    // user keeps the popup up.
+    onPopupOpenChanged: if (popupOpen) refresh()
 
     Timer {
         id: hideTimer
@@ -54,74 +59,66 @@ Item {
 
     Timer {
         interval: 2000
-        running:  true
+        running:  root.popupOpen
         repeat:   true
         onTriggered: root.refresh()
     }
 
-    Component.onCompleted: refresh()
-
-    // ---- procfs readers ----
+    // ---- procfs reader ----
+    // Single bash invocation reads all three procfs files and emits a
+    // delimiter-separated payload. Pre-refactor this was three separate
+    // Process { command: ["bash", "-lc", ...] } objects = 6 forks per
+    // tick (bash + tool). One bash, three sources, parsed below.
+    // `-c` instead of `-lc` — the login-shell -l sourced profiles on
+    // every poll for no benefit.
     Process {
-        id: cpuProc
-        command: ["bash", "-lc", "head -n1 /proc/stat"]
+        id: statsProc
+        command: ["bash", "-c",
+            "{ head -n1 /proc/stat; echo '---'; head -n3 /proc/meminfo; echo '---'; cat /proc/loadavg; }"]
         stdout: StdioCollector {
-            id: cpuOut
+            id: statsOut
             waitForEnd: true
             onStreamFinished: {
-                const fields = String(cpuOut.text || "").trim().split(/\s+/);
-                if (fields.length < 8) return;
-                const user    = parseInt(fields[1]) || 0;
-                const nice    = parseInt(fields[2]) || 0;
-                const sys     = parseInt(fields[3]) || 0;
-                const idle    = parseInt(fields[4]) || 0;
-                const iowait  = parseInt(fields[5]) || 0;
-                const irq     = parseInt(fields[6]) || 0;
-                const softirq = parseInt(fields[7]) || 0;
-                const total = user + nice + sys + idle + iowait + irq + softirq;
-                const totalDiff = total - root.prevCpu.total;
-                const idleDiff  = idle  - root.prevCpu.idle;
-                if (root.prevCpu.total > 0 && totalDiff > 0) {
-                    const usage = (1 - idleDiff / totalDiff) * 100;
-                    root.cpuPercent = Math.max(0, Math.min(100, usage));
-                    root.cpuHistory = root.pushHistory(root.cpuHistory, root.cpuPercent);
+                const parts = String(statsOut.text || "").split("---\n");
+                if (parts.length < 3) return;
+
+                // CPU
+                const fields = parts[0].trim().split(/\s+/);
+                if (fields.length >= 8) {
+                    const user    = parseInt(fields[1]) || 0;
+                    const nice    = parseInt(fields[2]) || 0;
+                    const sys     = parseInt(fields[3]) || 0;
+                    const idle    = parseInt(fields[4]) || 0;
+                    const iowait  = parseInt(fields[5]) || 0;
+                    const irq     = parseInt(fields[6]) || 0;
+                    const softirq = parseInt(fields[7]) || 0;
+                    const total = user + nice + sys + idle + iowait + irq + softirq;
+                    const totalDiff = total - root.prevCpu.total;
+                    const idleDiff  = idle  - root.prevCpu.idle;
+                    if (root.prevCpu.total > 0 && totalDiff > 0) {
+                        const usage = (1 - idleDiff / totalDiff) * 100;
+                        root.cpuPercent = Math.max(0, Math.min(100, usage));
+                        root.cpuHistory = root.pushHistory(root.cpuHistory, root.cpuPercent);
+                    }
+                    root.prevCpu = { idle: idle, total: total };
                 }
-                root.prevCpu = { idle: idle, total: total };
-            }
-        }
-    }
 
-    Process {
-        id: memProc
-        command: ["bash", "-lc", "head -n3 /proc/meminfo"]
-        stdout: StdioCollector {
-            id: memOut
-            waitForEnd: true
-            onStreamFinished: {
-                const lines = String(memOut.text || "").split("\n");
-                let total = 0, available = 0;
-                for (const line of lines) {
+                // Memory
+                const memLines = parts[1].split("\n");
+                let memTotal = 0, memAvailable = 0;
+                for (const line of memLines) {
                     if (line.indexOf("MemTotal:") === 0)
-                        total = parseInt(line.replace(/[^0-9]/g, "")) || 0;
+                        memTotal = parseInt(line.replace(/[^0-9]/g, "")) || 0;
                     else if (line.indexOf("MemAvailable:") === 0)
-                        available = parseInt(line.replace(/[^0-9]/g, "")) || 0;
+                        memAvailable = parseInt(line.replace(/[^0-9]/g, "")) || 0;
                 }
-                if (total > 0) {
-                    root.memPercent = ((total - available) / total) * 100;
+                if (memTotal > 0) {
+                    root.memPercent = ((memTotal - memAvailable) / memTotal) * 100;
                     root.memHistory = root.pushHistory(root.memHistory, root.memPercent);
                 }
-            }
-        }
-    }
 
-    Process {
-        id: loadProc
-        command: ["bash", "-lc", "cat /proc/loadavg"]
-        stdout: StdioCollector {
-            id: loadOut
-            waitForEnd: true
-            onStreamFinished: {
-                const n = parseFloat(String(loadOut.text || "").trim().split(/\s+/)[0]);
+                // Load average
+                const n = parseFloat(parts[2].trim().split(/\s+/)[0]);
                 if (!isNaN(n)) root.loadAvg = n;
             }
         }

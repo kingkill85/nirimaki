@@ -95,9 +95,41 @@ sudo LC_ALL=C pacman -Sy --noconfirm archlinux-keyring 2> >(grep -vE 'archlinux-
 echo
 
 # ---- 5. git pull ----------------------------------------------------
+# Dev-link bridge: in dev-link mode, $repo/default is a symlink into the
+# user's dev repo (set up by dev-link.sh) and `default.pre-link/` holds
+# the production copy. git refuses to write paths "beyond a symbolic
+# link", so an incoming commit that touches default/* aborts the
+# autostash. Swap the symlink for the real dir during the pull, then
+# restore. The EXIT trap is a belt-and-braces in case git fails mid-pull.
+default_link_target=""
+if [[ -L "$repo/default" ]]; then
+  default_link_target=$(readlink "$repo/default")
+  echo "(dev-link: temporarily restoring default/ from default.pre-link/)"
+  rm "$repo/default"
+  if [[ -d "$repo/default.pre-link" ]]; then
+    mv "$repo/default.pre-link" "$repo/default"
+  fi
+fi
+
+_restore_default_link() {
+  # Only re-link if it's still a real dir; if git pull replaced it with
+  # something else (shouldn't happen) or we already restored, do nothing.
+  if [[ -n $default_link_target ]]; then
+    [[ -d "$repo/default" && ! -L "$repo/default" ]] && \
+      mv "$repo/default" "$repo/default.pre-link"
+    [[ ! -e "$repo/default" ]] && \
+      ln -s "$default_link_target" "$repo/default"
+  fi
+}
+trap _restore_default_link EXIT
+
 echo "=> git pull --autostash"
 git -C "$repo" pull --autostash
 echo
+
+_restore_default_link
+trap - EXIT
+default_link_target=""
 
 # ---- 5b. Run pending migrations -------------------------------------
 # System-side one-offs that the repo can't fix via git pull alone

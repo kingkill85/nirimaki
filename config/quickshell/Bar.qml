@@ -56,6 +56,7 @@ PanelWindow {
 
             Updates {
                 anchors.verticalCenter: parent.verticalCenter
+                barWindow: bar
             }
 
             Voxtype {

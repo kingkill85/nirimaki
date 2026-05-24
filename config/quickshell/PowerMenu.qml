@@ -33,6 +33,18 @@ Item {
     property string filterText: ""
     property int selectedIndex: 0
 
+    // Latched once the menu has been opened — keeps the lazy-loaded
+    // content tree alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+    onOpenedChanged: {
+        if (opened) {
+            _everLoaded = true;
+            PopupBus.show(root);
+        } else {
+            PopupBus.hide(root);
+        }
+    }
+
     readonly property color accent:     Theme.accent
     readonly property color background: Theme.cardBg
     readonly property color foreground: Theme.fg
@@ -59,7 +71,8 @@ Item {
         filterText = "";
         selectedIndex = 0;
         rebuild();
-        Qt.callLater(() => keyCatcher.forceActiveFocus());
+        // Focus is grabbed inside the content Component via Connections
+        // on root.opened — see Loader below.
     }
     function closeMenu() { opened = false }
     function toggleMenu() { opened ? closeMenu() : open() }
@@ -133,7 +146,34 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
+        // Lazy-load the menu's interior — the Item + Column + ListView
+        // tree only instantiates on first open, and stays loaded for
+        // subsequent opens. The bar itself doesn't pay this cost at
+        // shell startup.
+        Loader {
+            anchors.fill: parent
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
         Item {
+            anchors.fill: parent
+
+            // Grab focus when the dialog opens. Fires on first load
+            // (Component.onCompleted) and on every subsequent open
+            // (Connections on root.opened).
+            Component.onCompleted: Qt.callLater(() => keyCatcher.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => keyCatcher.forceActiveFocus());
+                }
+            }
+
+            Item {
                 id: keyCatcher
                 anchors.fill: parent
                 focus: true
@@ -248,5 +288,7 @@ Item {
                     }
                 }
             }
+        }
+        }
     }
 }

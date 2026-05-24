@@ -24,6 +24,18 @@ Item {
     // Stack of node ids the user has drilled into. Empty = root.
     property var path: []
 
+    // Latched once the menu has been opened — keeps the lazy-loaded
+    // content tree alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+    onOpenedChanged: {
+        if (opened) {
+            _everLoaded = true;
+            PopupBus.show(root);
+        } else {
+            PopupBus.hide(root);
+        }
+    }
+
     readonly property color accent:     Theme.accent
     readonly property color background: Theme.cardBg
     readonly property color foreground: Theme.fg
@@ -227,7 +239,8 @@ Item {
         path = [];
         selectedIndex = 0;
         rebuild();
-        Qt.callLater(() => keyCatcher.forceActiveFocus());
+        // Focus is grabbed inside the content Component via Connections
+        // on root.opened.
     }
     function closeMenu()  { opened = false }
     function toggleMenu() { opened ? closeMenu() : open() }
@@ -277,9 +290,9 @@ Item {
     function select(delta) {
         if (displayModel.count === 0) return;
         selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count;
-        // Keep the selection visible — needed for any drilldown that
-        // overflows the card (Install → Development, foot's font list, …).
-        rowList.positionViewAtIndex(selectedIndex, ListView.Contain);
+        // ListView position follows selectedIndex via Connections inside
+        // the content Component below — needed for drilldowns that
+        // overflow the card (Install → Development, foot's font list, …).
     }
     function setFilter(next) {
         filterText = next;
@@ -321,10 +334,42 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        Item {
-            id: keyCatcher
+        // Lazy-load the menu's interior — drilldown ListView only
+        // builds on first open.
+        Loader {
+            id: contentLoader
             anchors.fill: parent
-            focus: true
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
+        Item {
+            anchors.fill: parent
+
+            function scrollToSelected() {
+                if (root.selectedIndex >= 0)
+                    rowList.positionViewAtIndex(root.selectedIndex, ListView.Contain);
+            }
+
+            Component.onCompleted: Qt.callLater(() => keyCatcher.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => keyCatcher.forceActiveFocus());
+                }
+                function onSelectedIndexChanged() {
+                    if (root.selectedIndex >= 0)
+                        rowList.positionViewAtIndex(root.selectedIndex, ListView.Contain);
+                }
+            }
+
+            Item {
+                id: keyCatcher
+                anchors.fill: parent
+                focus: true
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
@@ -458,5 +503,7 @@ Item {
                     }
                 }
             }
+        }
+        }
     }
 }

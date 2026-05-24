@@ -26,6 +26,18 @@ Item {
     property int selectedIndex: 0
     property var emojis: []
 
+    // Latched once the picker has been opened — keeps the lazy-loaded
+    // content tree alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+    onOpenedChanged: {
+        if (opened) {
+            _everLoaded = true;
+            PopupBus.show(root);
+        } else {
+            PopupBus.hide(root);
+        }
+    }
+
     readonly property color accent:     Theme.accent
     readonly property color background: Theme.cardBg
     readonly property color foreground: Theme.fg
@@ -46,7 +58,8 @@ Item {
         filterText = "";
         selectedIndex = 0;
         rebuildDisplay();
-        Qt.callLater(() => keyCatcher.forceActiveFocus());
+        // Focus is grabbed inside the content Component via Connections
+        // on root.opened — see Loader below.
     }
     function closePicker() { opened = false; }
     function togglePicker() { opened ? closePicker() : open(); }
@@ -64,47 +77,59 @@ Item {
         if (opened) rebuildDisplay();
     }
 
+    // Plain JS array as the GridView model — was a ListModel with
+    // clear() + append-per-item on every keystroke, which churns hard
+    // across 1870 entries. With a JS array we recompute once and
+    // assign in one shot; the delegate reads modelData.emoji.
+    property var displayModel: []
+
     function rebuildDisplay() {
         const q = filterText.trim().toLowerCase();
-        displayModel.clear();
-        let outCount = 0;
+        const out = [];
         for (let i = 0; i < emojis.length; i++) {
             const it = emojis[i];
             if (!q || it.k.indexOf(q) >= 0) {
-                displayModel.append({ emoji: it.e, index: outCount });
-                outCount++;
-                if (outCount >= 1000) break;
+                out.push({ emoji: it.e, index: out.length });
+                if (out.length >= 1000) break;
             }
         }
-        if (displayModel.count === 0) selectedIndex = 0;
-        else if (selectedIndex >= displayModel.count) selectedIndex = displayModel.count - 1;
+        displayModel = out;
+        if (displayModel.length === 0) selectedIndex = 0;
+        else if (selectedIndex >= displayModel.length) selectedIndex = displayModel.length - 1;
         else if (selectedIndex < 0) selectedIndex = 0;
         Qt.callLater(() => {
-            if (displayModel.count > 0) resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain);
+            if (contentLoader.item && displayModel.length > 0)
+                contentLoader.item.scrollToSelected();
         });
     }
 
+    // Positioning of the GridView is reactive via Connections inside
+    // the content Component (sourceComponent: contentComponent below) —
+    // see how it watches root.selectedIndex. So these functions just
+    // update the index; auto-scroll follows.
     function select(delta) {
-        if (displayModel.count === 0) return;
-        selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count;
-        resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain);
+        if (displayModel.length === 0) return;
+        selectedIndex = (selectedIndex + delta + displayModel.length) % displayModel.length;
     }
     function selectRow(delta) {
-        if (displayModel.count === 0) return;
+        if (displayModel.length === 0) return;
         let next = selectedIndex + delta * columns;
         if (next < 0) next = 0;
-        if (next >= displayModel.count) next = displayModel.count - 1;
+        if (next >= displayModel.length) next = displayModel.length - 1;
         selectedIndex = next;
-        resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain);
     }
     function selectPage(delta) {
-        if (displayModel.count === 0) return;
-        const visibleRows = Math.max(1, Math.floor(resultGrid.height / cellHeight));
+        if (displayModel.length === 0) return;
+        // resultGrid lives inside the lazy-loaded Component; use the
+        // exposed height ref to compute the page step, falling back to
+        // a sensible default when the dialog hasn't loaded yet (this
+        // function is keyboard-only so that case is unreachable).
+        const gridH = contentLoader.item ? contentLoader.item.gridHeight : cardHeight - headerHeight;
+        const visibleRows = Math.max(1, Math.floor(gridH / cellHeight));
         let next = selectedIndex + delta * columns * visibleRows;
         if (next < 0) next = 0;
-        if (next >= displayModel.count) next = displayModel.count - 1;
+        if (next >= displayModel.length) next = displayModel.length - 1;
         selectedIndex = next;
-        resultGrid.positionViewAtIndex(selectedIndex, GridView.Contain);
     }
 
     function setFilter(next) {
@@ -114,8 +139,8 @@ Item {
     }
 
     function activateIndex(idx) {
-        if (idx < 0 || idx >= displayModel.count) return;
-        applySelected(displayModel.get(idx).emoji);
+        if (idx < 0 || idx >= displayModel.length) return;
+        applySelected(displayModel[idx].emoji);
     }
 
     function applySelected(emoji) {
@@ -125,8 +150,6 @@ Item {
         Quickshell.execDetached(["bash", "-lc",
             "wl-copy '" + esc + "'; sleep 0.05; wtype '" + esc + "' 2>/dev/null || true"]);
     }
-
-    ListModel { id: displayModel }
 
     IpcHandler {
         target: "emoji-picker"
@@ -153,10 +176,48 @@ Item {
 
         onCloseRequested: root.closePicker()
 
-        Item {
-            id: keyCatcher
+        // Lazy-load the picker's interior — first open builds the
+        // GridView + grid cell delegates; the bar doesn't pay this
+        // cost at shell startup.
+        Loader {
+            id: contentLoader
             anchors.fill: parent
-            focus: true
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
+        Item {
+            anchors.fill: parent
+
+            // Exposed so outer rebuildDisplay() / selectPage() can drive
+            // the GridView without reaching into its internal ids.
+            property alias gridHeight: resultGrid.height
+            function scrollToSelected() {
+                if (root.selectedIndex >= 0)
+                    resultGrid.positionViewAtIndex(root.selectedIndex, GridView.Contain);
+            }
+
+            // Grab focus on open. Fires on first load (Component.onCompleted)
+            // and on every subsequent open (Connections on root.opened).
+            Component.onCompleted: Qt.callLater(() => keyCatcher.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => keyCatcher.forceActiveFocus());
+                }
+                function onSelectedIndexChanged() {
+                    if (root.selectedIndex >= 0)
+                        resultGrid.positionViewAtIndex(root.selectedIndex, GridView.Contain);
+                }
+            }
+
+            Item {
+                id: keyCatcher
+                anchors.fill: parent
+                focus: true
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
@@ -214,7 +275,7 @@ Item {
                     GridView {
                         id: resultGrid
                         anchors.fill: parent
-                        model: displayModel
+                        model: root.displayModel
                         clip: true
                         cellWidth: root.cellWidth
                         cellHeight: root.cellHeight
@@ -222,7 +283,7 @@ Item {
 
                         delegate: Rectangle {
                             required property int index
-                            required property string emoji
+                            required property var modelData
 
                             width: root.cellWidth
                             height: root.cellHeight
@@ -233,7 +294,7 @@ Item {
                                                     mouseArea.containsMouse ? 0.045 : 0)
 
                             Text {
-                                text: parent.emoji
+                                text: parent.modelData.emoji
                                 font.family: root.fontFamily
                                 font.pixelSize: 24
                                 anchors.centerIn: parent
@@ -257,7 +318,7 @@ Item {
                     Column {
                         anchors.centerIn: parent
                         spacing: 8
-                        visible: displayModel.count === 0
+                        visible: root.displayModel.length === 0
 
                         Text {
                             text: "󰞅"
@@ -280,5 +341,7 @@ Item {
                     }
                 }
             }
+        }
+        }
         }
     }

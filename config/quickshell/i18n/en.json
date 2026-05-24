@@ -97,6 +97,11 @@
   "network.link":         "Link",
   "network.duplex":       "duplex",
 
+  "updates.title": "Updates",
+  "updates.one":   "update available",
+  "updates.many":  "updates available",
+  "updates.run":   "Run update",
+
   "stats.system": "System",
   "stats.cpu":    "CPU",
   "stats.memory": "Memory",

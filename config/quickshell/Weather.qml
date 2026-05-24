@@ -17,6 +17,12 @@ Item {
     property var barWindow: null
     property bool popupOpen: false
 
+    // Latched once the popup has been opened — keeps the lazy-loaded
+    // hero+forecast content alive after close so subsequent opens are
+    // free.
+    property bool _everOpened: false
+    onPopupOpenChanged: if (popupOpen) _everOpened = true
+
     // Default to Berlin; refined by locationProc on startup.
     property real lat: 52.52
     property real lon: 13.41
@@ -256,13 +262,28 @@ Item {
                 popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
                        + (pill.width - implicitWidth) / 2;
                 PopupBus.show(root);
+                Qt.callLater(() => keyCatcher.forceActiveFocus());
             } else {
                 PopupBus.hide(root);
+                // Compositor dismissed (outside-click / Escape) — sync
+                // popupOpen back so the binding doesn't re-show us.
+                if (root.popupOpen) root.popupOpen = false;
             }
         }
 
+        Item {
+            id: keyCatcher
+            anchors.fill: parent
+            focus: true
+            Keys.onEscapePressed: root.popupOpen = false
+        }
+
         implicitWidth:  480
-        implicitHeight: card.implicitHeight + 28
+        // Hard-coded height (hero row + divider + forecast row + margins)
+        // so the popup surface gets the right size at construction.
+        // Pre-refactor this bound to card.implicitHeight, but card now
+        // lives inside a Loader and isn't built until first open.
+        implicitHeight: 200
 
         Rectangle {
             anchors.fill: parent
@@ -270,6 +291,17 @@ Item {
             border.color: Theme.cardBorderColor
             border.width: Theme.cardBorderWidth
         }
+
+        // Lazy-load hero + forecast — first popup open builds the
+        // ~3-day forecast Repeater + Row layouts, subsequent opens free.
+        Loader {
+            anchors.fill: parent
+            active: root.popupOpen || root._everOpened
+            sourceComponent: cardComponent
+        }
+
+        Component {
+            id: cardComponent
 
         Column {
             id: card
@@ -481,6 +513,7 @@ Item {
                     }
                 }
             }
+        }
         }
     }
 }

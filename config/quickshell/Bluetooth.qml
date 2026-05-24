@@ -23,7 +23,10 @@ Item {
     Component.onCompleted: refresh()
 
     Timer {
-        interval: 5000
+        // Adapter power state rarely changes; the icon is the only
+        // bar-visible signal. 30 s is a fine balance between freshness
+        // and not forking bluetoothctl every few seconds.
+        interval: 30000
         running: true
         repeat: true
         triggeredOnStart: true

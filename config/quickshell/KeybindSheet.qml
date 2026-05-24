@@ -24,6 +24,24 @@ Item {
     property bool opened: false
     property string rawDefault: ""
     property string rawUser: ""
+
+    // Drives the lazy-loaded ListView's currentIndex from outside the
+    // content Component. Filter text is similarly hoisted up here so
+    // rebuildView() can read it without reaching into the Component.
+    property int currentIndex: 0
+    property string searchText: ""
+
+    // Latched once the sheet has been opened — keeps the lazy-loaded
+    // content tree alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+    onOpenedChanged: {
+        if (opened) {
+            _everLoaded = true;
+            PopupBus.show(root);
+        } else {
+            PopupBus.hide(root);
+        }
+    }
     readonly property string raw:
         rawDefault + "\n// ===== " + tr("section", "User overrides") + " =====\n" + rawUser
     property var rows: []   // [{kind: "section"|"bind", section?, chord?, label?}, …]
@@ -65,22 +83,22 @@ Item {
 
     function open() {
         opened = true;
-        if (shell.searchField) shell.searchField.text = "";
+        searchText = "";
+        currentIndex = 0;
         reparse();
-        Qt.callLater(() => { if (shell.searchField) shell.searchField.forceActiveFocus(); });
+        // Search focus is grabbed inside the content Component via
+        // Connections on root.opened — see Loader below.
     }
     function closeMenu()  { opened = false }
     function toggleMenu() { opened ? closeMenu() : open() }
 
-    // Same pattern as Launcher: nudge currentIndex with bounds, then
-    // ask ListView to keep it visible. ListView handles all the
-    // scrolling math.
+    // Same pattern as Launcher: nudge currentIndex with bounds. The
+    // ListView inside the content Component watches root.currentIndex
+    // and scrolls to keep it visible.
     function move(delta) {
         const n = displayModel.count;
         if (n === 0) return;
-        const next = Math.max(0, Math.min(n - 1, list.currentIndex + delta));
-        list.currentIndex = next;
-        list.positionViewAtIndex(next, ListView.Contain);
+        currentIndex = Math.max(0, Math.min(n - 1, currentIndex + delta));
     }
 
     // ---- Parser -------------------------------------------------
@@ -178,7 +196,7 @@ Item {
 
     function rebuildView() {
         displayModel.clear();
-        const q = (shell.searchField ? shell.searchField.text : "").trim().toLowerCase();
+        const q = searchText.trim().toLowerCase();
         let lastSection = "";
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
@@ -247,11 +265,33 @@ Item {
         cardBorderColor: root.border
         cardRadius: root.cornerRadius
 
-        // Exposed so root.open() can reset / focus the field without
-        // reaching across the DialogShell content boundary by id.
-        property alias searchField: search
-
         onCloseRequested: root.closeMenu()
+
+        // Lazy-load the sheet's interior — parses two kdl files and
+        // builds a long ListView; only on first open.
+        Loader {
+            id: contentLoader
+            anchors.fill: parent
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
+        Item {
+            anchors.fill: parent
+
+            Component.onCompleted: Qt.callLater(() => search.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => search.forceActiveFocus());
+                }
+                function onCurrentIndexChanged() {
+                    list.positionViewAtIndex(root.currentIndex, ListView.Contain);
+                }
+            }
 
         Column {
             anchors.fill: parent
@@ -278,7 +318,15 @@ Item {
                     clip: true
                     focus: true
 
-                    onTextChanged: { list.currentIndex = 0; root.rebuildView(); }
+                    // Mirror typed text into root.searchText so the
+                    // outer rebuildView() can read it. On root.open()
+                    // searchText is reset to "" and reflected back here.
+                    text: root.searchText
+                    onTextChanged: {
+                        if (root.searchText !== text) root.searchText = text;
+                        root.currentIndex = 0;
+                        root.rebuildView();
+                    }
 
                     Keys.onEscapePressed: {
                         if (text) text = "";
@@ -314,6 +362,7 @@ Item {
                 width: parent.width
                 height: parent.height - root.headerHeight - root.contentSpacing
                 model: displayModel
+                currentIndex: root.currentIndex
                 clip: true
                 spacing: 2
                 boundsBehavior: Flickable.StopAtBounds
@@ -377,4 +426,6 @@ Item {
                 }
             }
         }
+        }
     }
+}

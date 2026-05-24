@@ -25,6 +25,18 @@ Item {
     property int selectedIndex: 0
     property var bgs: []          // sorted list of absolute image paths
 
+    // Latched once the picker has been opened — keeps the lazy-loaded
+    // image grid alive after first close so re-opens are instant.
+    property bool _everLoaded: false
+    onOpenedChanged: {
+        if (opened) {
+            _everLoaded = true;
+            PopupBus.show(root);
+        } else {
+            PopupBus.hide(root);
+        }
+    }
+
     readonly property color accent:     Theme.accent
     readonly property color background: Theme.cardBg
     readonly property color foreground: Theme.fg
@@ -84,7 +96,8 @@ Item {
         // a Process { command: ["readlink", "-f", pickPath] } pipe,
         // out of scope here.
         selectedIndex = 0;
-        Qt.callLater(() => keyCatcher.forceActiveFocus());
+        // Focus is grabbed inside the content Component via Connections
+        // on root.opened.
     }
 
     function closeMenu() { opened = false }
@@ -132,15 +145,16 @@ Item {
         else if (selectedIndex >= displayModel.count) selectedIndex = displayModel.count - 1;
         else if (selectedIndex < 0) selectedIndex = 0;
         Qt.callLater(() => {
-            if (displayModel.count > 0)
-                grid.positionViewAtIndex(selectedIndex, GridView.Contain);
+            if (contentLoader.item && displayModel.count > 0)
+                contentLoader.item.scrollToSelected();
         });
     }
 
+    // GridView position follows selectedIndex via Connections inside
+    // the content Component below.
     function select(delta) {
         if (displayModel.count === 0) return;
         selectedIndex = (selectedIndex + delta + displayModel.count) % displayModel.count;
-        grid.positionViewAtIndex(selectedIndex, GridView.Contain);
     }
 
     function setFilter(next) {
@@ -207,10 +221,43 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        Item {
-            id: keyCatcher
+        // Lazy-load the image grid — first open builds the GridView
+        // and its image-loading delegates. Wallpaper picker is rare
+        // enough that paying the cost only on demand is a clean win.
+        Loader {
+            id: contentLoader
             anchors.fill: parent
-            focus: true
+            active: root.opened || root._everLoaded
+            sourceComponent: contentComponent
+        }
+
+        Component {
+            id: contentComponent
+
+        Item {
+            anchors.fill: parent
+
+            function scrollToSelected() {
+                if (root.selectedIndex >= 0)
+                    grid.positionViewAtIndex(root.selectedIndex, GridView.Contain);
+            }
+
+            Component.onCompleted: Qt.callLater(() => keyCatcher.forceActiveFocus())
+            Connections {
+                target: root
+                function onOpenedChanged() {
+                    if (root.opened) Qt.callLater(() => keyCatcher.forceActiveFocus());
+                }
+                function onSelectedIndexChanged() {
+                    if (root.selectedIndex >= 0)
+                        grid.positionViewAtIndex(root.selectedIndex, GridView.Contain);
+                }
+            }
+
+            Item {
+                id: keyCatcher
+                anchors.fill: parent
+                focus: true
                 Keys.priority: Keys.BeforeItem
                 Keys.onPressed: (event) => {
                     if (event.key === Qt.Key_Escape) {
@@ -348,5 +395,7 @@ Item {
                     }
                 }
             }
+        }
+        }
         }
     }

@@ -21,6 +21,11 @@ Item {
     // when another bar widget opens its own popup.
     property bool popupOpen: false
 
+    // Latched once the popup has been opened — keeps the lazy-loaded
+    // grid alive after close so subsequent opens are instant.
+    property bool _everOpened: false
+    onPopupOpenChanged: if (popupOpen) _everOpened = true
+
     property string format: "dddd HH:mm"
 
     property date now:       new Date()
@@ -151,13 +156,34 @@ Item {
                 popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
                        + (pill.width - implicitWidth) / 2;
                 PopupBus.show(root);
+                Qt.callLater(() => keyCatcher.forceActiveFocus());
             } else {
                 PopupBus.hide(root);
+                // Compositor dismissed the xdg_popup (user clicked
+                // outside / pressed Escape): sync popupOpen back so the
+                // `visible: root.popupOpen` binding doesn't re-show us.
+                if (root.popupOpen) root.popupOpen = false;
             }
         }
 
+        // Focus target — catches Escape to close the popup. focus: true
+        // claims keyboard focus inside the popup's xdg_popup grab; no
+        // MouseArea so clicks fall through to the day cells below.
+        Item {
+            id: keyCatcher
+            anchors.fill: parent
+            focus: true
+            Keys.onEscapePressed: root.popupOpen = false
+        }
+
         implicitWidth:  360
-        implicitHeight: gridCol.implicitHeight + 24
+        // Hard-coded height (header + day-header row + 6 week rows +
+        // anchors.margins) so the popup surface gets the right size at
+        // construction — pre-refactor this was bound to gridCol.implicitHeight,
+        // but gridCol now lives inside a Loader and isn't built until
+        // first open. Keeping the binding meant the popup window
+        // appeared at 24 px tall for one frame.
+        implicitHeight: 320
 
         // Bordered card flush with popup edge (matches every other
         // bar popup — Network, SystemStats, Weather, Media).
@@ -170,8 +196,19 @@ Item {
 
             readonly property int columnSpacing: 4
             readonly property real cellWidth:
-                (gridCol.width - 7 * columnSpacing) / 8
+                (width - 24 - 7 * columnSpacing) / 8
         }
+
+        // Lazy-load the month grid — first popup open instantiates
+        // the 42 day cells + 8 header cells, subsequent opens are free.
+        Loader {
+            anchors.fill: parent
+            active: root.popupOpen || root._everOpened
+            sourceComponent: gridComponent
+        }
+
+        Component {
+            id: gridComponent
 
         Column {
             id: gridCol
@@ -395,5 +432,6 @@ Item {
                     }
                 }
             }
+        }
         }
     }

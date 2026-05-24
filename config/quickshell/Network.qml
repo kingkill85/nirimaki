@@ -40,11 +40,13 @@ if [[ -z $device ]]; then
   printf 'state\\tdisconnected\\n'
   exit 0
 fi
+# One ip route get, parse everything from its output (was three forks pre-refactor).
+route=$(ip route get 1.1.1.1 2>/dev/null)
+src=$(awk '{ for (i=1;i<=NF;i++) if ($i=="src") { print $(i+1); exit } }' <<<"$route")
+gw=$(awk '{ for (i=1;i<=NF;i++) if ($i=="via") { print $(i+1); exit } }' <<<"$route")
+prefix=$(ip -o -f inet addr show "$device" 2>/dev/null | awk '{ split($4,a,"/"); print a[2]; exit }')
 printf 'state\\tconnected\\n'
 printf 'iface\\t%s\\n' "$device"
-src=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i=1;i<=NF;i++) if ($i=="src") { print $(i+1); exit } }')
-gw=$(ip route get 1.1.1.1 2>/dev/null | awk '{ for (i=1;i<=NF;i++) if ($i=="via") { print $(i+1); exit } }')
-prefix=$(ip -o -f inet addr show "$device" 2>/dev/null | awk '{ split($4,a,"/"); print a[2]; exit }')
 [[ -n $src ]] && printf 'ip\\t%s/%s\\n' "$src" "$prefix"
 [[ -n $gw ]] && printf 'gateway\\t%s\\n' "$gw"
 if [[ -r /sys/class/net/$device/speed ]]; then
@@ -123,9 +125,18 @@ fi
                 popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
                        + (pill.width - implicitWidth) / 2;
                 PopupBus.show(root);
+                Qt.callLater(() => keyCatcher.forceActiveFocus());
             } else {
                 PopupBus.hide(root);
+                if (root.popupOpen) root.popupOpen = false;
             }
+        }
+
+        Item {
+            id: keyCatcher
+            anchors.fill: parent
+            focus: true
+            Keys.onEscapePressed: root.popupOpen = false
         }
 
         implicitWidth:  260
