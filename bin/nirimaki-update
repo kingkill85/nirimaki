@@ -34,7 +34,7 @@ if [[ -z ${NIRIMAKI_UPDATE_LOGGED:-} ]]; then
   exec env NIRIMAKI_UPDATE_LOGGED=1 script -qefc "$cmd" "$LOG_FILE"
 fi
 
-trap 'rc=$?; echo; printf "\033[0;31mUpdate failed (exit %d).\nThe full log is at %s — review it before retrying.\033[0m\n" "$rc" "$LOG_FILE"' ERR
+trap 'rc=$?; echo; printf "\033[0;31mUpdate failed (exit %d).\nThe full log is at %s — review it before retrying.\033[0m\n" "$rc" "$LOG_FILE"; nirimaki_pause' ERR
 
 nirimaki_banner "Nirimaki" "Update"
 
