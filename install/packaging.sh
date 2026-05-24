@@ -188,6 +188,31 @@ _pkg_browsers() {
   ok "default browser: $(xdg-settings get default-web-browser 2>/dev/null || echo '(unset)')"
 }
 
+# §2f.5 — strip CachyOS preinstalls that conflict with Nirimaki's stack.
+#
+# CachyOS ships with packages that compete with Nirimaki's chosen
+# baseline — most visibly alacritty, which duplicates foot's role
+# (Nirimaki's keybinds, helpers, and theming all target foot). On
+# vanilla Arch these are absent, so the conditional check makes this
+# a no-op there.
+_pkg_strip_cachyos_conflicts() {
+  section "Packages: strip CachyOS preinstall conflicts"
+  local pkg
+  local removed=0
+  for pkg in alacritty; do
+    if pacman -Qq "$pkg" >/dev/null 2>&1; then
+      info "removing preinstall: $pkg"
+      run_quiet "pacman -R $pkg" -- sudo pacman -R --noconfirm "$pkg"
+      removed=$((removed + 1))
+    fi
+  done
+  if (( removed == 0 )); then
+    ok "no CachyOS conflicts present — skipped"
+  else
+    ok "removed $removed CachyOS preinstall(s)"
+  fi
+}
+
 # §2g — fontconfig regional preference for CJK.
 #
 # Without this, fc-match resolves lang=zh to Noto CJK JP (wrong glyphs).
@@ -293,6 +318,7 @@ packaging() {
   _pkg_aur
   _pkg_bootstrap_extras
   _pkg_browsers
+  _pkg_strip_cachyos_conflicts
   _pkg_fontconfig
   _pkg_mimeapps
   _pkg_system_enables
