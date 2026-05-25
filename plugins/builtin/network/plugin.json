@@ -1,11 +1,16 @@
 {
-  "id": "network",
-  "name": "Network",
-  "description": "Wi-Fi / Ethernet status pill + details popover.",
-  "version": "1.0.0",
-  "author": "nirimaki",
-  "mount": "bar.right",
-  "after": "bluetooth",
-  "entry": "main.qml",
-  "api": 1
+  "id":          "network",
+  "name":        "Network",
+  "description": "Wi-Fi / Ethernet status pill + connection manager panel.",
+  "version":     "2.0.0",
+  "author":      "nirimaki",
+  "kinds":       ["bar-widget", "panel"],
+  "entryPoints": {
+    "bar-widget": "BarWidget.qml",
+    "panel":      "Panel.qml"
+  },
+  "mount":       "bar.right",
+  "after":       "bluetooth",
+  "entry":       "BarWidget.qml",
+  "api":         1
 }

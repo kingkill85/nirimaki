@@ -14,7 +14,7 @@ wifi management".
 - ✅ **Group C — shell.json migration** (Phase N, `docs/phase-n-shell-json.md`)
 - ✅ **Group D — AudioService + audio panel** (Phase O, `docs/phase-o-audio.md`)
 - ✅ **Group E — BluetoothService + bluetooth panel** (Phase P, `docs/phase-p-bluetooth.md`)
-- 🔜 **Group F — NetworkService + network panel** (Phase Q, planned)
+- ✅ **Group F — NetworkService + network panel** (Phase Q, `docs/phase-q-network.md`)
 - 🔜 **Group G — Cleanup + polish** (Phase R, planned)
 
 A picking-up-from-here cheat sheet — quickshell gotchas, key files,

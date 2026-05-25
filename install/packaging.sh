@@ -62,7 +62,8 @@ _pkg_compositor() {
     sddm \
     swaybg swayidle \
     foot \
-    wiremix bluetui impala bluez bluez-utils \
+    networkmanager \
+    wiremix bluetui bluez bluez-utils \
     ddcutil wf-recorder cliphist wl-clipboard wtype \
     grim slurp satty \
     pacman-contrib libnotify btop \
@@ -281,10 +282,10 @@ _pkg_mimeapps() {
 # i2c: ddcutil-backed external-monitor brightness needs i2c-dev module +
 #      user in i2c group. The group change requires a fresh login; we
 #      flag it in the final reboot-needed report.
-# systemd-networkd: per user choice (audit item, included). NB: this
-#      coexists with NetworkManager-style stacks only if the user has
-#      NM disabled. Default Arch ships neither enabled, so enabling
-#      networkd here is safe on a fresh box.
+# NetworkManager: the network panel (Group F) talks to NM via DBus.
+#      We enable NM and disable systemd-networkd in the same step to
+#      avoid two services racing for the same interfaces (IP flapping,
+#      DNS clobbering, route conflicts).
 _pkg_system_enables() {
   section "System enables"
 
@@ -309,9 +310,37 @@ _pkg_system_enables() {
     ok "/etc/modules-load.d/i2c-dev.conf already present"
   fi
 
-  info "enable systemd-networkd"
-  sudo systemctl enable --now systemd-networkd
-  ok "systemd-networkd.service enabled"
+  # NetworkManager is the only Quickshell.Networking backend, so it has
+  # to be the active manager. Disable the networkd family first so NM
+  # doesn't fight it for interfaces. The varlink + resolve-hook sockets
+  # would re-activate networkd.service otherwise — disabling only the
+  # main .service + .socket is not enough on current systemd.
+  local networkd_units=(
+    systemd-networkd.service
+    systemd-networkd.socket
+    systemd-networkd-varlink.socket
+    systemd-networkd-varlink-metrics.socket
+    systemd-networkd-resolve-hook.socket
+    systemd-networkd-wait-online.service
+  )
+  local needs_disable=0
+  for u in "${networkd_units[@]}"; do
+    if systemctl is-enabled --quiet "$u" 2>/dev/null \
+       || systemctl is-active  --quiet "$u" 2>/dev/null; then
+      needs_disable=1
+      break
+    fi
+  done
+  if (( needs_disable )); then
+    info "disable systemd-networkd family (NM will manage interfaces)"
+    for u in "${networkd_units[@]}"; do
+      sudo systemctl disable --now "$u" 2>/dev/null || true
+    done
+    ok "systemd-networkd family disabled"
+  fi
+  info "enable+start NetworkManager"
+  sudo systemctl enable --now NetworkManager.service
+  ok "NetworkManager.service enabled"
 }
 
 # Top-level entrypoint, called from install.sh.

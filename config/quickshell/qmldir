@@ -8,6 +8,7 @@ singleton Plugins 1.0 Plugins.qml
 singleton Config 1.0 Config.qml
 singleton AudioService 1.0 AudioService.qml
 singleton BluetoothService 1.0 BluetoothService.qml
+singleton NetworkService 1.0 NetworkService.qml
 Bar 1.0 Bar.qml
 BarPill 1.0 BarPill.qml
 BarPopover 1.0 BarPopover.qml

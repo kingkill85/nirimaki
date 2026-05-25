@@ -9,10 +9,10 @@ where each remaining group plugs in.
 
 The big migration described in
 [`quickshell-migration-plan.md`](quickshell-migration-plan.md) is
-**most of the way landed**: the UI primitives, the plugin-kinds
-lifecycle, the shell.json config, and two service-backed plugins
-(audio + bluetooth, each with its tabbed panel) are in. One service
-plugin remains — network — plus a final cleanup pass.
+**nearly done**: the UI primitives, the plugin-kinds lifecycle, the
+shell.json config, and all three service-backed plugins (audio +
+bluetooth + network, each with its tabbed panel) are in. Only the
+Group G cleanup pass remains.
 
 Run the dev gallery to eyeball the kit:
 
@@ -41,8 +41,10 @@ quickshell ipc call shell summon audio
 | **Audio plugin** | Two-surface plugin under `plugins/builtin/audio/`: `BarWidget.qml` (compact popover) + `Panel.qml` (full mixer with Output / Input / Apps tabs, per-process app grouping with expandable sub-rows, sink+source pickers, per-app sliders). |
 | **BluetoothService** | `config/quickshell/BluetoothService.qml` — wraps `Quickshell.Bluetooth` (BlueZ). Exposes default adapter + typed device sublists (connected / paired / available), per-device controls, BlueZ-icon → Nerd-Font glyph mapping. |
 | **Bluetooth plugin** | Two-surface plugin under `plugins/builtin/bluetooth/`: `BarWidget.qml` (icon + connected-count badge + compact popover) + `Panel.qml` (full device manager with Devices / Adapter tabs, scan toggle, contextual per-row actions, "adapter off" empty state). |
-| **i18n**         | Audio + bluetooth surfaces are fully localised; keys live under `audio.*` / `bluetooth.*` in `config/quickshell/i18n/{en,de}.json`. |
-| **Bar widgets**  | Audio: right-click → mixer, scroll = volume. Bluetooth: right-click → panel, count badge when ≥1 connected. Both left-click → compact popover. |
+| **NetworkService** | `config/quickshell/NetworkService.qml` — wraps `Quickshell.Networking` (NetworkManager via DBus). Exposes wifiEnabled, primaryDevice/primaryNetwork, typed device sublists, deduped+sorted accessPoints, scan helpers, connect/disconnect/forget, signal-bar mapper, localised state/connectivity labels. |
+| **Network plugin** | Two-surface plugin under `plugins/builtin/network/`: `BarWidget.qml` (signal-bar/ethernet pill + compact popover with top 3 APs) + `Panel.qml` (Wi-Fi tab with full SSID list and inline PSK prompt; Wired tab with per-interface state + autoconnect). |
+| **i18n**         | Audio + bluetooth + network surfaces are fully localised; keys live under `audio.*` / `bluetooth.*` / `network.*` in `config/quickshell/i18n/{en,de}.json`. |
+| **Bar widgets**  | Audio: right-click → mixer, scroll = volume. Bluetooth: right-click → panel, count badge when ≥1 connected. Network: right-click → panel, pill glyph switches between signal bars / ethernet / off. All three left-click → compact popover. |
 | **Dev gallery**  | `plugins/builtin/dev-gallery/` — first `kind: overlay` consumer; renders every primitive for visual QA. |
 
 ## Gotchas worth paying attention to
@@ -195,6 +197,8 @@ config/quickshell/
 ├── Plugins.qml            # singleton, registry + summon API + shell IPC
 ├── Config.qml             # singleton, parses ~/.config/nirimaki/shell.json
 ├── AudioService.qml       # singleton, wraps Pipewire (the FIRST service)
+├── BluetoothService.qml   # singleton, wraps Quickshell.Bluetooth (BlueZ)
+├── NetworkService.qml     # singleton, wraps Quickshell.Networking (NetworkManager)
 ├── NiriService.qml        # singleton, niri IPC (existing)
 ├── NotificationService.qml # singleton, DBus notifications (existing)
 ├── UpdatesService.qml     # singleton, paru/pacman (existing)
@@ -208,8 +212,14 @@ plugins/builtin/
 │   ├── plugin.json        # kinds:[bar-widget, panel] + entryPoints
 │   ├── BarWidget.qml      # bar pill + compact popover
 │   └── Panel.qml          # full mixer overlay (Output/Input/Apps tabs)
-├── bluetooth/             # ← Group E target (currently bar-widget only)
-├── network/               # ← Group F target (currently ethernet-only bar-widget)
+├── bluetooth/
+│   ├── plugin.json
+│   ├── BarWidget.qml      # icon + count badge + compact popover
+│   └── Panel.qml          # device manager (Devices/Adapter tabs)
+├── network/
+│   ├── plugin.json        # kinds:[bar-widget, panel]
+│   ├── BarWidget.qml      # signal/ethernet pill + compact popover
+│   └── Panel.qml          # connection manager (Wi-Fi/Wired tabs)
 ├── dev-gallery/
 │   ├── plugin.json        # first kind:overlay plugin
 │   └── DevGallery.qml
@@ -246,25 +256,27 @@ silently — `Quickshell.Bluetooth` doesn't register a BlueZ Agent1, so
 the system's own agent has to handle it. Documented as a follow-up in
 `phase-p-bluetooth.md`.
 
-## Picking up Group F (Network)
+## Network design notes (Phase Q, already shipped)
 
-Same shape as Group E, but bigger because:
+`Quickshell.Networking` is a first-class QML module wrapping
+NetworkManager — much like `Quickshell.Bluetooth` wraps BlueZ. The
+service exposes typed sublists (wifiDevices, wiredDevices), a deduped
++ sorted access-point view (one row per SSID, connected → known →
+strongest), a `signalBars()`/`signalIcon()` mapper from 0..1 ratio to
+0..4 bars, and an inline PSK prompt in the panel's wifi rows for
+unknown secured networks.
 
-- Requires committing to **NetworkManager** as a hard dependency
-  (currently the bar uses `ip route` + `/sys/class/net` polling and
-  knows nothing about wifi).
-- `install.sh` needs to install `networkmanager`, enable
-  `NetworkManager.service`, and add a migration for users on
-  systemd-networkd. Write `migrations/<ts>-networkmanager.sh` and
-  pre-mark it in `install/preflight.sh` (mirrors how
-  `1779702575.sh` is treated).
-- `NetworkService.qml` wraps a larger DBus surface — Connections,
-  Devices, AccessPoints. Read Omarchy's `shell/plugins/network/`
-  (which is ~50 KB) for a feature reference; we cherry-pick what
-  fits Nirimaki.
+NetworkManager is the **only** backend `Quickshell.Networking` supports
+right now, so Group F committed Nirimaki to NM. `install.sh` enables
+`NetworkManager.service` and disables `systemd-networkd.service` (both
+running at once races for interfaces — IP flapping, DNS clobbering).
+`migrations/1779716834.sh` does the same flip for existing installs;
+warns (doesn't disable) on `dhcpcd.service` since some users
+intentionally run it.
 
-Rest of the recipe (BarWidget split, Panel with tabs, settings menu
-entry, keybind, i18n, phase doc) is the same.
+Deferred from this phase: hidden SSID entry, VPN section, saved-only
+profile management (NMSettings listing without a live AP), WPA-EAP
+enterprise UX. See `phase-q-network.md` for the full list.
 
 ## Picking up Group G (Cleanup)
 
@@ -297,5 +309,7 @@ entry, keybind, i18n, phase doc) is the same.
 - Plugin lifecycle / IPC → `docs/phase-m-plugin-kinds.md`
 - shell.json schema → `docs/phase-n-shell-json.md`
 - AudioService / mixer → `docs/phase-o-audio.md`
+- BluetoothService / device manager → `docs/phase-p-bluetooth.md`
+- NetworkService / connection manager → `docs/phase-q-network.md`
 - Big picture → `docs/quickshell-migration-plan.md`
 - Project conventions → `CLAUDE.md`

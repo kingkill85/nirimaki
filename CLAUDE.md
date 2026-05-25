@@ -259,10 +259,10 @@ modules itself.
 |--------------------|-------------------|--------------------------|
 | `NiriService`      | niri IPC          | every plugin (TUI launch, focus app, ...) |
 | `AudioService`     | Pipewire (`Quickshell.Services.Pipewire`) | audio plugin (BarWidget + Panel) |
+| `BluetoothService` | `Quickshell.Bluetooth` (BlueZ DBus)       | bluetooth plugin (BarWidget + Panel) |
+| `NetworkService`   | `Quickshell.Networking` (NetworkManager DBus) | network plugin (BarWidget + Panel) |
 | `NotificationService` | DBus org.freedesktop.Notifications | notification toast / center |
 | `UpdatesService`   | `checkupdates` / paru | updates widget |
-| *(future) BluetoothService* | BlueZ DBus  | bluetooth plugin |
-| *(future) NetworkService* | NetworkManager DBus | network plugin |
 
 The service pattern: one singleton owns a `PwObjectTracker` / DBus
 proxy / poll loop; plugins read its reactive properties and call its
