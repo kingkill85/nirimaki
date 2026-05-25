@@ -95,38 +95,63 @@ sudo LC_ALL=C pacman -Sy --noconfirm archlinux-keyring 2> >(grep -vE 'archlinux-
 echo
 
 # ---- 5. git pull ----------------------------------------------------
-# Dev-link bridge: dev-link.sh replaces several content roots inside the
-# production checkout with symlinks back into the user's dev repo, and
-# keeps the production copies as `<path>.pre-link/`. git refuses to
-# write paths "beyond a symbolic link", so any incoming change to
-# default/*, bin/*, or plugins/builtin/* aborts the autostash. Swap
-# each symlink for its .pre-link dir during the pull, then restore.
-# The EXIT trap is a belt-and-braces in case git fails mid-pull.
+# Two collision classes get in the way of a clean `git pull` on top of
+# a dev-link.sh install:
 #
-# Adding a new dev-linked root? Add its path here. (We hardcode rather
-# than walk the tree because git pull is fast and we want predictable
-# restore semantics — discovering "any symlink with a .pre-link sibling"
-# at runtime would also pick up paths a user manually structured the
-# same way.)
+#   A. Dir-symlinks (default/, plugins/builtin/) — dev-link.sh points
+#      these back at the user's dev repo. git refuses to write paths
+#      "beyond a symbolic link", so any incoming change to those roots
+#      aborts the pull. We replace each symlink with HEAD-content
+#      (via `git checkout HEAD -- path/`) before the pull and re-link
+#      after.
+#
+#   B. Untracked files — pull aborts when an incoming tracked file
+#      would clobber an untracked one in the working tree. Stash
+#      everything (tracked changes + untracked files) before the pull,
+#      pop after. Pop conflicts get surfaced but don't fail the
+#      update — the pull itself already succeeded.
+#
+# Adding a new dev-linked root? Add its path here. Materializing from
+# HEAD (instead of from a stale `.pre-link/`) means the script also
+# self-heals when `.pre-link/` is missing, partial, or out of date.
+
 DEV_LINKED_PATHS=(
   "$repo/default"
-  "$repo/bin"
   "$repo/plugins/builtin"
 )
 declare -a DEV_LINK_RESTORE_PATHS=()
 declare -a DEV_LINK_RESTORE_TARGETS=()
 
 for p in "${DEV_LINKED_PATHS[@]}"; do
-  if [[ -L $p && -d "$p.pre-link" ]]; then
+  if [[ -L $p ]]; then
     DEV_LINK_RESTORE_PATHS+=("$p")
     DEV_LINK_RESTORE_TARGETS+=("$(readlink "$p")")
     rm "$p"
-    mv "$p.pre-link" "$p"
+    # Drop any stale .pre-link/ (and timestamped siblings dev-link.sh
+    # leaves behind when it backs up an already-backed-up dir) so the
+    # checkout below populates the path with current HEAD content;
+    # we'll write a fresh .pre-link/ post-pull from whatever the pull
+    # leaves there.
+    rm -rf "$p".pre-link "$p".pre-link.* 2>/dev/null || true
+    relpath="${p#$repo/}"
+    git -C "$repo" checkout HEAD -- "$relpath/" 2>/dev/null || true
   fi
 done
 
 if (( ${#DEV_LINK_RESTORE_PATHS[@]} > 0 )); then
-  echo "(dev-link: temporarily restored ${#DEV_LINK_RESTORE_PATHS[@]} dir(s) from .pre-link/ for the pull)"
+  echo "(dev-link: materialised ${#DEV_LINK_RESTORE_PATHS[@]} dir(s) from HEAD for the pull)"
+fi
+
+# Stash any local changes + untracked files. `git pull --autostash`
+# only handles tracked changes; an untracked file that collides with
+# an incoming tracked path would still abort. Manual stash w/ -u
+# captures both.
+did_stash=0
+if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
+  if git -C "$repo" stash push --include-untracked --message "nirimaki-update auto" >/dev/null; then
+    did_stash=1
+    echo "(stashed local changes + untracked files for the pull)"
+  fi
 fi
 
 _restore_dev_links() {
@@ -134,22 +159,36 @@ _restore_dev_links() {
   for i in "${!DEV_LINK_RESTORE_PATHS[@]}"; do
     p="${DEV_LINK_RESTORE_PATHS[$i]}"
     t="${DEV_LINK_RESTORE_TARGETS[$i]}"
-    # Only move-back if it's still a real dir at $p; if a re-run of
-    # this trap already restored, skip.
+    # Idempotent: if a re-run of this trap already restored, the
+    # checks below short-circuit cleanly.
     [[ -d $p && ! -L $p ]] && mv "$p" "$p.pre-link"
     [[ ! -e $p ]] && ln -s "$t" "$p"
   done
 }
 trap _restore_dev_links EXIT
 
-echo "=> git pull --autostash"
-git -C "$repo" pull --autostash
+echo "=> git pull"
+git -C "$repo" pull
 echo
 
 _restore_dev_links
 trap - EXIT
 DEV_LINK_RESTORE_PATHS=()
 DEV_LINK_RESTORE_TARGETS=()
+
+# Pop the auto-stash. If pop fails (incoming pull overlaps stashed
+# content), leave the stash entry alone and tell the user — don't
+# fail the update since the pull itself already succeeded.
+if (( did_stash )); then
+  if ! git -C "$repo" stash pop >/dev/null 2>&1; then
+    echo
+    echo "  ⚠  Couldn't auto-pop the stash — your local changes are preserved."
+    git -C "$repo" stash list | grep "nirimaki-update auto" | head -1 | sed 's/^/     /'
+    echo "     Resolve manually:  git -C '$repo' stash pop"
+    echo "     Then drop with:    git -C '$repo' stash drop <ref>"
+    echo
+  fi
+fi
 
 # ---- 5b. Run pending migrations -------------------------------------
 # System-side one-offs that the repo can't fix via git pull alone
