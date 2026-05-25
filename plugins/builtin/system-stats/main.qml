@@ -4,9 +4,9 @@ import Quickshell.Io
 import qs
 
 // Port of Omarchy's systemStats.qml.
-// Bar shows the chip icon (󰍛). Hover for a popup with CPU / Memory / Load
-// averaged over a 30-sample sparkline. Omarchy-only bits dropped: btop
-// launcher, WidgetButton/PopupCard/DetailStat UI kit.
+// Bar shows the chip icon (󰍛). Left-click opens a popup with CPU / Memory /
+// Load averaged over a 30-sample sparkline; right-click launches btop.
+// Omarchy-only bits dropped: WidgetButton/PopupCard/DetailStat UI kit.
 Item {
     id: root
 
@@ -21,11 +21,6 @@ Item {
     property var  prevCpu: ({ idle: 0, total: 0 })
     readonly property int historyLimit: 30
 
-    // ---- Hover-popup coordination (matches Omarchy 220 ms grace) ----
-    property bool popupOpen:     false
-    property bool buttonHovered: false
-    property bool popupHovered:  false
-
     function pushHistory(arr, value) {
         const next = arr.slice();
         next.push(value);
@@ -37,30 +32,14 @@ Item {
         if (!statsProc.running) statsProc.running = true;
     }
 
-    function showPopup()    { hideTimer.stop(); popupOpen = true; }
-    function scheduleHide() { hideTimer.restart(); }
-
-    onButtonHoveredChanged: buttonHovered ? showPopup() : scheduleHide()
-    onPopupHoveredChanged:  popupHovered  ? hideTimer.stop() : scheduleHide()
-
     // The bar pill is a static chip glyph — sparkline / numbers only
     // appear inside the popup. So idle CPU is pure waste: poll fast
     // (2 s) while the popup is open, off otherwise. First open shows
     // current values with an empty sparkline; history fills as the
     // user keeps the popup up.
-    onPopupOpenChanged: if (popupOpen) refresh()
-
-    Timer {
-        id: hideTimer
-        interval: 220
-        onTriggered: {
-            if (!root.buttonHovered && !root.popupHovered) root.popupOpen = false;
-        }
-    }
-
     Timer {
         interval: 2000
-        running:  root.popupOpen
+        running:  popover.popupOpen
         repeat:   true
         onTriggered: root.refresh()
     }
@@ -130,93 +109,50 @@ Item {
 
     // ---------------- Bar trigger ----------------
     implicitHeight: Theme.barHeight
-    implicitWidth:  pill.width
+    implicitWidth:  pill.implicitWidth
 
-    Rectangle {
+    BarPill {
         id: pill
-        anchors.verticalCenter: parent.verticalCenter
-        height: Theme.barHeight - 2 * Theme.padY
-        width:  iconText.implicitWidth + 2 * Theme.padX
-        radius: Theme.radius
-        color: (root.buttonHovered || root.popupOpen) ? Theme.hot : "transparent"
+        active: popover.popupOpen
+        onClicked: {
+            popover.toggle();
+            if (popover.popupOpen) root.refresh();
+        }
+        onRightClicked: {
+            popover.close();
+            root.launchOrFocusBtop();
+        }
 
         Text {
-            id: iconText
-            anchors.centerIn: parent
+            anchors.verticalCenter: parent.verticalCenter
             text: "󰍛"   // nf-md-chip
             color: Theme.fg
             font.family: Theme.iconFamily
             font.pixelSize: Theme.iconPx
         }
-
-        HoverHandler {
-            id: hoverHandler
-            onHoveredChanged: root.buttonHovered = hovered
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.LeftButton
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-                root.popupOpen = false;
-                root.launchOrFocusBtop();
-            }
-        }
     }
 
     // ---------------- Popup ----------------
-    PopupWindow {
-        id: popup
-        visible: root.popupOpen
-        // Transparent window; the bordered card is the inner Rectangle.
-        color: "transparent"
-
-        // Drop directly under the pill, horizontally centred. `popupX`
-        // is recomputed on every show because `mapToItem` isn't
-        // binding-reactive (see Calendar.qml).
-        property real popupX: 0
-        anchor.window: root.barWindow
-        anchor.rect.x: popupX
-        anchor.rect.y: root.barWindow ? root.barWindow.height : 0
-
-        onVisibleChanged: {
-            if (visible) {
-                popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
-                       + (pill.width - implicitWidth) / 2;
-                PopupBus.show(root);
-            } else {
-                PopupBus.hide(root);
-            }
-        }
+    BarPopover {
+        id: popover
+        barWindow:  root.barWindow
+        anchorItem: pill
 
         implicitWidth:  340
-        implicitHeight: detailColumn.implicitHeight + 24
-
-        HoverHandler {
-            onHoveredChanged: root.popupHovered = hovered
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            color: Theme.cardBg
-            border.color: Theme.cardBorderColor
-            border.width: Theme.cardBorderWidth
-        }
+        implicitHeight: detailColumn.implicitHeight + 2 * contentMargin
 
         Column {
             id: detailColumn
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 10
+            spacing: Theme.popoverSpacing
 
-            Text {
-                text: I18n.t("stats.system")
-                color: Theme.fg
-                font.family: Theme.sansFamily
-                font.pixelSize: Theme.fontPx
-                font.bold: true
+            PopoverHeader {
+                icon:     "󰍛"
+                title:    I18n.t("stats.system")
+                subtitle: I18n.t("stats.load") + " " + root.loadAvg.toFixed(2)
             }
+
+            PopoverDivider {}
 
             DetailStat {
                 title:   I18n.t("stats.cpu")
@@ -232,20 +168,16 @@ Item {
                 width: parent.width
             }
 
-            Row {
-                width: parent.width
-                spacing: 6
-                Text {
-                    text: I18n.t("stats.load")
-                    color: Theme.fgDim
-                    font.family: Theme.sansFamily
-                    font.pixelSize: Theme.fontPx - 2
-                }
-                Text {
-                    text: root.loadAvg.toFixed(2)
-                    color: Theme.fg
-                    font.family: Theme.sansFamily
-                    font.pixelSize: Theme.fontPx - 2
+            PopoverDivider {}
+
+            PopoverActions {
+                PopoverButton {
+                    label: "btop"
+                    variant: PopoverButton.Primary
+                    onTriggered: {
+                        popover.close();
+                        root.launchOrFocusBtop();
+                    }
                 }
             }
         }

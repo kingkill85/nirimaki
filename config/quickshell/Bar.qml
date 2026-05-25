@@ -4,14 +4,17 @@ import Quickshell
 import Quickshell.Wayland
 
 // One per screen. The three Rows are pure plugin hosts now —
-// no hardcoded widgets. Order within each section is set by the
-// per-plugin `mount` + `after`/`before` fields in plugin.json,
-// re-orderable by the user via ~/.config/nirimaki/plugins.json.
+// no hardcoded widgets. Order within each section is the positional
+// order in ~/.config/nirimaki/shell.json's `bar.layout.{left,center,right}`
+// arrays; when shell.json is absent the loader falls back to deriving
+// order from the per-plugin `mount`+`after`/`before` fields in
+// plugin.json.
 //
 // setSource passes init props down so plugins can declare
-// `property var barWindow` (for popover positioning) and
-// `property string outputName` (workspaces et al.) — silently
-// ignored by plugins that don't declare them.
+// `property var barWindow` (for popover positioning),
+// `property string outputName` (workspaces et al.), and
+// `property var settings` (inline per-entry shell.json settings) —
+// silently ignored by plugins that don't declare them.
 PanelWindow {
     id: bar
     required property ShellScreen modelData
@@ -42,6 +45,7 @@ PanelWindow {
                 if (!item) return;
                 if ("barWindow"  in item) item.barWindow  = bar;
                 if ("outputName" in item) item.outputName = bar.modelData.name;
+                if ("settings"   in item) item.settings   = modelData.settings || ({});
             }
         }
     }

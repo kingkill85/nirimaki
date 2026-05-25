@@ -14,7 +14,6 @@ Item {
 
     // Parsed state from the polling script
     property var info: ({})      // { state, iface, ip, gateway, speed, duplex }
-    property bool popupOpen: false
 
     readonly property bool connected: info.state === "connected"
     readonly property string icon:
@@ -78,125 +77,46 @@ fi
 
     // ---------------- Bar trigger ----------------
     implicitHeight: Theme.barHeight
-    implicitWidth:  pill.width
+    implicitWidth:  pill.implicitWidth
 
-    Rectangle {
+    BarPill {
         id: pill
-        anchors.verticalCenter: parent.verticalCenter
-        height: Theme.barHeight - 2 * Theme.padY
-        width:  iconText.implicitWidth + 2 * Theme.padX
-        radius: Theme.radius
-        color: (hover.containsMouse || root.popupOpen) ? Theme.hot : "transparent"
+        active: popover.popupOpen
+        onClicked: popover.toggle()
 
         Text {
-            id: iconText
-            anchors.centerIn: parent
+            anchors.verticalCenter: parent.verticalCenter
             text: root.icon
             color: root.connected ? Theme.fg : Theme.fgDim
             font.family: Theme.iconFamily
             font.pixelSize: Theme.iconPx
         }
-
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.popupOpen = !root.popupOpen
-        }
     }
 
     // ---------------- Popup ----------------
-    PopupWindow {
-        id: popup
-        visible: root.popupOpen
-        // Transparent window; the bordered card is the inner Rectangle.
-        color: "transparent"
-
-        // Drop directly under the pill, horizontally centred. `popupX`
-        // is recomputed on every show because `mapToItem` isn't
-        // binding-reactive (see Calendar.qml).
-        property real popupX: 0
-        anchor.window: root.barWindow
-        anchor.rect.x: popupX
-        anchor.rect.y: root.barWindow ? root.barWindow.height : 0
-
-        onVisibleChanged: {
-            if (visible) {
-                popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
-                       + (pill.width - implicitWidth) / 2;
-                PopupBus.show(root);
-                Qt.callLater(() => keyCatcher.forceActiveFocus());
-            } else {
-                PopupBus.hide(root);
-                if (root.popupOpen) root.popupOpen = false;
-            }
-        }
-
-        Item {
-            id: keyCatcher
-            anchors.fill: parent
-            focus: true
-            Keys.onEscapePressed: root.popupOpen = false
-        }
+    BarPopover {
+        id: popover
+        barWindow:  root.barWindow
+        anchorItem: pill
 
         implicitWidth:  260
-        implicitHeight: content.implicitHeight + 24
-
-        Rectangle {
-            anchors.fill: parent
-            color: Theme.cardBg
-            border.color: Theme.cardBorderColor
-            border.width: Theme.cardBorderWidth
-        }
+        implicitHeight: content.implicitHeight + 2 * contentMargin
 
         Column {
             id: content
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            spacing: Theme.popoverSpacing
 
-            // Header row: big icon + interface label
-            Row {
-                spacing: 10
-                width: parent.width
-                Text {
-                    text: root.icon
-                    color: root.connected ? Theme.fg : Theme.fgDim
-                    font.family: Theme.iconFamily
-                    font.pixelSize: 22
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Column {
-                    spacing: 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    Text {
-                        text: root.info.iface
-                              || (root.connected ? "" : I18n.t("network.disconnected"))
-                        color: Theme.fg
-                        font.family: Theme.sansFamily
-                        font.pixelSize: Theme.fontPx
-                        font.bold: true
-                    }
-                    Text {
-                        text: I18n.t("network.ethernet")
-                        visible: root.connected
-                        color: Theme.fgDim
-                        font.family: Theme.sansFamily
-                        font.pixelSize: Theme.fontPx - 3
-                    }
-                }
+            PopoverHeader {
+                icon:      root.icon
+                iconColor: root.connected ? Theme.fg : Theme.fgDim
+                title:     root.info.iface
+                           || (root.connected ? "" : I18n.t("network.disconnected"))
+                subtitle:  root.connected ? I18n.t("network.ethernet") : ""
             }
 
-            Rectangle {
-                width: parent.width
-                height: 1
-                color: Theme.fgDim
-                opacity: 0.25
-                visible: root.connected
-            }
+            PopoverDivider { visible: root.connected }
 
-            // Detail grid
             Grid {
                 columns: 2
                 columnSpacing: 14

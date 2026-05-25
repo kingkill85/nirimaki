@@ -1,11 +1,16 @@
 {
-  "id": "audio",
-  "name": "Audio",
-  "description": "Output volume pill + mute / scroll-to-adjust.",
-  "version": "1.0.0",
-  "author": "nirimaki",
-  "mount": "bar.right",
-  "after": "system-stats",
-  "entry": "main.qml",
-  "api": 1
+  "id":          "audio",
+  "name":        "Audio",
+  "description": "Volume slider, output picker, per-app mixer.",
+  "version":     "2.0.0",
+  "author":      "nirimaki",
+  "kinds":       ["bar-widget", "panel"],
+  "entryPoints": {
+    "bar-widget": "BarWidget.qml",
+    "panel":      "Panel.qml"
+  },
+  "mount":       "bar.right",
+  "after":       "system-stats",
+  "entry":       "BarWidget.qml",
+  "api":         1
 }

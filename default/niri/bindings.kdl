@@ -53,6 +53,12 @@ binds {
     Mod+Escape           hotkey-overlay-title="Power menu"          { spawn "quickshell" "ipc" "call" "--" "power-menu"        "toggle"; }
     Mod+Alt+Space        hotkey-overlay-title="Settings"            { spawn "quickshell" "ipc" "call" "--" "settings-menu"    "toggle"; }
 
+    // ===== Service panels =====
+    // The new graphical replacements for the wiremix / bluetui / impala
+    // TUIs (Group D-F of the Quickshell migration). All go through the
+    // shell IPC summon API.
+    Mod+Shift+A          hotkey-overlay-title="Audio mixer"         { spawn "quickshell" "ipc" "call" "--" "shell" "toggle" "audio" ""; }
+
     // ===== Dictation =====
     // Mod+F9 toggles voxtype recording. Bare F9 would shadow apps'
     // own F9 binds; Mod+F9 stays universal-keyboard-friendly.

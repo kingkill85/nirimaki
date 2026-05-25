@@ -43,20 +43,16 @@ Item {
     }
 
     implicitHeight: Theme.barHeight
-    implicitWidth:  any ? pill.width : 0
+    implicitWidth:  any ? pill.implicitWidth : 0
     visible: any
 
-    Rectangle {
+    BarPill {
         id: pill
-        anchors.verticalCenter: parent.verticalCenter
-        height: Theme.barHeight - 2 * Theme.padY
-        width:  iconText.implicitWidth + 2 * Theme.padX
-        radius: Theme.radius
-        color:  hover.containsMouse ? Theme.hot : "transparent"
+        // Left-click toggles dictation (same as the Mod+Ctrl+X bind).
+        onClicked: Quickshell.execDetached(["voxtype", "record", "toggle"])
 
         Text {
-            id: iconText
-            anchors.centerIn: parent
+            anchors.verticalCenter: parent.verticalCenter
             // nf-md-microphone (idle/recording) and nf-md-timer_sand
             // (transcribing). Same glyphs Omarchy waybar maps in its
             // `custom/voxtype.format-icons` block.
@@ -69,23 +65,14 @@ Item {
             font.family: Theme.iconFamily
             font.pixelSize: Theme.iconPx
         }
+    }
 
-        // Pulse the icon while actively recording — matches the
-        // ScreenRecord indicator's affordance.
-        SequentialAnimation on opacity {
-            running: root.recording
-            loops:   Animation.Infinite
-            NumberAnimation { from: 1.0; to: 0.55; duration: 700 }
-            NumberAnimation { from: 0.55; to: 1.0; duration: 700 }
-        }
-
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            // Left-click toggles dictation (same as the Mod+Ctrl+X bind).
-            onClicked: Quickshell.execDetached(["voxtype", "record", "toggle"])
-        }
+    // Pulse the pill while actively recording — matches the
+    // ScreenRecord indicator's affordance.
+    SequentialAnimation {
+        running: root.recording
+        loops:   Animation.Infinite
+        NumberAnimation { target: pill; property: "opacity"; from: 1.0; to: 0.55; duration: 700 }
+        NumberAnimation { target: pill; property: "opacity"; from: 0.55; to: 1.0; duration: 700 }
     }
 }

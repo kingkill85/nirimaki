@@ -18,14 +18,9 @@ Item {
     // Parent PanelWindow reference — used as the popup's anchor.window.
     property var barWindow: null
 
-    // Whether the calendar popup is open. PopupBus.show() clears this
-    // when another bar widget opens its own popup.
-    property bool popupOpen: false
-
     // Latched once the popup has been opened — keeps the lazy-loaded
     // grid alive after close so subsequent opens are instant.
     property bool _everOpened: false
-    onPopupOpenChanged: if (popupOpen) _everOpened = true
 
     property string format: "dddd HH:mm"
 
@@ -104,107 +99,49 @@ Item {
     }
 
     implicitHeight: Theme.barHeight
-    implicitWidth:  pill.width
+    implicitWidth:  pill.implicitWidth
 
-    Rectangle {
+    BarPill {
         id: pill
-        anchors.verticalCenter: parent.verticalCenter
-        height: Theme.barHeight - 2 * Theme.padY
-        width:  label.implicitWidth + 2 * Theme.padX
-        radius: Theme.radius
-        color:  (hover.containsMouse || popup.visible) ? Theme.hot : "transparent"
+        active: popover.popupOpen
+        onClicked: {
+            root.jumpToToday();
+            popover.toggle();
+            if (popover.popupOpen) root._everOpened = true;
+        }
 
         Text {
-            id: label
-            anchors.centerIn: parent
+            anchors.verticalCenter: parent.verticalCenter
             text: loc.toString(root.now, root.format)
             color: Theme.fg
             font.family: Theme.sansFamily
             font.pixelSize: Theme.fontPx
         }
-
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-                root.jumpToToday();
-                root.popupOpen = !root.popupOpen;
-            }
-        }
     }
 
     // ---------------- Popup ----------------
-    PopupWindow {
-        id: popup
-        visible: root.popupOpen
-        // Transparent window; the bordered card is the inner Rectangle.
-        color: "transparent"
-
-        // Drop directly under the pill, horizontally centred. `popupX`
-        // is recomputed on every show because `pill.mapToItem(...)`
-        // isn't binding-reactive — calling it at component-creation
-        // time (when the bar hasn't laid out yet) gives the wrong x
-        // for any pill inside an anchored Row.
-        property real popupX: 0
-        anchor.window: root.barWindow
-        anchor.rect.x: popupX
-        anchor.rect.y: root.barWindow ? root.barWindow.height : 0
-
-        onVisibleChanged: {
-            if (visible) {
-                popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
-                       + (pill.width - implicitWidth) / 2;
-                PopupBus.show(root);
-                Qt.callLater(() => keyCatcher.forceActiveFocus());
-            } else {
-                PopupBus.hide(root);
-                // Compositor dismissed the xdg_popup (user clicked
-                // outside / pressed Escape): sync popupOpen back so the
-                // `visible: root.popupOpen` binding doesn't re-show us.
-                if (root.popupOpen) root.popupOpen = false;
-            }
-        }
-
-        // Focus target — catches Escape to close the popup. focus: true
-        // claims keyboard focus inside the popup's xdg_popup grab; no
-        // MouseArea so clicks fall through to the day cells below.
-        Item {
-            id: keyCatcher
-            anchors.fill: parent
-            focus: true
-            Keys.onEscapePressed: root.popupOpen = false
-        }
+    BarPopover {
+        id: popover
+        barWindow:  root.barWindow
+        anchorItem: pill
 
         implicitWidth:  360
         // Hard-coded height (header + day-header row + 6 week rows +
-        // anchors.margins) so the popup surface gets the right size at
-        // construction — pre-refactor this was bound to gridCol.implicitHeight,
-        // but gridCol now lives inside a Loader and isn't built until
-        // first open. Keeping the binding meant the popup window
-        // appeared at 24 px tall for one frame.
+        // margins) so the popup surface gets the right size at
+        // construction — gridCol lives inside a Loader and isn't built
+        // until first open, so binding to its size would render the
+        // popup window at 24 px tall for one frame.
         implicitHeight: 320
 
-        // Bordered card flush with popup edge (matches every other
-        // bar popup — Network, SystemStats, Weather, Media).
-        Rectangle {
-            id: card
-            anchors.fill: parent
-            color: Theme.cardBg
-            border.color: Theme.cardBorderColor
-            border.width: Theme.cardBorderWidth
-
-            readonly property int columnSpacing: 4
-            readonly property real cellWidth:
-                (width - 24 - 7 * columnSpacing) / 8
-        }
+        readonly property int columnSpacing: 4
+        readonly property real cellWidth:
+            (implicitWidth - 2 * contentMargin - 7 * columnSpacing) / 8
 
         // Lazy-load the month grid — first popup open instantiates
         // the 42 day cells + 8 header cells, subsequent opens are free.
         Loader {
             anchors.fill: parent
-            active: root.popupOpen || root._everOpened
+            active: popover.popupOpen || root._everOpened
             sourceComponent: gridComponent
         }
 
@@ -214,8 +151,7 @@ Item {
         Column {
             id: gridCol
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
+            spacing: Theme.popoverSpacing
 
                 // -------- Header: «  ‹  Month YYYY  ›  » --------
                 Item {
@@ -296,13 +232,13 @@ Item {
 
                 // -------- Day-of-week header --------
                 Row {
-                    spacing: card.columnSpacing
+                    spacing: popover.columnSpacing
                     Repeater {
                         // 8 cells: Wk + 7 locale-ordered days.
                         model: 8
                         delegate: Item {
                             required property int index
-                            width:  card.cellWidth
+                            width:  popover.cellWidth
                             height: 18
 
                             readonly property bool isWeekCol: index === 0
@@ -333,7 +269,7 @@ Item {
                 Column {
                     id: weeksCol
                     width: parent.width
-                    spacing: card.columnSpacing
+                    spacing: popover.columnSpacing
 
                     readonly property var startOfMonth: {
                         const d = new Date(root.viewMonth);
@@ -349,7 +285,7 @@ Item {
                         model: 6
                         delegate: Row {
                             required property int index   // week row 0..5
-                            spacing: card.columnSpacing
+                            spacing: popover.columnSpacing
 
                             // First visible date of this row
                             // (locale's firstDayOfWeek).
@@ -372,7 +308,7 @@ Item {
 
                             // Week-number cell.
                             Rectangle {
-                                width:  card.cellWidth
+                                width:  popover.cellWidth
                                 height: 28
                                 radius: Theme.radius
                                 color:  "transparent"
@@ -410,7 +346,7 @@ Item {
                                             && dayDate.getFullYear() === n.getFullYear();
                                     }
 
-                                    width:  card.cellWidth
+                                    width:  popover.cellWidth
                                     height: 28
                                     radius: Theme.radius
                                     color:  isToday ? Theme.fg : "transparent"

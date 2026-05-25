@@ -84,6 +84,49 @@ QtObject {
     readonly property int menuFontPx:        fontPxLarge   // 18
     readonly property int menuIconPx:        fontPxLarge + 2  // 20
 
+    // ===== Bar popover tokens =====
+    // Every bar popover uses the same Header / Divider / Body / Actions
+    // shape. These are the shared layout numbers — change here to
+    // re-tune the whole family. Per-popover paddings stay local via
+    // BarPopover.contentMargin (default 12).
+    readonly property int popoverSpacing:        10   // between sections
+    readonly property int popoverHeaderIconPx:   22   // big icon in header
+    readonly property int popoverHeaderRowHeight: 30  // header row minimum height (icon-sized)
+    readonly property int popoverButtonHeight:   30   // action button height
+    readonly property int popoverButtonSpacing:  8    // between action buttons
+
+    // ===== Control tokens (Group A UI kit) =====
+    // Shared geometry for Toggle / PanelSlider / Dropdown / TextField /
+    // Button. Single source of truth for the kit so a whole-theme tweak
+    // is one file. Anything popover-specific stays under the popover*
+    // block above; anything here applies to controls used in panels,
+    // popovers, settings forms, dialogs alike.
+    readonly property int controlHeight:           32   // text fields, dropdown header, single-row toggle
+    readonly property int controlPadX:             10   // horizontal padding inside controls
+    readonly property int controlBorderWidth:      1
+    readonly property int controlFocusBorderWidth: 2
+    readonly property int controlSpacing:          8    // between stacked controls
+
+    // Slider (PanelSlider). Knob scales subtly on hover/drag (see primitive).
+    readonly property int sliderTrackHeight:  4
+    readonly property int sliderKnobSize:     14
+
+    // Toggle switch geometry. Pill shape derived from track height.
+    readonly property int toggleTrackHeight:  22
+    readonly property int toggleTrackWidth:   42
+    readonly property int toggleKnobSize:     16
+    readonly property int toggleKnobInset:    3
+
+    // Dropdown popup geometry.
+    readonly property int dropdownRowHeight:  30
+    readonly property int dropdownMaxRows:    8    // before scrolling
+
+    // Tooltip — small contextual label after hover dwell.
+    readonly property int tooltipDelay:  600        // ms
+    readonly property int tooltipPadX:   8
+    readonly property int tooltipPadY:   4
+    readonly property int tooltipFontPx: fontPx - 2
+
     // ===== Fonts =====
     // Family resolves from ~/.config/nirimaki/font (one family name per
     // line, written by `nirimaki font set`). Default JetBrainsMono Nerd

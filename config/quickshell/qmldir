@@ -5,6 +5,23 @@ singleton UpdatesService 1.0 UpdatesService.qml
 singleton PopupBus 1.0 PopupBus.qml
 singleton I18n 1.0 I18n.qml
 singleton Plugins 1.0 Plugins.qml
+singleton Config 1.0 Config.qml
+singleton AudioService 1.0 AudioService.qml
 Bar 1.0 Bar.qml
+BarPill 1.0 BarPill.qml
+BarPopover 1.0 BarPopover.qml
+Button 1.0 Button.qml
 DialogShell 1.0 DialogShell.qml
+Dropdown 1.0 Dropdown.qml
 MenuView 1.0 MenuView.qml
+NumberField 1.0 NumberField.qml
+PanelSlider 1.0 PanelSlider.qml
+PopoverActions 1.0 PopoverActions.qml
+PopoverButton 1.0 PopoverButton.qml
+PopoverDivider 1.0 PopoverDivider.qml
+PopoverHeader 1.0 PopoverHeader.qml
+SearchableDropdown 1.0 SearchableDropdown.qml
+TabBar 1.0 TabBar.qml
+TextField 1.0 TextField.qml
+Toggle 1.0 Toggle.qml
+Tooltip 1.0 Tooltip.qml

@@ -16,13 +16,11 @@ Item {
     id: root
 
     property var barWindow: null
-    property bool popupOpen: false
 
     // Latched once the popup has been opened — keeps the lazy-loaded
     // hero+forecast content alive after close so subsequent opens are
     // free.
     property bool _everOpened: false
-    onPopupOpenChanged: if (popupOpen) _everOpened = true
 
     // Default to Berlin; refined by locationProc on startup.
     property real lat: 52.52
@@ -194,110 +192,57 @@ Item {
     // ---------------- Bar trigger ----------------
     visible: current !== null
     implicitHeight: Theme.barHeight
-    implicitWidth:  visible ? pill.width : 0
+    implicitWidth:  visible ? pill.implicitWidth : 0
 
-    Rectangle {
+    BarPill {
         id: pill
-        anchors.verticalCenter: parent.verticalCenter
-        height: Theme.barHeight - 2 * Theme.padY
-        width:  rowLabel.implicitWidth + 2 * Theme.padX
-        radius: Theme.radius
-        color:  (hover.containsMouse || root.popupOpen) ? Theme.hot : "transparent"
-
-        Row {
-            id: rowLabel
-            anchors.centerIn: parent
-            spacing: 5
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.icon
-                color: Theme.fg
-                font.family: Theme.iconFamily
-                font.pixelSize: Theme.iconPx
-            }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.current ? (root.tempInt + "°") : ""
-                color: Theme.fg
-                font.family: Theme.sansFamily
-                font.pixelSize: Theme.fontPx
-                opacity: 0.85
+        active: popover.popupOpen
+        spacing: 5
+        onClicked: {
+            popover.toggle();
+            if (popover.popupOpen) {
+                root._everOpened = true;
+                root.refresh();
             }
         }
+        onMiddleClicked: root.refresh()
 
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-            onClicked: (mouse) => {
-                if (mouse.button === Qt.MiddleButton) {
-                    root.refresh();
-                } else {
-                    root.popupOpen = !root.popupOpen;
-                    if (root.popupOpen) root.refresh();
-                }
-            }
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.icon
+            color: Theme.fg
+            font.family: Theme.iconFamily
+            font.pixelSize: Theme.iconPx
+        }
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.current ? (root.tempInt + "°") : ""
+            color: Theme.fg
+            font.family: Theme.sansFamily
+            font.pixelSize: Theme.fontPx
+            opacity: 0.85
         }
     }
 
     // ---------------- Popup ----------------
-    PopupWindow {
-        id: popup
-        visible: root.popupOpen
-        // Transparent window; the bordered card is the inner Rectangle.
-        color: "transparent"
-
-        // Drop directly under the pill, horizontally centred. `popupX`
-        // is recomputed on every show because `mapToItem` isn't
-        // binding-reactive (see Calendar.qml).
-        property real popupX: 0
-        anchor.window: root.barWindow
-        anchor.rect.x: popupX
-        anchor.rect.y: root.barWindow ? root.barWindow.height : 0
-
-        onVisibleChanged: {
-            if (visible) {
-                popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
-                       + (pill.width - implicitWidth) / 2;
-                PopupBus.show(root);
-                Qt.callLater(() => keyCatcher.forceActiveFocus());
-            } else {
-                PopupBus.hide(root);
-                // Compositor dismissed (outside-click / Escape) — sync
-                // popupOpen back so the binding doesn't re-show us.
-                if (root.popupOpen) root.popupOpen = false;
-            }
-        }
-
-        Item {
-            id: keyCatcher
-            anchors.fill: parent
-            focus: true
-            Keys.onEscapePressed: root.popupOpen = false
-        }
+    BarPopover {
+        id: popover
+        barWindow:  root.barWindow
+        anchorItem: pill
+        contentMargin: 14
 
         implicitWidth:  480
         // Hard-coded height (hero row + divider + forecast row + margins)
         // so the popup surface gets the right size at construction.
-        // Pre-refactor this bound to card.implicitHeight, but card now
-        // lives inside a Loader and isn't built until first open.
+        // card lives inside the lazy Loader, so binding to its size would
+        // race the first frame.
         implicitHeight: 200
-
-        Rectangle {
-            anchors.fill: parent
-            color: Theme.cardBg
-            border.color: Theme.cardBorderColor
-            border.width: Theme.cardBorderWidth
-        }
 
         // Lazy-load hero + forecast — first popup open builds the
         // ~3-day forecast Repeater + Row layouts, subsequent opens free.
         Loader {
             anchors.fill: parent
-            active: root.popupOpen || root._everOpened
+            active: popover.popupOpen || root._everOpened
             sourceComponent: cardComponent
         }
 
@@ -307,8 +252,7 @@ Item {
         Column {
             id: card
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 14
+            spacing: Theme.popoverSpacing
 
             // -------- Hero row --------
             Item {
@@ -449,13 +393,8 @@ Item {
                 font.italic: true
             }
 
-            // -------- Divider --------
-            Rectangle {
+            PopoverDivider {
                 visible: root.forecastDays.length > 0
-                width: parent.width
-                height: 1
-                color: Theme.fg
-                opacity: 0.12
             }
 
             // -------- Forecast row --------

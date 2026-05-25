@@ -67,6 +67,9 @@ ShellRoot {
     // passive surfaces. Each plugin's main.qml owns its own scrim,
     // DialogShell, Variants-per-screen as appropriate.
 
+    // Legacy eager mounts — plugins with `mount: overlay/bezel/toast` in
+    // their manifest. Loaded at startup, plugins manage their own
+    // `opened` state via their own IpcHandler.
     Variants {
         model: Plugins.byMount["overlay"] || []
         delegate: Loader {
@@ -91,6 +94,37 @@ ShellRoot {
             required property var modelData
             active: true
             source: Plugins.entryUrl(modelData)
+        }
+    }
+
+    // v2 lazy-summon mounts — plugins that declare `kinds: ["overlay"]`
+    // (or "panel"/"menu") in their manifest. Loader stays inactive
+    // until `Plugins.summon(id)` flips Plugins.summoned[id] = true,
+    // typically via `quickshell ipc call shell summon <id> <payload>`.
+    Variants {
+        model: Plugins.byKind["overlay"] || []
+        delegate: Loader {
+            required property var modelData
+            active: Plugins.isSummoned(modelData.id)
+            source: "file://" + modelData.dir + "/" + modelData.entry
+        }
+    }
+
+    Variants {
+        model: Plugins.byKind["panel"] || []
+        delegate: Loader {
+            required property var modelData
+            active: Plugins.isSummoned(modelData.id)
+            source: "file://" + modelData.dir + "/" + modelData.entry
+        }
+    }
+
+    Variants {
+        model: Plugins.byKind["menu"] || []
+        delegate: Loader {
+            required property var modelData
+            active: Plugins.isSummoned(modelData.id)
+            source: "file://" + modelData.dir + "/" + modelData.entry
         }
     }
 }

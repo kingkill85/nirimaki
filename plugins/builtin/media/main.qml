@@ -4,9 +4,8 @@ import Quickshell.Services.Mpris
 import qs
 
 // Port of Omarchy's media.qml — MPRIS-driven now-playing widget.
-//   Left click   → toggle play/pause
-//   Middle click → next track
-//   Right click  → toggle popup with album art + transport
+//   Left click   → toggle popup with album art + transport
+//   Middle click → toggle play/pause
 //   Wheel up     → previous
 //   Wheel down   → next
 // Hidden when no player has a track.
@@ -35,26 +34,33 @@ Item {
     readonly property string artist:
         activePlayer ? (activePlayer.trackArtist || "") : ""
 
-    property bool popupOpen: false
     property real maxLabelWidth: 180
 
     visible: hasMedia
-    implicitWidth:  hasMedia ? pill.width : 0
+    implicitWidth:  hasMedia ? pill.implicitWidth : 0
     implicitHeight: Theme.barHeight
 
     // Bar pill — only the play/pause glyph; the scrolling title was
-    // distracting. Track title / artist still live on right-click popup.
-    Rectangle {
+    // distracting. Track title / artist live on the popover.
+    BarPill {
         id: pill
-        anchors.verticalCenter: parent.verticalCenter
-        height: Theme.barHeight - 2 * Theme.padY
-        width: 2 * Theme.padX + glyph.implicitWidth
-        radius: Theme.radius
-        color: (hoverArea.containsMouse || root.popupOpen) ? Theme.hot : "transparent"
+        active: popover.popupOpen
+        onClicked: if (root.activePlayer) popover.toggle()
+        onMiddleClicked: {
+            if (root.activePlayer && root.activePlayer.canTogglePlaying)
+                root.activePlayer.togglePlaying();
+        }
+        onWheel: (ticks) => {
+            if (!root.activePlayer) return;
+            if (ticks > 0 && root.activePlayer.canGoPrevious)
+                root.activePlayer.previous();
+            else if (ticks < 0 && root.activePlayer.canGoNext)
+                root.activePlayer.next();
+        }
 
         Text {
             id: glyph
-            anchors.centerIn: parent
+            anchors.verticalCenter: parent.verticalCenter
             text: root.playIcon
             color: root.activePlayer && root.activePlayer.isPlaying
                    ? Theme.fg : Theme.fgDim
@@ -64,82 +70,23 @@ Item {
         }
     }
 
-    MouseArea {
-        id: hoverArea
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: root.activePlayer ? Qt.PointingHandCursor : Qt.ArrowCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-        onClicked: (mouse) => {
-            if (!root.activePlayer) return;
-            if (mouse.button === Qt.MiddleButton) {
-                if (root.activePlayer.canGoNext) root.activePlayer.next();
-            } else if (mouse.button === Qt.RightButton) {
-                root.popupOpen = !root.popupOpen;
-            } else {
-                if (root.activePlayer.canTogglePlaying) root.activePlayer.togglePlaying();
-            }
-        }
-        onWheel: (wheel) => {
-            if (!root.activePlayer) return;
-            if (wheel.angleDelta.y > 0 && root.activePlayer.canGoPrevious)
-                root.activePlayer.previous();
-            else if (wheel.angleDelta.y < 0 && root.activePlayer.canGoNext)
-                root.activePlayer.next();
-        }
-    }
-
     // ---------------- Popup ----------------
-    PopupWindow {
-        id: popup
-        visible: root.popupOpen
-        // Transparent window; the bordered card is the inner Rectangle.
-        color: "transparent"
-
-        // Drop directly under the pill, horizontally centred. `popupX`
-        // is recomputed on every show because `mapToItem` isn't
-        // binding-reactive (see Calendar.qml).
-        property real popupX: 0
-        anchor.window: root.barWindow
-        anchor.rect.x: popupX
-        anchor.rect.y: root.barWindow ? root.barWindow.height : 0
-
-        onVisibleChanged: {
-            if (visible) {
-                popupX = pill.mapToItem(root.barWindow.contentItem, 0, 0).x
-                       + (pill.width - implicitWidth) / 2;
-                PopupBus.show(root);
-                Qt.callLater(() => keyCatcher.forceActiveFocus());
-            } else {
-                PopupBus.hide(root);
-                if (root.popupOpen) root.popupOpen = false;
-            }
-        }
-
-        Item {
-            id: keyCatcher
-            anchors.fill: parent
-            focus: true
-            Keys.onEscapePressed: root.popupOpen = false
-        }
+    BarPopover {
+        id: popover
+        barWindow:  root.barWindow
+        anchorItem: pill
 
         implicitWidth:  340
-        implicitHeight: contentColumn.implicitHeight + 24
-
-        Rectangle {
-            anchors.fill: parent
-            color: Theme.cardBg
-            border.color: Theme.cardBorderColor
-            border.width: Theme.cardBorderWidth
-        }
+        implicitHeight: contentColumn.implicitHeight + 2 * contentMargin
 
         Column {
             id: contentColumn
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 10
+            spacing: Theme.popoverSpacing
 
-            // Art + text
+            // Custom header: media uses album art (an Image) instead of
+            // a font-glyph, so it can't use PopoverHeader. Typography
+            // and spacing still mirror the standard header.
             Row {
                 spacing: 10
                 width: parent.width
@@ -170,14 +117,15 @@ Item {
                 }
 
                 Column {
-                    spacing: 4
+                    spacing: 2
+                    anchors.verticalCenter: parent.verticalCenter
                     width: parent.width - 74
 
                     Text {
                         text: root.title || "Nothing playing"
                         color: Theme.fg
                         font.family: Theme.sansFamily
-                        font.pixelSize: Theme.fontPx + 1
+                        font.pixelSize: Theme.fontPx
                         font.bold: true
                         elide: Text.ElideRight
                         width: parent.width
@@ -186,7 +134,7 @@ Item {
                         text: root.artist
                         color: Theme.fgDim
                         font.family: Theme.sansFamily
-                        font.pixelSize: Theme.fontPx - 2
+                        font.pixelSize: Theme.fontPx - 3
                         elide: Text.ElideRight
                         width: parent.width
                         visible: text !== ""
@@ -205,7 +153,9 @@ Item {
                 }
             }
 
-            // Transport
+            PopoverDivider {}
+
+            // Transport — three fixed-width icon buttons centered.
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 8

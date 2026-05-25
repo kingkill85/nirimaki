@@ -24,11 +24,26 @@ import Quickshell.Io
 // `requires.binary` in a manifest gates loading on `command -v <bin>`.
 // If the binary is missing the plugin stays in the registry (so the
 // Settings Menu can show it as "not installed") but doesn't render.
+//
+// ---- Manifest schema v2 (Group B) ----
+// The legacy schema uses `mount` (single string) + `entry` (single
+// filename). The v2 schema adds:
+//   - `kinds: ["bar-widget" | "overlay" | "panel" | "menu" | "bezel" | "toast" | "service"]`
+//   - `entryPoints: { <kind>: <filename> }`
+// Backward compat: if `kinds` is absent we infer one from `mount`;
+// if `entryPoints` is absent we synthesize it from `entry`.
+//
+// ---- Lifecycles ----
+// `bar-widget` / `bezel` / `toast` are eager — loaded into the bar host
+// or as top-level Variants under ShellRoot.
+// `overlay` / `panel` / `menu` are lazy — instantiated only when
+// `summon(id)` is called (typically via the shell IPC handler).
+// `service` is eager but headless (singleton-style; no entry surface).
 QtObject {
     id: bus
 
     // All discovered plugins, keyed by id:
-    //   { dir, manifest, installed }
+    //   { dir, manifest, installed, kinds: [...], entryPoints: {kind: filename} }
     property var registry: ({})
 
     // Per-plugin user overrides read from plugins.json.
@@ -38,6 +53,20 @@ QtObject {
     //   { "bar.left": [{id, dir, entry, mount, after, before}, ...], ... }
     // Reassigned wholesale on every rebuild so QML bindings refresh.
     property var byMount: ({})
+
+    // Same shape but keyed by kind — populated for v2-style plugins:
+    //   { "overlay": [{id, dir, kinds, ...}, ...], "panel": [...], ... }
+    property var byKind: ({})
+
+    // Lazy-summon state for kind:overlay/panel/menu plugins.
+    //   { "dev-gallery": true, "audio": false, ... }
+    // shell.qml's overlay/panel/menu Loaders gate `active` on this.
+    property var summoned: ({})
+
+    // Optional payload passed to the most recent summon for an id.
+    //   summon("audio", {tab: "mixer"})  →  summonPayload.audio === {tab: "mixer"}
+    // Plugins that care read this at instantiation time; reset on hide.
+    property var summonPayload: ({})
 
     readonly property string _userPath:
         Quickshell.env("HOME") + "/.config/nirimaki/plugins.json"
@@ -51,12 +80,118 @@ QtObject {
     function enabledOrder(mount) { return byMount[mount] || []; }
 
     // file:// URL for a plugin's entry QML — what Loader.source wants.
+    // Accepts either a byMount/byKind entry object (legacy) or a plain
+    // {dir, entry} pair.
     function entryUrl(entry) {
         return "file://" + entry.dir + "/" + (entry.entry || "main.qml");
     }
 
+    // Resolve a plugin's entry file for a specific kind (v2). Falls
+    // back to legacy `entry` field when entryPoints[kind] is missing.
+    //   entryUrlFor("audio", "panel")  →  "file:///.../audio/Panel.qml"
+    function entryUrlFor(id, kind) {
+        const ent = registry[id];
+        if (!ent) return "";
+        const filename = (ent.entryPoints && ent.entryPoints[kind])
+                      || ent.manifest.entry
+                      || "main.qml";
+        return "file://" + ent.dir + "/" + filename;
+    }
+
+    // ---- Lazy-summon API (v2 kinds: overlay / panel / menu) ----
+
+    function isSummoned(id) { return summoned[id] === true; }
+
+    function summon(id, payload) {
+        if (!registry[id]) {
+            console.warn("Plugins.summon: unknown plugin", id);
+            return false;
+        }
+        const next = Object.assign({}, summoned);
+        next[id] = true;
+        summoned = next;
+        if (payload !== undefined) {
+            const pp = Object.assign({}, summonPayload);
+            pp[id] = payload;
+            summonPayload = pp;
+        }
+        return true;
+    }
+
+    function hide(id) {
+        if (!summoned[id]) return;
+        const next = Object.assign({}, summoned);
+        delete next[id];
+        summoned = next;
+        if (summonPayload[id] !== undefined) {
+            const pp = Object.assign({}, summonPayload);
+            delete pp[id];
+            summonPayload = pp;
+        }
+    }
+
+    function toggle(id, payload) {
+        if (summoned[id]) hide(id);
+        else              summon(id, payload);
+    }
+
+    // Per-plugin setting lookup. Reads inline settings on the shell.json
+    // bar-layout entry; falls back to `fallback` if the plugin isn't in
+    // any bar section or the key is absent.
+    function settingFor(id, key, fallback) {
+        return Config.settingFor(id, key, fallback);
+    }
+
+    // JSON-friendly snapshot for `quickshell ipc call shell listPlugins`.
+    function listPlugins() {
+        const out = [];
+        for (const id of Object.keys(registry)) {
+            const ent = registry[id];
+            const m = ent.manifest;
+            out.push({
+                id: id,
+                name: m.name || id,
+                kinds: ent.kinds,
+                mount: m.mount || "",
+                installed: ent.installed,
+                summoned: isSummoned(id)
+            });
+        }
+        return out;
+    }
+
     // Re-run discovery. Cheap; safe to call after install/uninstall.
     function rescan() { scanProc.running = true; }
+
+    // ---- Internal: schema-v2 normalisation ----
+
+    // Infer kinds from a v1 manifest's `mount` field. Bar mounts all
+    // become "bar-widget"; overlay/bezel/toast become themselves.
+    function _kindsFromMount(mount) {
+        if (!mount) return [];
+        if (mount === "bar.left" || mount === "bar.center" || mount === "bar.right")
+            return ["bar-widget"];
+        if (mount === "overlay") return ["overlay"];
+        if (mount === "bezel")   return ["bezel"];
+        if (mount === "toast")   return ["toast"];
+        return [mount];
+    }
+
+    function _normalizeManifest(m) {
+        const kindsExplicit = Array.isArray(m.kinds) && m.kinds.length > 0;
+        const kinds = kindsExplicit ? m.kinds.slice()
+                                    : _kindsFromMount(m.mount);
+        const entryPoints = (m.entryPoints && typeof m.entryPoints === "object")
+                          ? Object.assign({}, m.entryPoints)
+                          : {};
+        // If entryPoints is empty, synthesize one entry per kind from
+        // the legacy `entry` field (default main.qml).
+        if (Object.keys(entryPoints).length === 0) {
+            const file = m.entry || "main.qml";
+            for (const k of kinds) entryPoints[k] = file;
+        }
+        return { kinds: kinds, entryPoints: entryPoints, v2: kindsExplicit };
+    }
 
     // ---- Discovery: a single bash pipe emits one JSON object per
     // line, each with the plugin's manifest fields plus dir+installed.
@@ -93,10 +228,14 @@ done
                     try {
                         const obj = JSON.parse(s);
                         if (obj.id) {
+                            const norm = bus._normalizeManifest(obj);
                             reg[obj.id] = {
                                 dir: obj.dir,
                                 installed: obj.installed !== false,
-                                manifest: obj
+                                manifest: obj,
+                                kinds: norm.kinds,
+                                entryPoints: norm.entryPoints,
+                                v2: norm.v2
                             };
                         }
                     } catch (e) {
@@ -148,26 +287,121 @@ done
     }
 
     function _rebuild() {
-        const out = {};
+        const outMount = {};
+        const outKind  = {};
+        const barMounts = { "bar.left": 1, "bar.center": 1, "bar.right": 1 };
+
+        // ---- Bar layout ----
+        // Prefer shell.json (positional, with inline settings) when valid;
+        // otherwise fall back to the legacy manifest+plugins.json path
+        // (after/before resolution). Either way only the three bar.*
+        // mounts come from this branch.
+        if (Config.valid) {
+            const sections = [
+                ["bar.left",   Config.barLeft],
+                ["bar.center", Config.barCenter],
+                ["bar.right",  Config.barRight]
+            ];
+            for (const [mount, entries] of sections) {
+                outMount[mount] = [];
+                for (const e of entries) {
+                    const id = e && e.id;
+                    if (!id) continue;
+                    const ent = registry[id];
+                    if (!ent || !ent.installed) continue;
+                    // Strip the id so the rest of the entry IS the settings.
+                    const settings = {};
+                    for (const k of Object.keys(e))
+                        if (k !== "id") settings[k] = e[k];
+                    outMount[mount].push({
+                        id: id,
+                        dir: ent.dir,
+                        entry: ent.entryPoints["bar-widget"]
+                            || ent.manifest.entry
+                            || "main.qml",
+                        mount: mount,
+                        settings: settings
+                    });
+                }
+            }
+        } else {
+            // Legacy fallback for bar mounts (fresh install pre-migration).
+            for (const id of Object.keys(registry)) {
+                const eff = _effective(id);
+                if (!eff) continue;
+                const ent = registry[id];
+                if (!ent.installed) continue;
+                const mount = eff.mount;
+                if (!mount || !barMounts[mount]) continue;
+                if (!outMount[mount]) outMount[mount] = [];
+                outMount[mount].push({
+                    id: id,
+                    dir: ent.dir,
+                    entry: (ent.entryPoints && ent.entryPoints["bar-widget"])
+                        || eff.entry
+                        || "main.qml",
+                    mount: mount,
+                    after: eff.after || "",
+                    before: eff.before || "",
+                    settings: {}
+                });
+            }
+            for (const k of Object.keys(outMount))
+                if (barMounts[k]) outMount[k] = _sortByRefs(outMount[k]);
+        }
+
+        // ---- Non-bar legacy mounts (overlay / bezel / toast) ----
+        // shell.json's `plugins[]` array is reserved for these in the
+        // future; until then they always come from manifests + the
+        // plugins.json fallback. Without this branch, switching to
+        // shell.json kills every overlay (launcher, settings-menu,
+        // emoji-picker, power-menu, etc.) and bezels (osd) and toasts
+        // (notification-toast).
         for (const id of Object.keys(registry)) {
             const eff = _effective(id);
             if (!eff) continue;
-            if (!registry[id].installed) continue;
+            const ent = registry[id];
+            if (!ent.installed) continue;
             const mount = eff.mount;
-            if (!mount) continue;
-            if (!out[mount]) out[mount] = [];
-            out[mount].push({
+            if (!mount || barMounts[mount]) continue;
+            if (!outMount[mount]) outMount[mount] = [];
+            outMount[mount].push({
                 id: id,
-                dir: registry[id].dir,
+                dir: ent.dir,
                 entry: eff.entry || "main.qml",
                 mount: mount,
                 after: eff.after || "",
-                before: eff.before || ""
+                before: eff.before || "",
+                settings: {}
             });
         }
-        for (const k of Object.keys(out))
-            out[k] = _sortByRefs(out[k]);
-        byMount = out;
+        for (const k of Object.keys(outMount))
+            if (!barMounts[k]) outMount[k] = _sortByRefs(outMount[k]);
+
+        // ---- byKind (v2 lazy-summon kinds) — independent of bar layout ----
+        // shell.json doesn't list overlay/panel/menu plugins in its bar
+        // layout; they're enumerated from manifests. Listed here regardless
+        // of Config.valid since the lazy hosts use byKind directly.
+        for (const id of Object.keys(registry)) {
+            const eff = _effective(id);
+            if (!eff) continue;
+            const ent = registry[id];
+            if (!ent.installed) continue;
+            if (!ent.v2) continue;
+            for (const kind of ent.kinds) {
+                if (kind === "bar-widget") continue;  // handled by byMount
+                if (!outKind[kind]) outKind[kind] = [];
+                outKind[kind].push({
+                    id: id,
+                    dir: ent.dir,
+                    kind: kind,
+                    entry: ent.entryPoints[kind] || eff.entry || "main.qml"
+                });
+            }
+        }
+
+        byMount = outMount;
+        byKind  = outKind;
     }
 
     // Stable order: scan order is the baseline; an `after: X` moves
@@ -191,6 +425,47 @@ done
             }
         }
         return order.map(id => byId[id]);
+    }
+
+    // ---- Shell-level IPC ----
+    // Single target `shell` with summon/hide/toggle/listPlugins.
+    // Individual plugins can still register their own IpcHandler (legacy
+    // overlays do); this just adds a uniform entry point for lazy-summon
+    // plugins that don't register their own handler.
+    property IpcHandler _shellIpc: IpcHandler {
+        target: "shell"
+        function summon(id: string, payload: string): string {
+            const p = (payload && payload.length > 0) ? JSON.parse(payload) : undefined;
+            return bus.summon(id, p) ? "ok" : "unknown";
+        }
+        function hide(id: string): string {
+            bus.hide(id);
+            return "ok";
+        }
+        function toggle(id: string, payload: string): string {
+            const p = (payload && payload.length > 0) ? JSON.parse(payload) : undefined;
+            bus.toggle(id, p);
+            return "ok";
+        }
+        function listPlugins(): string {
+            return JSON.stringify(bus.listPlugins());
+        }
+        function rescanPlugins(): string {
+            bus.rescan();
+            return "ok";
+        }
+        function ping(): string { return "ok"; }
+    }
+
+    // Re-derive layout whenever shell.json changes. Config's properties
+    // are bindings on top of a FileView reload; we listen on each one
+    // so a hand-edit to shell.json refreshes the bar without restart.
+    property Connections _configWatch: Connections {
+        target: Config
+        function onValidChanged()     { bus._rebuild(); }
+        function onBarLeftChanged()   { bus._rebuild(); }
+        function onBarCenterChanged() { bus._rebuild(); }
+        function onBarRightChanged()  { bus._rebuild(); }
     }
 
     // Boot the first scan once. Subsequent scans go through rescan().

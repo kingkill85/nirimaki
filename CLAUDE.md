@@ -112,6 +112,67 @@ both `dev-link.sh` (dev) and `install/config.sh` (production install,
 in the non-canonical-repo branch only — when REPO_DIR is the canonical
 `~/.local/share/nirimaki`, the path already resolves directly).
 
+### Plugin kinds (schema v2)
+
+Manifests can declare `kinds: [...]` instead of (or alongside) the
+legacy `mount` field. Each kind has its own lifecycle:
+
+| Kind         | Lifecycle | Where it loads |
+|--------------|-----------|----------------|
+| `bar-widget` | eager     | inside the per-screen `Bar.qml` Repeater (one instance per screen) |
+| `bezel`      | eager     | top-level `Variants` in `shell.qml` (transient OSD-style overlay) |
+| `toast`      | eager     | top-level `Variants` in `shell.qml` (passive per-screen surface) |
+| `overlay`    | **lazy**  | top-level `Variants` in `shell.qml`, `Loader.active` gated on `Plugins.isSummoned(id)` |
+| `panel`      | **lazy**  | same as overlay; semantic alias for "summonable full UI panel" |
+| `menu`       | **lazy**  | same as overlay; semantic alias for "summoned menu surface" |
+| `service`    | eager     | headless, no UI surface (singleton-style) |
+
+Lazy kinds are loaded only when summoned, freeing memory until first
+use. The legacy `mount: overlay/bezel/toast` model keeps working
+unchanged — only plugins that explicitly set `kinds` use the new lazy
+path.
+
+### Shell IPC
+
+The shell itself registers a single IPC target `shell` that drives the
+lazy-summon machinery:
+
+```
+quickshell ipc call shell summon  <id> <json-payload>   # open a panel/overlay/menu
+quickshell ipc call shell hide    <id>                  # close it
+quickshell ipc call shell toggle  <id> <json-payload>   # flip
+quickshell ipc call shell listPlugins                   # JSON dump of every plugin (id, kinds, mount, installed, summoned)
+quickshell ipc call shell rescanPlugins                 # re-walk plugin dirs
+quickshell ipc call shell ping                          # health check
+```
+
+`summon` / `toggle` accept an optional JSON payload string — the
+target plugin reads it from `Plugins.summonPayload[<id>]` if it cares
+(e.g. opening the audio panel directly on the "input" tab). Plugins
+that don't need payload semantics ignore it.
+
+Lazy plugins close themselves by calling `Plugins.hide(<id>)` from
+their QML — typically wired to an Escape handler or a "close" button.
+
+### Entry points
+
+Plugins with multiple kinds (e.g. an audio plugin that ships both a
+bar widget and a full mixer panel) declare an `entryPoints` map:
+
+```jsonc
+{
+  "id": "audio",
+  "kinds": ["bar-widget", "panel"],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "panel":     "Panel.qml"
+  }
+}
+```
+
+Legacy single-entry plugins keep using `entry: "main.qml"` — that's
+synthesized into `entryPoints` automatically.
+
 ### Manifest shape
 
 ```jsonc
@@ -134,26 +195,80 @@ in the non-canonical-repo branch only — when REPO_DIR is the canonical
 }
 ```
 
-### User override — `~/.config/nirimaki/plugins.json`
+### User config — `~/.config/nirimaki/shell.json`
 
-niri-style per-plugin override. Seeded as `{}` on install / dev-link,
-never overwritten. Schema is one entry per plugin id:
+Single authoritative file (Phase N). Owns bar position, positional
+layout per section, and any inline per-widget settings:
 
 ```jsonc
 {
-  "voxtype": false,                                        // disabled
-  "weather": { "mount": "bar.left", "after": "active-window" },
-  "calendar": { "after": "updates" }                       // reorder only
+  "version": 1,
+  "bar": {
+    "position": "top",
+    "layout": {
+      "left":   [{"id": "workspaces"}, {"id": "active-window"}],
+      "center": [{"id": "calendar", "format": "dddd HH:mm"}, ...],
+      "right":  [{"id": "audio"}, {"id": "tray"}, ...]
+    }
+  },
+  "plugins": []
 }
 ```
 
-- Missing entry → use the manifest's declared default.
-- `false` / `null` → disabled (not loaded).
-- Object → override manifest fields (last-wins per field).
+Rules:
 
-There is NO shipped `default/plugins.json`. Defaults are computed from
-the plugin manifests themselves; a new built-in plugin appears
-automatically without the user needing to "merge" anything.
+- **Positional order.** The order of entries in each section array is
+  the order they render in the bar. No more `after` / `before` hints —
+  the user-side file just lists them.
+- **Inline settings.** Anything other than `id` on an entry is a
+  per-widget setting the plugin reads via `Plugins.settingFor(id, key, fallback)`.
+  Adding `{"id": "calendar", "format": "HH:mm"}` overrides the
+  calendar's default format.
+- **Disable by removal.** A plugin not listed anywhere in the bar
+  layout (and not in the top-level `plugins` array) simply doesn't load.
+- **Live edits.** `Config.qml` watches the file; saving an edit
+  refreshes the bar without restart.
+- **Migrator.** `bin/nirimaki-config-migrate` converts an existing
+  `plugins.json` to `shell.json` on first run. Backs up the old file
+  to `plugins.json.pre-migration`. Idempotent — exits 0 when shell.json
+  already exists; pass `--force` to regenerate.
+
+The legacy `plugins.json` model still works as a fallback when
+shell.json is absent — the plugin loader falls back to deriving the
+layout from manifests + plugins.json overrides exactly as before. New
+installs get shell.json via the install.sh migration step.
+
+### Plugin settings
+
+Plugins read inline settings via the `Plugins.settingFor(id, key, fallback)`
+helper (delegates to `Config.settingFor`). For bar widgets, Bar.qml
+injects a `settings` object into plugins that declare
+`property var settings: ({})` — analogous to the existing `barWindow`
+and `outputName` injection. Either path works; `settingFor` is the
+direct call, `settings` is the injected view.
+
+### Service singletons
+
+Headless infrastructure that wraps an underlying daemon (Pipewire,
+niri IPC, BlueZ, NetworkManager) and exposes a clean app-facing API.
+Every plugin that touches the underlying state reads from + writes to
+the service rather than running shell commands or wiring Quickshell
+modules itself.
+
+| Singleton          | Wraps             | Used by                  |
+|--------------------|-------------------|--------------------------|
+| `NiriService`      | niri IPC          | every plugin (TUI launch, focus app, ...) |
+| `AudioService`     | Pipewire (`Quickshell.Services.Pipewire`) | audio plugin (BarWidget + Panel) |
+| `NotificationService` | DBus org.freedesktop.Notifications | notification toast / center |
+| `UpdatesService`   | `checkupdates` / paru | updates widget |
+| *(future) BluetoothService* | BlueZ DBus  | bluetooth plugin |
+| *(future) NetworkService* | NetworkManager DBus | network plugin |
+
+The service pattern: one singleton owns a `PwObjectTracker` / DBus
+proxy / poll loop; plugins read its reactive properties and call its
+methods. Two-surface plugins (audio's `BarWidget.qml` + `Panel.qml`)
+share the same service singleton so the compact popover is a
+lightweight view onto the same state the panel manipulates.
 
 ### Standard-library primitives
 
@@ -165,14 +280,44 @@ components) can compose without reimplementing common patterns. Today:
 | `DialogShell` | Two-surface scrim + card; niri's compositor blur scoped to the card only |
 | `PopupBus` | Single-popup gate — opening one popup dismisses any other |
 | `MenuView` | Drilldown menu engine — search, keyboard nav, breadcrumb, visibleWhen gating. Data-in (tree, installedState, placeholder), signals-out (actionRequested, closeRequested). Used by `SettingsMenu`; any plugin that wants its own settings-style panel imports this. |
+| `BarPill` | Uniform topbar-widget chrome. Hover-tinted rounded rect with default-property children laid out in a centered Row. Signals: `clicked`, `rightClicked`, `middleClicked`, `wheel(int ticks)`. `active` bool lets the host tint when its popover is open. Every clickable bar plugin uses this so hover / cursor / hit-area behavior is identical across the bar. |
+| `BarPopover` | Anchored bar-popover card. Takes `barWindow` + `anchorItem` (the BarPill), owns popupX recompute, PopupBus participation, Escape catcher, and `Theme.cardBg` bordered chrome. `open` / `close` / `toggle` methods, `popupOpen` bool. Default-property children land inside the card with `contentMargin` padding. |
+| `PopoverHeader` | Standard header row inside a BarPopover — icon + title + subtitle. `iconColor` is overridable to reflect state (fgDim when offline, urgent on alert). Sizes come from `Theme.popoverHeaderIconPx`. |
+| `PopoverDivider` | Thin horizontal rule between popover sections — `Theme.fgDim` at 0.25 opacity, single source for the family look. |
+| `PopoverButton` | Action-row button. Three variants: `Primary` (accent border for the main affordance), `Secondary` (fgDim for neutral toggles), `Urgent` (red for destructive / unmute-when-muted). Takes `label` + `enabled` + `onTriggered`. |
+| `PopoverActions` | Footer row that distributes its `PopoverButton` children equally across the popover width with `Theme.popoverButtonSpacing` gaps. |
+| `Button` | Generic action button — same variants as `PopoverButton` (`Primary`/`Secondary`/`Urgent`) but sized for panels / dialogs / settings forms (`Theme.controlHeight`). Use anywhere outside a popover action row. |
+| `Toggle` | Labeled switch row (title + optional description + pill switch). Stateless: emits `toggled(checked)`; caller flips `checked`. Used for adapter power, mute, DnD, NightLight. |
+| `PanelSlider` | Drag / click / scroll-wheel slider with `value`/`min`/`max`/`step`/`integer`. Emits `moved(v)` live and `released(v)` on commit so callers can choose per-frame vs commit-only. |
+| `Dropdown` | Single-select dropdown — header looks like a `TextField`, click opens an in-scene list. `model` + `textRole` + `valueRole`; emits `selected(index, item)`. |
+| `SearchableDropdown` | Same as Dropdown but the header doubles as a search input filtering the list by `textRole`. For ssid pickers, saved-network pickers, app pickers. |
+| `TextField` | Single-line text input with themed chrome, focus border, placeholder, optional leading icon. `accepted(text)` on Return; `editingFinished()` on focus loss. |
+| `NumberField` | Numeric `TextField` variant — clamps to `[min, max]`, optional `integer`, optional `suffix`. Exposes typed `value: real` plus `valueCommitted(v)`. |
+| `Tooltip` | Hover-delayed in-scene label. Position `below`/`above`/`left`/`right` relative to a `target` Item. `BarPill.tooltipText` is the bar-specific variant — uses `PopupWindow` so it escapes the 32-px bar extent. |
 | `Plugins` | Plugin loader + registry singleton |
+
+Uniform topbar behavior follows from BarPill + BarPopover: left-click
+opens the popover (or fires a plugin-specific action when there is no
+popover), and the chrome looks the same everywhere. Right-click, middle-
+click, and scroll are opt-in power gestures — audio uses scroll-to-adjust
+and right-click-to-wiremix; bluetooth uses right-click-to-bluetui;
+system-stats uses right-click-to-btop; weather uses middle-click-to-
+refresh; media uses scroll-to-skip and middle-click-to-play/pause.
+
+Uniform popover *layout* follows from `PopoverHeader` / `PopoverDivider`
+/ `PopoverActions` / `PopoverButton`: every popover composes
+header → divider → body → divider → actions in a Column with
+`Theme.popoverSpacing` between sections. Media's header is custom (album
+art is an Image, not a font glyph) but typography mirrors `PopoverHeader`;
+weather keeps its hero hero / forecast body for the same reason; calendar
+keeps its month nav as its own header. Everything else (audio, bluetooth,
+network, system-stats, updates) uses the primitives directly.
 
 Pattern when adding a new primitive: extract from a concrete consumer
 (like MenuView came out of SettingsMenu), keep it data-in / signals-out
 (no hardcoded singletons it doesn't import via `qs`), and register in
-`qmldir`. Future candidates: `BarPill` (the hoverable rounded-rect pattern
-every right-Row widget reimplements), `BarPopover` (anchor-to-pill popover
-card), `Bezel` (transient overlay used by OSD / toast).
+`qmldir`. Future candidates: `Bezel` (transient overlay used by OSD /
+toast).
 
 ### Where plugins consume host singletons
 
@@ -326,6 +471,11 @@ it. The repo only owns `templates/` and `themes/` (the sources).
 - **Phase docs in `docs/phase-*.md`** are the source of truth for
   "what shipped and why". Update the Outcome section when you change
   something that contradicts the original plan.
+- **Quickshell migration is a multi-phase initiative.** Status
+  checklist at the top of `docs/quickshell-migration-plan.md`.
+  Cross-cutting gotchas, project map, and a recipe for picking up the
+  next group live at `docs/session-handoff.md` — read that before
+  touching service-backed plugins or anything in `config/quickshell/`.
 - **Comments**: WHY, not WHAT. The code already says what it does.
 - **Don't reformat untouched indentation** when editing — leaves
   noise in diffs.

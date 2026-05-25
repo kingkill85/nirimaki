@@ -46,7 +46,7 @@
                              "setup.browser", "setup.editor", "setup.language",
                              "setup.edit"] },
   "setup.audio":     { "icon": "󰓃", "labelKey": "settings.setup.audio",
-                       "action": { "type": "tui", "name": "wiremix", "exec": ["wiremix"] } },
+                       "action": { "type": "summon", "id": "audio" } },
   "setup.bluetooth": { "icon": "󰂯", "labelKey": "settings.setup.bluetooth",
                        "action": { "type": "shell", "cmd": "rfkill unblock bluetooth; foot --app-id=tui-bluetui bluetui" } },
   "setup.wifi":      { "icon": "󰖩", "labelKey": "settings.setup.wifi",

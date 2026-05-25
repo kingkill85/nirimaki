@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# nirimaki:summary=Migrate plugins.json → shell.json (positional layout + inline settings)
+#
+# Idempotent — exits 0 with no action if shell.json already exists.
+# Otherwise reads every plugin manifest from the builtin and user
+# plugin dirs, applies any user overrides from plugins.json, computes
+# the effective bar layout (resolving `after`/`before` references),
+# and writes:
+#   ~/.config/nirimaki/shell.json
+# Backs up the old override file to plugins.json.pre-migration if
+# present.
+#
+# Safe to run by hand any time. Pass `--force` to regenerate even when
+# shell.json already exists (existing shell.json is moved to
+# shell.json.bak first).
+set -euo pipefail
+
+config_dir="$HOME/.config/nirimaki"
+shell_json="$config_dir/shell.json"
+plugins_json="$config_dir/plugins.json"
+force=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --force) force=1 ;;
+        --help|-h)
+            sed -n '2,/^set/p' "$0" | sed 's/^# \?//;s/^set.*$//' >&2
+            exit 0
+            ;;
+    esac
+done
+
+mkdir -p "$config_dir"
+
+if [[ -f $shell_json && $force -eq 0 ]]; then
+    echo "nirimaki-config-migrate: $shell_json already exists — nothing to do" >&2
+    echo "(pass --force to regenerate)" >&2
+    exit 0
+fi
+
+if [[ -f $shell_json && $force -eq 1 ]]; then
+    cp "$shell_json" "$shell_json.bak"
+    echo "Backed up existing shell.json → shell.json.bak"
+fi
+
+python3 - "$plugins_json" "$shell_json" <<'PYEOF'
+import json
+import os
+import sys
+from pathlib import Path
+
+plugins_json_path = Path(sys.argv[1])
+shell_json_path   = Path(sys.argv[2])
+
+home = Path(os.path.expanduser("~"))
+roots = [
+    home / ".local/share/nirimaki/plugins/builtin",
+    home / ".config/nirimaki/plugins",
+]
+
+manifests = {}
+for root in roots:
+    if not root.exists():
+        continue
+    for manifest_path in sorted(root.glob("*/plugin.json")):
+        try:
+            with open(manifest_path) as f:
+                m = json.load(f)
+        except Exception as e:
+            print(f"  skipping {manifest_path}: {e}", file=sys.stderr)
+            continue
+        pid = m.get("id")
+        if not pid:
+            continue
+        manifests[pid] = m
+
+# Load existing plugins.json overrides (if any). Underscore-prefixed
+# keys are documentation comments — strip them.
+overrides = {}
+if plugins_json_path.exists():
+    try:
+        with open(plugins_json_path) as f:
+            raw = json.load(f)
+        overrides = {k: v for k, v in raw.items() if not k.startswith("_")}
+    except Exception as e:
+        print(f"  ignoring unreadable plugins.json: {e}", file=sys.stderr)
+
+# Compute effective manifest per plugin.
+effective = {}
+for pid, m in manifests.items():
+    if pid in overrides:
+        ov = overrides[pid]
+        if ov is False or ov is None:
+            continue   # disabled
+        if isinstance(ov, dict):
+            m = {**m, **ov}
+    effective[pid] = m
+
+# Group plugins by their mount, preserving discovery order as the base.
+buckets = {"bar.left": [], "bar.center": [], "bar.right": []}
+discovery_order = sorted(effective.keys())
+for pid in discovery_order:
+    mount = effective[pid].get("mount", "")
+    if mount in buckets:
+        buckets[mount].append(pid)
+
+# Resolve after/before within each bucket. Same algorithm Plugins.qml
+# uses: pop the item, splice after/before its ref if present in the
+# same mount. Items without refs keep discovery-order position.
+def resolve(order_ids, manifests_by_id):
+    order = order_ids[:]
+    for pid in order_ids:
+        m = manifests_by_id[pid]
+        after  = m.get("after",  "")
+        before = m.get("before", "")
+        if after and after in order:
+            order.remove(pid)
+            order.insert(order.index(after) + 1, pid)
+        elif before and before in order:
+            order.remove(pid)
+            order.insert(order.index(before), pid)
+    return order
+
+# Build positional layout. Each entry is `{id: ...}` plus any plugin-
+# declared default settings the manifest opted to expose. For now no
+# plugin opts in (defaults stay in plugin code); the shape is just
+# `{id}` for everything. Users can edit shell.json by hand to add
+# inline overrides like `{"id": "calendar", "format": "HH:mm"}`.
+layout = {"left": [], "center": [], "right": []}
+for mount_key, layout_key in [
+    ("bar.left",   "left"),
+    ("bar.center", "center"),
+    ("bar.right",  "right"),
+]:
+    ordered = resolve(buckets[mount_key], effective)
+    layout[layout_key] = [{"id": pid} for pid in ordered]
+
+shell = {
+    "_comment": (
+        "Nirimaki shell configuration. See "
+        "docs/phase-n-shell-json.md for the schema."
+    ),
+    "version": 1,
+    "bar": {
+        "position": "top",
+        "layout":   layout,
+    },
+    "plugins": [],
+}
+
+shell_json_path.parent.mkdir(parents=True, exist_ok=True)
+with open(shell_json_path, "w") as f:
+    json.dump(shell, f, indent=2)
+    f.write("\n")
+
+print(f"Wrote {shell_json_path}", file=sys.stderr)
+print(f"  bar.layout.left   ({len(layout['left'])} widgets)", file=sys.stderr)
+print(f"  bar.layout.center ({len(layout['center'])} widgets)", file=sys.stderr)
+print(f"  bar.layout.right  ({len(layout['right'])} widgets)", file=sys.stderr)
+PYEOF
+
+if [[ -f $plugins_json ]]; then
+    mv "$plugins_json" "$plugins_json.pre-migration"
+    echo "Backed up plugins.json → plugins.json.pre-migration"
+fi
+
+echo "Done."

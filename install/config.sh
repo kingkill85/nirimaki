@@ -160,39 +160,20 @@ _cfg_links() {
   ok "linked nirimaki-* helpers into ~/.local/bin"
 
   # User-owned plugin overrides file: seeded once with a comment
-  # header explaining the schema; never overwritten. Edit via
-  # Settings → Setup → Edit → Plugins, or `nirimaki edit plugins`.
-  # See Plugins.qml for parser behaviour (strips `_*` keys).
-  if [[ ! -e "$HOME/.config/nirimaki/plugins.json" ]]; then
-    mkdir -p "$HOME/.config/nirimaki"
-    cat > "$HOME/.config/nirimaki/plugins.json" <<'EOF'
-{
-  "_comment": [
-    "User plugin overrides — niri-style last-wins per plugin id.",
-    "",
-    "Format:  { \"<plugin-id>\": <override>, ... }",
-    "Override values:",
-    "  false                              — disabled (won't load)",
-    "  { \"mount\": \"bar.left\" }            — move to a different mount",
-    "  { \"after\": \"calendar\" }            — reorder within current mount",
-    "  { \"before\": \"updates\" }            — alternative to `after`",
-    "",
-    "Missing entry → use the manifest defaults from",
-    "  ~/.local/share/nirimaki/plugins/builtin/<id>/plugin.json",
-    "",
-    "Examples:",
-    "  \"voxtype\":  false",
-    "  \"weather\":  { \"mount\": \"bar.left\", \"after\": \"active-window\" }",
-    "  \"calendar\": { \"after\": \"updates\" }",
-    "",
-    "Open this file via Settings → Setup → Edit → Plugins, or directly:",
-    "  nirimaki edit plugins",
-    "",
-    "Saves take effect immediately — the loader watches the file."
-  ]
-}
-EOF
-    ok "seeded ~/.config/nirimaki/plugins.json"
+  # shell.json — the user's positional bar layout + inline per-widget
+  # settings (Phase N / Group C of the Quickshell migration). The
+  # nirimaki-config-migrate script is idempotent: on a fresh install it
+  # computes shell.json from the plugin manifests; on a re-run / upgrade
+  # it converts an existing plugins.json forward; once shell.json
+  # exists it exits without touching anything.
+  mkdir -p "$HOME/.config/nirimaki"
+  if [[ -x $REPO_DIR/bin/nirimaki-config-migrate ]]; then
+    "$REPO_DIR/bin/nirimaki-config-migrate" >/dev/null 2>&1 || true
+    if [[ -e "$HOME/.config/nirimaki/shell.json" ]]; then
+      ok "seeded ~/.config/nirimaki/shell.json"
+    else
+      info "nirimaki-config-migrate did not write shell.json — the legacy fallback in Plugins.qml keeps the bar working until next run"
+    fi
   fi
 
   # ~/.config/nirimaki/ samples — per-file symlinks so user-added

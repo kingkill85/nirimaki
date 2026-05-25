@@ -40,44 +40,31 @@ Item {
     }
 
     implicitHeight: Theme.barHeight
-    implicitWidth:  recording ? pill.width : 0
+    implicitWidth:  recording ? pill.implicitWidth : 0
     visible: recording
 
-    Rectangle {
+    BarPill {
         id: pill
-        anchors.verticalCenter: parent.verticalCenter
-        height: Theme.barHeight - 2 * Theme.padY
-        width:  iconText.implicitWidth + 2 * Theme.padX
-        radius: Theme.radius
-        color:  hover.containsMouse ? Theme.hot : "transparent"
+        onClicked: {
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/nirimaki-screenrecord"]);
+            Qt.callLater(() => root.refresh());
+        }
 
         Text {
-            id: iconText
-            anchors.centerIn: parent
+            anchors.verticalCenter: parent.verticalCenter
             // nf-md-record_rec — solid filled record dot.
             text: "󰻂"
             color: Theme.urgent      // red, matches Omarchy's `.active` class
             font.family: Theme.iconFamily
             font.pixelSize: Theme.iconPx
         }
+    }
 
-        // Subtle pulse so the dot reads as "live" rather than static.
-        SequentialAnimation on opacity {
-            running: root.recording
-            loops:   Animation.Infinite
-            NumberAnimation { from: 1.0; to: 0.55; duration: 700 }
-            NumberAnimation { from: 0.55; to: 1.0; duration: 700 }
-        }
-
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: {
-                Quickshell.execDetached([Quickshell.env("HOME") + "/.local/bin/nirimaki-screenrecord"]);
-                Qt.callLater(() => root.refresh());
-            }
-        }
+    // Subtle pulse so the dot reads as "live" rather than static.
+    SequentialAnimation {
+        running: root.recording
+        loops:   Animation.Infinite
+        NumberAnimation { target: pill; property: "opacity"; from: 1.0; to: 0.55; duration: 700 }
+        NumberAnimation { target: pill; property: "opacity"; from: 0.55; to: 1.0; duration: 700 }
     }
 }

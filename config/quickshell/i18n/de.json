@@ -166,5 +166,26 @@
   "weather.fetching": "Vorhersage wird geladen…",
 
   "lock.password":     "Passwort",
-  "lock.bad_password": "Falsches Passwort"
+  "lock.bad_password": "Falsches Passwort",
+
+  "audio.mixer":              "Audio-Mixer",
+  "audio.summary":            "{0} Ausgänge · {1} Eingänge · {2} Apps",
+  "audio.tab.output":         "Ausgang",
+  "audio.tab.input":          "Eingang",
+  "audio.tab.apps":           "Apps",
+  "audio.section.default_output": "STANDARD-AUSGANG",
+  "audio.section.default_input":  "STANDARD-EINGANG",
+  "audio.section.volume":     "LAUTSTÄRKE",
+  "audio.section.level":      "PEGEL",
+  "audio.placeholder.output": "Keine Ausgabegeräte",
+  "audio.placeholder.input":  "Keine Eingabegeräte",
+  "audio.no_inputs":          "Keine Eingabegeräte erkannt.",
+  "audio.no_apps":            "Keine Anwendung spielt Audio ab.",
+  "audio.muted":              "Stumm",
+  "audio.mute":               "stumm",
+  "audio.unmute":             "an",
+  "audio.close":              "Schließen",
+  "audio.tooltip":            "Audioausgabe — {0} %",
+  "audio.tooltip_muted":      "Audioausgabe (stumm)",
+  "audio.bar.mixer":          "Mixer"
 }

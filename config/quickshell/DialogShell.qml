@@ -60,7 +60,15 @@ Item {
         // gets blur. (Pre-Phase-J this was `qs-scrim`, which was also
         // outside the old `qs-*` regex — same design intent.)
         WlrLayershell.namespace: "dialog-scrim"
-        WlrLayershell.layer: WlrLayer.Overlay
+        // Scrim sits on `Top` (below the dialog's `Overlay` layer).
+        // Both used to be on `Overlay`; within a single layer-shell
+        // layer the surface stacking order is implementation-defined,
+        // and niri evidently routed pointer events to the larger
+        // full-screen scrim even when the smaller dialog surface
+        // covered the click position. Demoting the scrim one layer
+        // guarantees the dialog sits above it for both rendering
+        // AND input routing. The scrim still covers the bar (`Top`).
+        WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.exclusiveZone: 0
 
         MouseArea {
@@ -88,6 +96,8 @@ Item {
         implicitHeight: shell.cardHeight
         color: "transparent"
         WlrLayershell.namespace: shell.dialogNamespace
+        // Dialog stays on `Overlay` — one layer above the scrim so
+        // pointer events inside the dialog go to the dialog.
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
         WlrLayershell.exclusiveZone: 0

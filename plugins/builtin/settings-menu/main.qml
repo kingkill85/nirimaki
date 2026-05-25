@@ -162,8 +162,18 @@ Item {
             // Defer the IPC call so the menu finishes closing first —
             // otherwise some overlays open behind our backdrop.
             const target = a.target, fn = a.fn || "toggle";
-            Qt.callLater(() => Quickshell.execDetached([
-                "quickshell", "ipc", "call", "--", target, fn]));
+            const args = (a.args || []).map(root._expandHome);
+            Qt.callLater(() => Quickshell.execDetached(
+                ["quickshell", "ipc", "call", "--", target, fn].concat(args)));
+        } else if (a.type === "summon") {
+            // Sugar over `{type: "ipc", target: "shell", fn: "summon",
+            // args: [<id>, <payload>]}`. Used to open the new lazy-
+            // overlay/panel plugins (audio mixer, future bluetooth /
+            // network panels) from menu entries.
+            const id = a.id || "";
+            const payload = a.payload ? JSON.stringify(a.payload) : "";
+            Qt.callLater(() => Quickshell.execDetached(
+                ["quickshell", "ipc", "call", "--", "shell", "summon", id, payload]));
         } else if (a.type === "tui") {
             NiriService.launchTui.apply(null, [a.name].concat((a.exec || []).map(root._expandHome)));
         } else if (a.type === "shell") {

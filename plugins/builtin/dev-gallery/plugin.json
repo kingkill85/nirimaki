@@ -1,0 +1,12 @@
+{
+  "id":          "dev-gallery",
+  "name":        "Dev gallery",
+  "description": "Visual preview of every UI primitive (Toggle, PanelSlider, Dropdown, TextField, Tooltip, Button, …). Summoned by `quickshell ipc call shell summon dev-gallery`.",
+  "version":     "1.0.0",
+  "author":      "nirimaki",
+  "kinds":       ["overlay"],
+  "entryPoints": {
+    "overlay": "DevGallery.qml"
+  },
+  "api":         1
+}
