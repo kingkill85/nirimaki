@@ -12,8 +12,8 @@
 #
 # What it links / seeds:
 #   ~/.local/share/nirimaki/default/ → repo/default/        (dir symlink)
-#   ~/.local/share/nirimaki/bin/     → repo/bin/            (dir symlink)
 #   ~/.local/share/nirimaki/plugins/builtin/ → repo/plugins/builtin/  (dir symlink)
+#   ~/.local/bin/nirimaki-<each>     → repo/bin/nirimaki-<each>       (per-helper symlinks)
 #   ~/.config/nirimaki/shell.json    SEEDED via nirimaki-config-migrate
 #                                    (positional bar layout + inline settings)
 #   ~/.config/quickshell/            → repo/config/quickshell/
@@ -114,6 +114,14 @@ echo "== Linking repo defaults under ~/.local/share/nirimaki/ =="
 # Upgrade-tracked content: niri defaults that the user's ~/.config/niri/
 # config.kdl `include`s. install.sh will cp these instead, but in dev
 # we symlink so edits show up live.
+#
+# IMPORTANT: each link_path here that points INTO the share/ dir
+# (i.e. ~/.local/share/nirimaki/) also needs to be listed in
+# bin/nirimaki-update's DEV_LINKED_PATHS array, otherwise `git pull`
+# in dev mode will abort with "beyond a symbolic link" when an
+# incoming commit touches that root. Currently registered:
+#   - $HOME/.local/share/nirimaki/default
+#   - $HOME/.local/share/nirimaki/plugins/builtin
 mkdir -p "$HOME/.local/share/nirimaki"
 link_path "$REPO_DIR/default"                "$HOME/.local/share/nirimaki/default"
 # Plugin tree: built-ins ship under repo/plugins/ and the loader scans
