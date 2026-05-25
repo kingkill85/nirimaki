@@ -95,41 +95,61 @@ sudo LC_ALL=C pacman -Sy --noconfirm archlinux-keyring 2> >(grep -vE 'archlinux-
 echo
 
 # ---- 5. git pull ----------------------------------------------------
-# Dev-link bridge: in dev-link mode, $repo/default is a symlink into the
-# user's dev repo (set up by dev-link.sh) and `default.pre-link/` holds
-# the production copy. git refuses to write paths "beyond a symbolic
-# link", so an incoming commit that touches default/* aborts the
-# autostash. Swap the symlink for the real dir during the pull, then
-# restore. The EXIT trap is a belt-and-braces in case git fails mid-pull.
-default_link_target=""
-if [[ -L "$repo/default" ]]; then
-  default_link_target=$(readlink "$repo/default")
-  echo "(dev-link: temporarily restoring default/ from default.pre-link/)"
-  rm "$repo/default"
-  if [[ -d "$repo/default.pre-link" ]]; then
-    mv "$repo/default.pre-link" "$repo/default"
+# Dev-link bridge: dev-link.sh replaces several content roots inside the
+# production checkout with symlinks back into the user's dev repo, and
+# keeps the production copies as `<path>.pre-link/`. git refuses to
+# write paths "beyond a symbolic link", so any incoming change to
+# default/*, bin/*, or plugins/builtin/* aborts the autostash. Swap
+# each symlink for its .pre-link dir during the pull, then restore.
+# The EXIT trap is a belt-and-braces in case git fails mid-pull.
+#
+# Adding a new dev-linked root? Add its path here. (We hardcode rather
+# than walk the tree because git pull is fast and we want predictable
+# restore semantics — discovering "any symlink with a .pre-link sibling"
+# at runtime would also pick up paths a user manually structured the
+# same way.)
+DEV_LINKED_PATHS=(
+  "$repo/default"
+  "$repo/bin"
+  "$repo/plugins/builtin"
+)
+declare -a DEV_LINK_RESTORE_PATHS=()
+declare -a DEV_LINK_RESTORE_TARGETS=()
+
+for p in "${DEV_LINKED_PATHS[@]}"; do
+  if [[ -L $p && -d "$p.pre-link" ]]; then
+    DEV_LINK_RESTORE_PATHS+=("$p")
+    DEV_LINK_RESTORE_TARGETS+=("$(readlink "$p")")
+    rm "$p"
+    mv "$p.pre-link" "$p"
   fi
+done
+
+if (( ${#DEV_LINK_RESTORE_PATHS[@]} > 0 )); then
+  echo "(dev-link: temporarily restored ${#DEV_LINK_RESTORE_PATHS[@]} dir(s) from .pre-link/ for the pull)"
 fi
 
-_restore_default_link() {
-  # Only re-link if it's still a real dir; if git pull replaced it with
-  # something else (shouldn't happen) or we already restored, do nothing.
-  if [[ -n $default_link_target ]]; then
-    [[ -d "$repo/default" && ! -L "$repo/default" ]] && \
-      mv "$repo/default" "$repo/default.pre-link"
-    [[ ! -e "$repo/default" ]] && \
-      ln -s "$default_link_target" "$repo/default"
-  fi
+_restore_dev_links() {
+  local i p t
+  for i in "${!DEV_LINK_RESTORE_PATHS[@]}"; do
+    p="${DEV_LINK_RESTORE_PATHS[$i]}"
+    t="${DEV_LINK_RESTORE_TARGETS[$i]}"
+    # Only move-back if it's still a real dir at $p; if a re-run of
+    # this trap already restored, skip.
+    [[ -d $p && ! -L $p ]] && mv "$p" "$p.pre-link"
+    [[ ! -e $p ]] && ln -s "$t" "$p"
+  done
 }
-trap _restore_default_link EXIT
+trap _restore_dev_links EXIT
 
 echo "=> git pull --autostash"
 git -C "$repo" pull --autostash
 echo
 
-_restore_default_link
+_restore_dev_links
 trap - EXIT
-default_link_target=""
+DEV_LINK_RESTORE_PATHS=()
+DEV_LINK_RESTORE_TARGETS=()
 
 # ---- 5b. Run pending migrations -------------------------------------
 # System-side one-offs that the repo can't fix via git pull alone
