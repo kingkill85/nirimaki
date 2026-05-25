@@ -86,11 +86,11 @@ The panel opens via the shell IPC, with three triggers:
   `{type: "tui", name: "wiremix", ...}` to `{type: "summon", id: "audio"}`.
   A new `summon` action type in `settings-menu/main.qml` is sugar
   over `quickshell ipc call shell summon <id> <payload>`.
-- **Keybind** — `Mod+Shift+A` in `default/niri/bindings.kdl` calls
-  `quickshell ipc call shell toggle audio ""`. Niri's hotkey overlay
-  labels it "Audio mixer".
 - **External IPC** — `quickshell ipc call shell summon audio` works
-  from any script / keybind / dmenu entry.
+  from any script / user keybind / dmenu entry. Service panels
+  deliberately get no shipped keybind — the settings menu is the
+  canonical top-level entry, and users who want a one-key shortcut
+  can wire one in `~/.config/niri/bindings.kdl`.
 
 ### 4. `summon` action type in settings-menu
 
@@ -238,7 +238,7 @@ Both BarWidget and Panel use `I18n.t(...)`.
 
 | Task                                | Command                                              |
 |-------------------------------------|------------------------------------------------------|
-| Open audio panel                    | `Mod+Shift+A` or `quickshell ipc call shell summon audio` |
+| Open audio panel                    | Settings menu → Setup → Audio, or `quickshell ipc call shell summon audio` |
 | Open compact popover                | Left-click the audio pill                            |
 | Open mixer from compact popover     | Click "mixer" button at the bottom                   |
 | Adjust default volume from anywhere | scroll on the audio pill, or XF86AudioRaiseVolume key |

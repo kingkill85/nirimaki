@@ -9,10 +9,10 @@ where each remaining group plugs in.
 
 The big migration described in
 [`quickshell-migration-plan.md`](quickshell-migration-plan.md) is
-**roughly half landed**: the UI primitives, the plugin-kinds lifecycle,
-the shell.json config, and the first service-backed plugin (audio with
-its tabbed mixer panel) are in. Two service plugins remain — bluetooth
-and network — plus a final cleanup pass.
+**most of the way landed**: the UI primitives, the plugin-kinds
+lifecycle, the shell.json config, and two service-backed plugins
+(audio + bluetooth, each with its tabbed panel) are in. One service
+plugin remains — network — plus a final cleanup pass.
 
 Run the dev gallery to eyeball the kit:
 
@@ -25,7 +25,7 @@ Open the audio mixer:
 
 ```bash
 quickshell ipc call shell summon audio
-# or Mod+Shift+A
+# or Settings menu → Setup → Audio
 # or right-click the audio pill on the bar
 ```
 
@@ -39,8 +39,10 @@ quickshell ipc call shell summon audio
 | **Migrator**     | `bin/nirimaki-config-migrate` — idempotent, run by `install/config.sh` on install and by `migrations/1779702575.sh` on upgrade. |
 | **AudioService** | `config/quickshell/AudioService.qml` — wraps `Quickshell.Services.Pipewire`. Exposes default sink/source, sink/source lists, per-app stream lists, **per-process stream groups**, plus setters and per-stream / per-group helpers. |
 | **Audio plugin** | Two-surface plugin under `plugins/builtin/audio/`: `BarWidget.qml` (compact popover) + `Panel.qml` (full mixer with Output / Input / Apps tabs, per-process app grouping with expandable sub-rows, sink+source pickers, per-app sliders). |
-| **i18n**         | Audio surfaces are fully localised; keys live under `audio.*` in `config/quickshell/i18n/{en,de}.json`. |
-| **Bar widget**   | Right-click on the audio pill summons the panel; scroll = volume; left-click opens the compact popover. |
+| **BluetoothService** | `config/quickshell/BluetoothService.qml` — wraps `Quickshell.Bluetooth` (BlueZ). Exposes default adapter + typed device sublists (connected / paired / available), per-device controls, BlueZ-icon → Nerd-Font glyph mapping. |
+| **Bluetooth plugin** | Two-surface plugin under `plugins/builtin/bluetooth/`: `BarWidget.qml` (icon + connected-count badge + compact popover) + `Panel.qml` (full device manager with Devices / Adapter tabs, scan toggle, contextual per-row actions, "adapter off" empty state). |
+| **i18n**         | Audio + bluetooth surfaces are fully localised; keys live under `audio.*` / `bluetooth.*` in `config/quickshell/i18n/{en,de}.json`. |
+| **Bar widgets**  | Audio: right-click → mixer, scroll = volume. Bluetooth: right-click → panel, count badge when ≥1 connected. Both left-click → compact popover. |
 | **Dev gallery**  | `plugins/builtin/dev-gallery/` — first `kind: overlay` consumer; renders every primitive for visual QA. |
 
 ## Gotchas worth paying attention to
@@ -215,57 +217,34 @@ plugins/builtin/
 
 bin/nirimaki-config-migrate # plugins.json → shell.json, called by install + migrations
 migrations/                 # one-shot upgrade hooks
-default/niri/bindings.kdl   # Mod+Shift+A → summon audio panel
+default/niri/bindings.kdl   # no shipped keybind for service panels — settings menu is the entry
 ```
 
-## Picking up Group E (Bluetooth)
+## Bluetooth design notes (Phase P, already shipped)
 
-Goal: replace the bluetui TUI launch with a graphical device manager.
+`Quickshell.Bluetooth` is a first-class QML module (not raw DBus) —
+`BluetoothAdapter` / `BluetoothDevice` are reactive QObjects with the
+right properties already named usefully (`enabled`, `discovering`,
+`discoverable`, per-device `connected`, `paired`, `pairing`, `trusted`,
+`battery`, etc.). `BluetoothService` is therefore much thinner than
+`AudioService` — no PwObjectTracker, no per-process grouping, no
+bespoke node classification. It's mostly typed sublists
+(`connectedDevices` / `pairedDevices` / `availableDevices`), an icon
+mapper (BlueZ `icon` strings → MDI glyphs), and an IPC dump handler.
 
-Tasks:
+One quirk: `BluetoothService.deviceSubtitle(d)` returns localised
+status text and reads the strings from `_connectedLabel` /
+`_pairedLabel` / `_pairingLabel` properties on the service. The Panel
+writes those properties on construction and on locale change. Reason:
+keep the service free of I18n dependency so it can be imported
+anywhere — the panel is the natural locale-aware consumer. Callers
+that want raw keys use `deviceState(d)` which returns
+`"connected"|"paired"|"pairing"|"available"`.
 
-1. **`BluetoothService.qml`** singleton at `config/quickshell/`
-   wrapping BlueZ DBus. Register in qmldir as
-   `singleton BluetoothService 1.0 BluetoothService.qml`.
-
-   Properties: `adapter` (`{ powered, discoverable, discovering }`),
-   `devices: []` (`{ name, address, icon, type, connected, paired,
-   trusted, rssi }`).
-
-   Methods: `setPowered(b)`, `scan(start|stop)`, `connect(device)`,
-   `disconnect(device)`, `pair(device)`, `trust(device, b)`, `remove(device)`.
-
-   DBus paths to wrap: `org.bluez` → `/org/bluez/hci0` (Adapter1) +
-   `/org/bluez/hci0/dev_*` (Device1). Use Quickshell's DBus bindings;
-   look at `NotificationService.qml` for the pattern.
-
-2. **Split `plugins/builtin/bluetooth/`** like audio:
-   - Rename `main.qml` → `BarWidget.qml`
-   - Update manifest: `kinds: ["bar-widget", "panel"]`,
-     `entryPoints: { "bar-widget": "BarWidget.qml", "panel": "Panel.qml" }`
-   - Update BarWidget to read from `BluetoothService` (replace the
-     `bluetoothctl show` Process polling)
-   - Add `Panel.qml` with tabs:
-     - **Devices**: paired list with connect/disconnect, available
-       list with pair button (toggle scan to populate)
-     - **Adapter**: power, discoverable, discovering toggles
-
-3. **Settings menu entry** in `config/quickshell/settings-menu.json`:
-   change `setup.bluetooth` from
-   `{type: "shell", cmd: "... bluetui"}` to
-   `{type: "summon", id: "bluetooth"}`.
-
-4. **Keybind** in `default/niri/bindings.kdl` (next to Mod+Shift+A):
-   `Mod+Shift+B → quickshell ipc call shell toggle bluetooth ""`.
-
-5. **Right-click** the bluetooth bar pill → `Plugins.summon("bluetooth")`
-   (replaces the current `NiriService.launchTui("bluetui")`).
-
-6. **i18n**: add a `bluetooth.*` block to en.json + de.json mirroring
-   `audio.*`.
-
-7. **Write `docs/phase-p-bluetooth.md`** following the structure of
-   `phase-o-audio.md`.
+Pairing devices that require PIN/numeric confirmation will fail
+silently — `Quickshell.Bluetooth` doesn't register a BlueZ Agent1, so
+the system's own agent has to handle it. Documented as a follow-up in
+`phase-p-bluetooth.md`.
 
 ## Picking up Group F (Network)
 

@@ -1,11 +1,16 @@
 {
-  "id": "bluetooth",
-  "name": "Bluetooth",
-  "description": "Bluetooth status pill + device picker.",
-  "version": "1.0.0",
-  "author": "nirimaki",
-  "mount": "bar.right",
-  "after": "notifications",
-  "entry": "main.qml",
-  "api": 1
+  "id":          "bluetooth",
+  "name":        "Bluetooth",
+  "description": "Bluetooth status pill + device manager panel.",
+  "version":     "2.0.0",
+  "author":      "nirimaki",
+  "kinds":       ["bar-widget", "panel"],
+  "entryPoints": {
+    "bar-widget": "BarWidget.qml",
+    "panel":      "Panel.qml"
+  },
+  "mount":       "bar.right",
+  "after":       "notifications",
+  "entry":       "BarWidget.qml",
+  "api":         1
 }

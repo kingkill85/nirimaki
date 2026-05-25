@@ -13,7 +13,7 @@ wifi management".
 - ✅ **Group B — Plugin kinds + lifecycle** (Phase M, `docs/phase-m-plugin-kinds.md`)
 - ✅ **Group C — shell.json migration** (Phase N, `docs/phase-n-shell-json.md`)
 - ✅ **Group D — AudioService + audio panel** (Phase O, `docs/phase-o-audio.md`)
-- 🔜 **Group E — BluetoothService + bluetooth panel** (Phase P, planned)
+- ✅ **Group E — BluetoothService + bluetooth panel** (Phase P, `docs/phase-p-bluetooth.md`)
 - 🔜 **Group F — NetworkService + network panel** (Phase Q, planned)
 - 🔜 **Group G — Cleanup + polish** (Phase R, planned)
 

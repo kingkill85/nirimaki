@@ -48,7 +48,7 @@
   "setup.audio":     { "icon": "󰓃", "labelKey": "settings.setup.audio",
                        "action": { "type": "summon", "id": "audio" } },
   "setup.bluetooth": { "icon": "󰂯", "labelKey": "settings.setup.bluetooth",
-                       "action": { "type": "shell", "cmd": "rfkill unblock bluetooth; foot --app-id=tui-bluetui bluetui" } },
+                       "action": { "type": "summon", "id": "bluetooth" } },
   "setup.wifi":      { "icon": "󰖩", "labelKey": "settings.setup.wifi",
                        "action": { "type": "shell", "cmd": "rfkill unblock wifi 2>/dev/null; foot --app-id=tui-impala impala" } },
   "setup.browser":   { "icon": "󰖟", "labelKey": "settings.setup.browser",
