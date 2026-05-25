@@ -1,0 +1,92 @@
+#!/bin/bash
+# nirimaki:group=xbox-controllers
+# nirimaki:summary=Install xpadneo (Xbox controller driver with rumble, battery, paddle buttons)
+# nirimaki:requires-sudo=true
+#
+# Replaces the in-kernel `xpad` driver with the community `xpadneo`
+# DKMS module for Xbox One / Series X|S controllers. Reasons xpadneo
+# beats stock xpad:
+#   - proper force-feedback / rumble (xpad's is broken on BT)
+#   - accurate trigger axes (HID conformant; xpad has deadzone glitches)
+#   - paddle buttons on Elite / Elite-2 controllers
+#   - battery reporting (UPower picks it up automatically)
+#   - works equally well over Bluetooth and USB
+#
+# Method mirrors basecamp/omarchy's omarchy-install-gaming-xbox-controllers:
+# install xpadneo-dkms, blacklist xpad, autoload hid_xpadneo, add user
+# to input group, hot-swap drivers in the running kernel so no reboot
+# is needed unless the group change had to fire.
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+nirimaki_banner "Xbox controllers" "Install"
+
+if pacman -Qi xpadneo-dkms >/dev/null 2>&1; then
+  echo "xpadneo-dkms is already installed (refreshing module config + state)."
+else
+  echo "Installing:"
+  echo "  - linux-headers  (needed for DKMS to compile against the running kernel)"
+  echo "  - xpadneo-dkms   (community Xbox controller driver; AUR)"
+  echo
+  echo "Then:"
+  echo "  - blacklist the in-kernel xpad driver (resolves xpad/xpadneo conflict)"
+  echo "  - autoload hid_xpadneo at boot"
+  echo "  - add your user to the input group (controllers need it)"
+  echo "  - hot-swap drivers without rebooting (when possible)"
+fi
+
+nirimaki_sudo_prime
+
+# linux-headers + xpadneo-dkms. paru handles the AUR build for xpadneo.
+paru -S --needed --noconfirm linux-headers xpadneo-dkms
+
+# xpad / xpadneo both claim Xbox One/Series controllers; pinning to
+# xpadneo gives the better driver consistently.
+echo "blacklist xpad" | sudo tee /etc/modprobe.d/blacklist-xpad.conf >/dev/null
+echo "hid_xpadneo"    | sudo tee /etc/modules-load.d/xpadneo.conf    >/dev/null
+
+# Controllers expose /dev/input/event*; reading them needs `input`
+# group membership. Steam Input + udev mostly bypass this, but missing
+# group is the difference between "paired but unresponsive in some
+# games" and "just works".
+needs_reboot=false
+if ! id -nG "$USER" | grep -qw input; then
+  sudo usermod -aG input "$USER"
+  needs_reboot=true
+fi
+
+# Best-effort hot-swap: only succeeds if no controller is currently
+# claimed by xpad. Falls back to reboot when the rmmod is refused.
+if lsmod | grep -q '^xpad '; then
+  sudo modprobe -r xpad 2>/dev/null || needs_reboot=true
+fi
+sudo modprobe hid_xpadneo
+
+cat <<'NOTE'
+
+  ✓ xpadneo installed and loaded.
+  ✓ xpad blacklisted; hid_xpadneo will autoload on next boot.
+  → Pair an Xbox controller via the bluetooth panel
+    (right-click the bluetooth pill in the bar, or
+     Settings → Setup → Bluetooth):
+       hold the small sync button on top until the Xbox glyph
+       blinks fast, start a scan, click "pair" on the row.
+  → Wired works too — just plug a USB-C cable.
+NOTE
+
+if $needs_reboot; then
+  cat <<'NOTE'
+
+  ⚠  You were added to the `input` group OR the running xpad module
+     couldn't be unloaded live. A reboot is needed to fully apply both.
+NOTE
+fi
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" || true
+
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" xbox-controllers-installed || true
+
+nirimaki_pause

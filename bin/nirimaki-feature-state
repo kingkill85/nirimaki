@@ -50,6 +50,7 @@ yn()   { if "$@"; then echo true; else echo false; fi; }
   emit vscode     "$(yn has_bin code)"
   emit helix      "$(yn has_helix)"
   emit steam      "$(yn has_pkg steam)"
+  emit xbox_controllers "$(yn has_pkg xpadneo-dkms)"
   emit zed        "$(yn has_bin zed)"
   emit nvim       "$(yn has_bin nvim)"
   emit docker     "$(yn has_bin docker)"

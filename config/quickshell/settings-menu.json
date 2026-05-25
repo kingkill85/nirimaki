@@ -288,12 +288,18 @@
                              "visibleWhen": { "feature": "helix", "is": "missing" } },
 
   "install.gaming":       { "icon": "󰊗", "labelKey": "settings.install.gaming",
-                            "children": ["install.gaming.steam"] },
+                            "children": ["install.gaming.steam", "install.gaming.xbox-controllers"] },
   "install.gaming.steam": { "icon": "󰓓", "labelKey": "settings.install.gaming.steam",
                             "action": { "type": "exec-in-foot",
                                         "appId": "tui-nirimaki-steam-install",
                                         "cmd":   ["$HOME/.local/bin/nirimaki-steam-install"] },
                             "visibleWhen": { "feature": "steam", "is": "missing" } },
+  "install.gaming.xbox-controllers": {
+                            "icon": "󰊴", "labelKey": "settings.install.gaming.xbox-controllers",
+                            "action": { "type": "exec-in-foot",
+                                        "appId": "tui-nirimaki-xbox-controllers-install",
+                                        "cmd":   ["$HOME/.local/bin/nirimaki-xbox-controllers-install"] },
+                            "visibleWhen": { "feature": "xbox_controllers", "is": "missing" } },
 
   "remove":   { "icon": "󰗨", "labelKey": "settings.remove",
                 "children": ["remove.webapp", "remove.service",
@@ -338,12 +344,18 @@
                             "visibleWhen": { "feature": "helix", "is": "installed" } },
 
   "remove.gaming":       { "icon": "󰊗", "labelKey": "settings.remove.gaming",
-                           "children": ["remove.gaming.steam"] },
+                           "children": ["remove.gaming.steam", "remove.gaming.xbox-controllers"] },
   "remove.gaming.steam": { "icon": "󰓓", "labelKey": "settings.remove.gaming.steam",
                            "action": { "type": "exec-in-foot",
                                        "appId": "tui-nirimaki-steam-remove",
                                        "cmd":   ["$HOME/.local/bin/nirimaki-steam-remove"] },
                            "visibleWhen": { "feature": "steam", "is": "installed" } },
+  "remove.gaming.xbox-controllers": {
+                           "icon": "󰊴", "labelKey": "settings.remove.gaming.xbox-controllers",
+                           "action": { "type": "exec-in-foot",
+                                       "appId": "tui-nirimaki-xbox-controllers-remove",
+                                       "cmd":   ["$HOME/.local/bin/nirimaki-xbox-controllers-remove"] },
+                           "visibleWhen": { "feature": "xbox_controllers", "is": "installed" } },
 
   "remove.dev":            { "icon": "󰘧", "labelKey": "settings.remove.dev",
                              "children": ["remove.dev.ruby",   "remove.dev.node",
