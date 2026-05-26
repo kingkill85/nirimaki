@@ -1,0 +1,12 @@
+{
+  "id":          "monitors",
+  "name":        "Monitors",
+  "description": "Graphical monitor layout / mode / scale editor that writes ~/.config/niri/monitors.kdl.",
+  "version":     "1.0.0",
+  "author":      "nirimaki",
+  "kinds":       ["panel"],
+  "entryPoints": {
+    "panel": "Panel.qml"
+  },
+  "api":         1
+}

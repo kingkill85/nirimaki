@@ -44,6 +44,7 @@
 
   "setup":    { "icon": "󰒓", "labelKey": "settings.setup",
                 "children": ["setup.audio", "setup.bluetooth", "setup.network",
+                             "setup.monitors",
                              "setup.browser", "setup.editor", "setup.language",
                              "setup.edit"] },
   "setup.audio":     { "icon": "󰓃", "labelKey": "settings.setup.audio",
@@ -52,6 +53,8 @@
                        "action": { "type": "summon", "id": "bluetooth" } },
   "setup.network":   { "icon": "󰖩", "labelKey": "settings.setup.network",
                        "action": { "type": "summon", "id": "network" } },
+  "setup.monitors":  { "icon": "󰍹", "labelKey": "settings.setup.monitors",
+                       "action": { "type": "summon", "id": "monitors" } },
   "setup.browser":   { "icon": "󰖟", "labelKey": "settings.setup.browser",
                        "children": ["setup.browser.zen", "setup.browser.firefox", "setup.browser.chromium"] },
   "setup.browser.zen":      { "icon": "󰖟", "labelKey": "settings.setup.browser.zen",
