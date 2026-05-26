@@ -42,6 +42,23 @@ QtObject {
     property string _backup: ""
     readonly property bool hasBackup: _backup.length > 0
 
+    // Map of output-identifier → raw KDL of any child nodes the panel
+    // doesn't manage (everything except mode/scale/transform/position/
+    // variable-refresh-rate). Re-emitted verbatim inside the rewritten
+    // output block so a user can hand-edit `layout { ... }` or other
+    // niri output settings without the panel clobbering them on Apply.
+    property var _lastExtras: ({})
+
+    // Live extras for an output. Looks up by EDID identifier first
+    // (the form `nirimaki monitors panel` writes), then by connector
+    // name (the form a user is more likely to type by hand). Returns
+    // empty string when the output has no hand-edits.
+    function extrasFor(id, connector) {
+        if (id        && _lastExtras[id])        return _lastExtras[id];
+        if (connector && _lastExtras[connector]) return _lastExtras[connector];
+        return "";
+    }
+
     readonly property string monitorsPath:
         Quickshell.env("HOME") + "/.config/niri/monitors.kdl"
 
@@ -127,7 +144,13 @@ QtObject {
             vrrSupported: o.vrrSupported,
             // Resolved mode object so the writer can render the
             // `mode "WxH@R"` line without re-indexing.
-            mode: o.modes[o.currentMode] || null
+            mode: o.modes[o.currentMode] || null,
+            // Per-output hand-edits the panel doesn't model (raw KDL
+            // pasted into the Custom-KDL textbox). Pre-filled from the
+            // current monitors.kdl so the textbox shows existing
+            // edits; the panel writes back here and applyConfig
+            // round-trips it.
+            extras: extrasFor(o.id, o.connector)
         }));
     }
 
@@ -146,6 +169,11 @@ QtObject {
     }
 
     function _afterBackupRead(snap) {
+        // Preserve any hand-edited output children that the panel
+        // doesn't model (e.g. per-output `layout { default-column-width
+        // ... }`). Parsed from the file we just backed up, keyed by the
+        // exact identifier string in the KDL header.
+        _lastExtras = _parseExtras(_backup);
         const text = _renderKdl(snap);
         writeProc.command = ["sh", "-lc",
             "set -e; tmp=$(mktemp \"" + monitorsPath + ".XXXXXX\"); " +
@@ -202,10 +230,109 @@ QtObject {
             lines.push("    position x=" + Math.round(m.positionX) +
                        " y=" + Math.round(m.positionY));
             if (m.vrr) lines.push("    variable-refresh-rate");
+            // Re-emit hand-edits. The snapshot's `extras` field wins
+            // (so the panel's Custom-KDL textbox is authoritative when
+            // present); otherwise fall back to whatever the live file
+            // had — keyed by EDID identifier first, connector name as
+            // a backup, covering either form a user may have typed.
+            let extra = (typeof m.extras === "string") ? m.extras
+                      : (_lastExtras[m.id] || _lastExtras[m.connector] || "");
+            extra = String(extra).replace(/^\n+|\n+$/g, "");
+            if (extra) {
+                // The textbox stores extras dedented (no leading column
+                // of indentation), so a four-space prefix on every
+                // non-empty line is what nests the block inside its
+                // owning `output { }`. Relative indentation typed by
+                // the user is preserved on top.
+                const indented = extra.split("\n").map(l =>
+                    l.length === 0 ? l : ("    " + l)
+                ).join("\n");
+                lines.push(indented);
+            }
             lines.push("}");
             lines.push("");
         }
         return lines.join("\n");
+    }
+
+    // Walk monitors.kdl and extract, for every `output "<name>" { ... }`
+    // block, the raw text of every child node that isn't a panel-managed
+    // field. Returned text is pre-indented with four spaces and ready
+    // to drop back inside a rewritten output block. Brace counting is
+    // depth-aware so nested blocks (`layout { default-column-width
+    // { proportion 1.0; } }`) survive intact.
+    readonly property var _managedFields: ({
+        "mode": true, "scale": true, "transform": true,
+        "position": true, "variable-refresh-rate": true
+    })
+    function _parseExtras(text) {
+        const out = {};
+        if (!text) return out;
+        const re = /output\s+"((?:[^"\\]|\\.)*)"\s*\{/g;
+        let m;
+        while ((m = re.exec(text)) !== null) {
+            const name = m[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+            let i = re.lastIndex;
+            let depth = 1;
+            const start = i;
+            while (i < text.length && depth > 0) {
+                const c = text[i];
+                if (c === "{") depth++;
+                else if (c === "}") depth--;
+                if (depth > 0) i++;
+            }
+            const body = text.substring(start, i);
+            re.lastIndex = i + 1;
+            const kept = [];
+            const lines = body.split("\n");
+            let j = 0;
+            while (j < lines.length) {
+                const line = lines[j];
+                const trimmed = line.trim();
+                if (trimmed === "" || trimmed.startsWith("//")) { j++; continue; }
+                const firstTok = trimmed.split(/\s|\{/)[0];
+                const managed = root._managedFields[firstTok] === true;
+                // Compute the nested-block depth this line opens — so
+                // both managed AND preserved entries can span multiple
+                // lines correctly.
+                let d = (line.match(/\{/g) || []).length
+                      - (line.match(/\}/g) || []).length;
+                if (!managed) kept.push(line);
+                j++;
+                while (d > 0 && j < lines.length) {
+                    const ln = lines[j];
+                    d += (ln.match(/\{/g) || []).length
+                       - (ln.match(/\}/g) || []).length;
+                    if (!managed) kept.push(ln);
+                    j++;
+                }
+            }
+            if (kept.length > 0) {
+                // Strip leading/trailing blank lines but keep interior
+                // formatting the user picked.
+                while (kept.length && kept[0].trim() === "") kept.shift();
+                while (kept.length && kept[kept.length - 1].trim() === "") kept.pop();
+                if (kept.length) {
+                    // Dedent by the shortest leading-whitespace run
+                    // among non-empty lines, so the textbox shows the
+                    // block flush-left. The writer re-applies the
+                    // four-space prefix when it rebuilds the file.
+                    let minIndent = Infinity;
+                    for (const ln of kept) {
+                        if (ln.trim() === "") continue;
+                        const lead = ln.match(/^[ \t]*/)[0].length;
+                        if (lead < minIndent) minIndent = lead;
+                    }
+                    if (minIndent > 0 && minIndent !== Infinity) {
+                        for (let k = 0; k < kept.length; k++) {
+                            kept[k] = kept[k].slice(minIndent);
+                        }
+                    }
+                    out[name] = kept.join("\n");
+                }
+            }
+        }
+        return out;
     }
 
     // niri JSON ↔ niri kdl transform spelling:
@@ -256,6 +383,18 @@ QtObject {
     function identifier(o) { return o ? o.id : ""; }
 
     // ---- Processes ----
+    // Live watch of monitors.kdl so `_lastExtras` is up-to-date the
+    // moment the panel opens (instead of only after the first Apply).
+    // niri's own file-watcher reloads on writes, so this FileView and
+    // niri see the same file in the same order.
+    property FileView _monitorsFile: FileView {
+        path: root.monitorsPath
+        watchChanges: true
+        printErrors: false
+        onLoaded: { root._lastExtras = root._parseExtras(text() || ""); }
+        onLoadFailed: { root._lastExtras = ({}); }
+    }
+
     property Process _pollProc: Process {
         id: pollProc
         property string collected: ""

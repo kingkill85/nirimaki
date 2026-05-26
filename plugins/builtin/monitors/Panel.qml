@@ -18,7 +18,7 @@ DialogShell {
     id: shell
     open: true
     cardWidth: 920
-    cardHeight: 720
+    cardHeight: 860
     dialogNamespace: "nirimaki-monitors"
 
     onCloseRequested: shell.requestClose()
@@ -501,6 +501,117 @@ DialogShell {
                     font.pixelSize: Theme.fontPxSmall
                     elide: Text.ElideRight
                     width: parent.width - 320
+                }
+            }
+
+            // ---- Custom-KDL textbox ----
+            // Free-form niri output settings (per-output `layout {}`,
+            // `off`, `background-color`, `focus-at-startup`, ...).
+            // Anything typed here is written verbatim inside this
+            // output's block on Apply, and round-trips through the
+            // panel: every reopen reads back what's currently in
+            // monitors.kdl.
+            Column {
+                width: parent.width
+                spacing: 6
+                visible: shell.selectedOutput() !== null
+
+                Text {
+                    text: I18n.t("monitors.extras")
+                    color: Theme.fgDim
+                    font.family: Theme.sansFamily
+                    font.pixelSize: Theme.fontPxSmall
+                }
+                Text {
+                    width: parent.width
+                    text: I18n.t("monitors.extras.hint")
+                    color: Theme.fgDim
+                    font.family: Theme.sansFamily
+                    font.pixelSize: Theme.fontPxSmall
+                    opacity: 0.7
+                    wrapMode: Text.WordWrap
+                }
+                Rectangle {
+                    width: parent.width
+                    height: 120
+                    radius: Theme.radius
+                    color: Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.05)
+                    border.color: extrasEditor.activeFocus ? Theme.accent : Theme.fgDim
+                    border.width: extrasEditor.activeFocus
+                                  ? Theme.controlFocusBorderWidth
+                                  : Theme.controlBorderWidth
+                    Behavior on border.color { ColorAnimation { duration: 120 } }
+
+                    Flickable {
+                        id: extrasFlick
+                        anchors.fill: parent
+                        anchors.margins: Theme.controlPadX
+                        contentWidth:  extrasEditor.paintedWidth
+                        contentHeight: extrasEditor.paintedHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        TextEdit {
+                            id: extrasEditor
+                            width: extrasFlick.width
+                            color: Theme.fg
+                            selectionColor: Theme.accent
+                            selectedTextColor: Theme.bg
+                            font.family: Theme.monoFamily
+                            font.pixelSize: Theme.fontPxSmall
+                            wrapMode: TextEdit.NoWrap
+                            selectByMouse: true
+                            activeFocusOnTab: true
+                            persistentSelection: true
+                            tabStopDistance: 4 * extrasEditor.font.pixelSize
+
+                            // Pull the current snapshot's extras into
+                            // the editor whenever the selection or
+                            // working snapshot changes. _sync is a
+                            // no-op when the text already matches, so
+                            // it doesn't fight a user mid-typing.
+                            function _sync() {
+                                const cur = shell.selectedOutput();
+                                const v = cur ? (cur.extras || "") : "";
+                                if (extrasEditor.text !== v) extrasEditor.text = v;
+                            }
+                            Component.onCompleted: _sync()
+
+                            Connections {
+                                target: shell
+                                function onSelectedIndexChanged() { extrasEditor._sync(); }
+                                function onWorkingChanged()       { extrasEditor._sync(); }
+                            }
+
+                            onTextChanged: {
+                                const cur = shell.selectedOutput();
+                                if (!cur) return;
+                                if ((cur.extras || "") === extrasEditor.text) return;
+                                shell.mutateSelected(o => { o.extras = extrasEditor.text; });
+                            }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                visible: extrasEditor.text === "" && !extrasEditor.activeFocus
+                                text: I18n.t("monitors.extras.placeholder")
+                                color: Theme.fgDim
+                                font.family: Theme.monoFamily
+                                font.pixelSize: Theme.fontPxSmall
+                                opacity: 0.7
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        propagateComposedEvents: true
+                        cursorShape: Qt.IBeamCursor
+                        onPressed: (mouse) => {
+                            extrasEditor.forceActiveFocus();
+                            mouse.accepted = false;
+                        }
+                    }
                 }
             }
         }

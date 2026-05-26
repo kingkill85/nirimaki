@@ -32,7 +32,7 @@ Item {
         }
     }
 
-    readonly property int cardWidth: 380
+    readonly property int cardWidth: 480
     readonly property int cardHeight: 540
 
     // ---- Tree merge: defaults ← generated ← user --------------------
