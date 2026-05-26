@@ -41,6 +41,37 @@ if [[ -f $desktop ]]; then
     && update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 fi
 
+# Drop the VPN bar-widget entry. The .sample stays (it's a symlink
+# back to the repo) so a future `nirimaki tailscale install` can
+# re-activate without manual file shuffling.
+ts_cfg="$HOME/.config/nirimaki/vpns.d/tailscale.json"
+if [[ -f $ts_cfg ]]; then
+  echo "Dropping Tailscale VPN bar-widget entry…"
+  rm -f -- "$ts_cfg"
+fi
+
+# If no VPN providers remain (no custom JSON files AND no NM VPN
+# profiles), drop the vpn pill from shell.json's bar layout — Row
+# spacing leaves a phantom gap around an empty Loader slot, so the
+# whole entry has to go to avoid that.
+shelljson="$HOME/.config/nirimaki/shell.json"
+if [[ -f $shelljson ]] && command -v jq >/dev/null 2>&1; then
+  custom=0
+  if [[ -d $HOME/.config/nirimaki/vpns.d ]]; then
+    custom=$(find "$HOME/.config/nirimaki/vpns.d" -maxdepth 1 -name '*.json' ! -name '*.json.sample' 2>/dev/null | wc -l)
+  fi
+  nm_count=0
+  if command -v nmcli >/dev/null 2>&1; then
+    nm_count=$(nmcli -t -f TYPE connection show 2>/dev/null | grep -cE '^(vpn|wireguard)$' || true)
+  fi
+  total=$((custom + nm_count))
+  if (( total == 0 )); then
+    tmp=$(mktemp "${shelljson}.XXXXXX")
+    jq '.bar.layout.right |= map(select(.id != "vpn"))' "$shelljson" > "$tmp" && mv -- "$tmp" "$shelljson"
+    echo "Removed vpn pill from shell.json (no providers remain)."
+  fi
+fi
+
 echo
 echo "  ✓ Tailscale removed."
 

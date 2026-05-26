@@ -311,5 +311,18 @@
   "monitors.confirm.title":            "Diese Anzeige­einstellungen behalten?",
   "monitors.confirm.body":             "Rücksetzen in {0} Sekunden, falls nicht bestätigt.",
   "monitors.confirm.keep":             "Behalten",
-  "monitors.confirm.revert":           "Rücksetzen"
+  "monitors.confirm.revert":           "Rücksetzen",
+
+  "vpn.tooltip_on":                    "VPN — {0} verbunden",
+  "vpn.tooltip_on_with":                "VPN — {0}",
+  "vpn.tooltip_off":                   "VPN — keine Verbindung",
+  "vpn.popover.title":                 "VPN",
+  "vpn.popover.subtitle_on":           "{0} verbunden",
+  "vpn.popover.subtitle_off":          "Nichts verbunden",
+  "vpn.popover.empty":                 "Keine VPN-Anbieter eingerichtet. NetworkManager-Profile über nm-connection-editor anlegen oder JSON-Dateien in ~/.config/nirimaki/vpns.d/ ablegen (Beispiele unter config/nirimaki/vpns.d/*.sample).",
+  "vpn.popover.hint":                  "Anbieter unter ~/.config/nirimaki/vpns.d/ ergänzen",
+  "vpn.row.connect":                   "Verbinden",
+  "vpn.row.disconnect":                "Trennen",
+  "vpn.state.connected":               "Verbunden",
+  "vpn.state.disconnected":            "Getrennt"
 }

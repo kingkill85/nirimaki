@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Private Internet Access provider — `piactl` is the headless CLI",
+    "that ships with the PIA Linux client.",
+    "",
+    "Copy to ~/.config/nirimaki/vpns.d/pia.json (drop .sample). For",
+    "first-time setup run the PIA GUI client once (sign in, accept the",
+    "EULA, set region). After that piactl is enough for connect /",
+    "disconnect, and the bar pill will pick up the region as its",
+    "secondary label."
+  ],
+  "id":               "pia",
+  "name":             "Private Internet Access",
+  "icon":             "󰒃",
+  "statusCmd":        ["piactl", "get", "connectionstate"],
+  "statusOnPattern":  "^Connected$",
+  "statusLabelCmd":   ["piactl", "get", "region"],
+  "connectCmd":       ["piactl", "connect"],
+  "disconnectCmd":    ["piactl", "disconnect"],
+  "setupCmd":         ["pia-client"],
+  "pollSeconds":      5
+}

@@ -1,0 +1,31 @@
+{
+  "_comment": [
+    "SonicWall NetExtender SSL VPN provider.",
+    "",
+    "NetExtender is interactive (prompts for server / username /",
+    "password) so this sample uses a tiny wrapper at",
+    "`$HOME/.local/bin/netextender-connect` that the user writes",
+    "with their pre-filled credentials. Example wrapper:",
+    "",
+    "  #!/bin/bash",
+    "  exec netExtender --auto-reconnect --auto-dns \\",
+    "      -u \"$USER\" -p \"$(secret-tool lookup app netextender)\" \\",
+    "      -d MYDOMAIN vpn.example.com",
+    "",
+    "Pair with `secret-tool store --label='NetExtender'",
+    "app netextender` to seed the password into the keyring.",
+    "",
+    "Status detection is process-based — `pgrep netExtender` returns",
+    "0 only while the tunnel is up. statusLabelCmd extracts the",
+    "tunnel IP from `ip -4 addr show ppp0` (NetExtender uses ppp0)."
+  ],
+  "id":               "netextender",
+  "name":             "Work VPN (NetExtender)",
+  "icon":             "󰦝",
+  "statusCmd":        ["pgrep", "-x", "netExtender"],
+  "statusOnPattern":  "^[0-9]+$",
+  "statusLabelCmd":   ["sh", "-lc", "ip -o -4 addr show ppp0 2>/dev/null | awk '{print $4}' | cut -d/ -f1"],
+  "connectCmd":       ["sh", "-lc", "$HOME/.local/bin/netextender-connect &"],
+  "disconnectCmd":    ["pkill", "-x", "netExtender"],
+  "pollSeconds":      5
+}

@@ -1,0 +1,11 @@
+{
+  "id":          "vpn",
+  "name":        "VPN",
+  "description": "Aggregated VPN status — NetworkManager profiles + custom providers (Tailscale, PIA, NetExtender, …) configured under ~/.config/nirimaki/vpns.d/.",
+  "version":     "1.0.0",
+  "author":      "nirimaki",
+  "mount":       "bar.right",
+  "after":       "network",
+  "entry":       "BarWidget.qml",
+  "api":         1
+}

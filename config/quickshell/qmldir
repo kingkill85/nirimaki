@@ -10,6 +10,7 @@ singleton AudioService 1.0 AudioService.qml
 singleton BluetoothService 1.0 BluetoothService.qml
 singleton NetworkService 1.0 NetworkService.qml
 singleton MonitorService 1.0 MonitorService.qml
+singleton VpnService 1.0 VpnService.qml
 Bar 1.0 Bar.qml
 BarPill 1.0 BarPill.qml
 BarPopover 1.0 BarPopover.qml
