@@ -12,8 +12,10 @@
 #   2. Confirmation prompt (skip with `-y`).
 #   3. Locate the Nirimaki git checkout via $NIRIMAKI_REPO →
 #      ~/.local/share/nirimaki/.git → dev-link fallback.
-#   4. Refresh archlinux-keyring first (stale keys are the #1 reason
-#      `pacman -Syu` fails silently on long-idle boxes).
+#   4. Refresh archlinux-keyring (+ cachyos-keyring on CachyOS) first
+#      — stale keys are the #1 reason `pacman -Syu` fails silently on
+#      long-idle boxes. Auto-recover via `pacman-key --refresh-keys`
+#      if the first -Sy is rejected by a DB signature.
 #   5. git pull --autostash on the repo.
 #   6. paru -Syu (else pacman -Syu) for the system + AUR.
 #   7. Refresh feature-state cache + reload niri config.
@@ -83,15 +85,58 @@ echo
 # Prime sudo once so the keyring + pacman/paru steps don't each prompt.
 nirimaki_sudo_prime
 
-# ---- 4. archlinux-keyring refresh -----------------------------------
-# Always reinstall — the keyring can be updated without a package
-# version bump, and missing maintainer keys silently break -Syu.
+# ---- 4. keyring refresh ---------------------------------------------
+# Always reinstall — keyrings can be updated without a package version
+# bump, and missing maintainer keys silently break -Syu. On CachyOS we
+# also need `cachyos-keyring` (CachyOS rotates its signing key
+# periodically; a stale local keyring rejects the cachyos-extra-v3.db
+# signature and the whole -Sy aborts before any package can be
+# downloaded). The condition keeps the line working on vanilla Arch
+# where the package doesn't exist.
+#
 # Filters the noisy "is up to date -- reinstalling" warning that
-# Arch emits when the install is a no-op. Force LC_ALL=C so the
+# pacman emits when the install is a no-op. Force LC_ALL=C so the
 # filter still matches on non-English locales (German pacman says
 # "ist aktuell -- Reinstalliere", etc.).
-echo "=> refresh archlinux-keyring"
-sudo LC_ALL=C pacman -Sy --noconfirm archlinux-keyring 2> >(grep -vE 'archlinux-keyring-[^ ]+ is up to date -- reinstalling$' >&2) >/dev/null
+keyring_pkgs=(archlinux-keyring)
+if pacman -Qq cachyos-keyring &>/dev/null; then
+  keyring_pkgs+=(cachyos-keyring)
+fi
+
+# Recovery branch — if `pacman -Sy` rejects a DB signature (a stale
+# trustdb hits this hardest), `pacman-key --refresh-keys` queries the
+# configured keyservers for the rotated keys, then we retry once. We
+# disable `set -e` around the first attempt so the trap doesn't fire
+# on the recoverable failure; the retry runs under normal -e rules so
+# a *second* failure still propagates to the ERR trap and the user
+# sees the standard "Update failed" message.
+echo "=> refresh keyring: ${keyring_pkgs[*]}"
+keyring_filter='(archlinux|cachyos)-keyring[^ ]* is up to date -- reinstalling$'
+set +e
+sudo LC_ALL=C pacman -Sy --noconfirm "${keyring_pkgs[@]}" \
+  2> >(grep -vE "$keyring_filter" >&2) >/dev/null
+rc=$?
+set -e
+if (( rc != 0 )); then
+  echo "   first attempt failed (likely stale signing keys) — recovering…"
+  # Two-stage recovery, cheap → expensive:
+  #   1. --populate re-imports keys from the on-disk keyring packages
+  #      into pacman's trustdb. Instant; fixes the case where the
+  #      trustdb has drifted from the local keyring (idempotent).
+  #   2. --refresh-keys hits the WKD / keyserver pool and re-fetches
+  #      every key in the trustdb. Slow (1-2 min) but covers the case
+  #      where a distro rotated a signing key without bumping the
+  #      shipping keyring package.
+  populate_targets=(archlinux)
+  pacman -Qq cachyos-keyring &>/dev/null && populate_targets+=(cachyos)
+  echo "   pacman-key --populate ${populate_targets[*]}"
+  sudo pacman-key --populate "${populate_targets[@]}"
+  echo "   pacman-key --refresh-keys (this can take a minute)"
+  sudo pacman-key --refresh-keys
+  echo "   retrying keyring install…"
+  sudo LC_ALL=C pacman -Sy --noconfirm "${keyring_pkgs[@]}" \
+    2> >(grep -vE "$keyring_filter" >&2) >/dev/null
+fi
 echo
 
 # ---- 5. git pull ----------------------------------------------------
