@@ -1,11 +1,12 @@
 {
-  "id": "power-menu",
-  "name": "Power menu",
+  "id":          "power-menu",
+  "name":        "Power menu",
   "description": "Lock / suspend / logout / restart / shutdown menu.",
-  "version": "1.0.0",
-  "author": "nirimaki",
-  "mount": "overlay",
-  "entry": "main.qml",
-  "ipc": "power-menu",
-  "api": 1
+  "version":     "1.1.0",
+  "author":      "nirimaki",
+  "kinds":       ["overlay"],
+  "entryPoints": {
+    "overlay": "main.qml"
+  },
+  "api":         1
 }

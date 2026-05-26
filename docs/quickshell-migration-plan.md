@@ -15,7 +15,7 @@ wifi management".
 - ✅ **Group D — AudioService + audio panel** (Phase O, `docs/phase-o-audio.md`)
 - ✅ **Group E — BluetoothService + bluetooth panel** (Phase P, `docs/phase-p-bluetooth.md`)
 - ✅ **Group F — NetworkService + network panel** (Phase Q, `docs/phase-q-network.md`)
-- 🔜 **Group G — Cleanup + polish** (Phase R, planned)
+- ✅ **Group G — Cleanup + polish** (Phase R, `docs/phase-r-cleanup.md`)
 
 A picking-up-from-here cheat sheet — quickshell gotchas, key files,
 new-session entry points — lives at

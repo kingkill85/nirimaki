@@ -1,6 +1,5 @@
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import qs
 
@@ -14,19 +13,22 @@ import qs
 // All the drilldown / search / keyboard nav / ListView rendering lives
 // inside MenuView so other plugins can use the same UI primitive.
 //
-// Trigger: `quickshell ipc call -- settings-menu toggle`
+// Trigger: `quickshell ipc call shell toggle settings-menu`.
+// Lazy-summoned by the v2 plugin host (kind: menu).
 Item {
     id: root
 
     property bool opened: false
-    property bool _everLoaded: false
+
+    // Loaded == summoned: snap to open.
+    Component.onCompleted: opened = true
 
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("settings-menu");
         }
     }
 
@@ -131,18 +133,7 @@ Item {
         onLoadFailed: { root.installedState = ({}); }
     }
 
-    // ---- Open / close / toggle --------------------------------------
-    function open() {
-        opened = true;
-        // Reset path/filter every time we summon — even if opened was
-        // already true (which would suppress the onOpenedChanged signal).
-        if (menuLoader.item) {
-            menuLoader.item.reset();
-            Qt.callLater(menuLoader.item.focusMenu);
-        }
-    }
-    function closeMenu()  { opened = false }
-    function toggleMenu() { opened ? closeMenu() : open() }
+    function closeMenu() { opened = false }
 
     // ---- Action dispatcher ------------------------------------------
     function _expandHome(v) {
@@ -159,21 +150,21 @@ Item {
         if (!action || !action.type) return;
         const a = action;
         if (a.type === "ipc") {
-            // Defer the IPC call so the menu finishes closing first —
-            // otherwise some overlays open behind our backdrop.
+            // External IPC target (not the shell). Fire synchronously
+            // while the menu QML is still alive — the menu is itself
+            // lazy-summoned now, so any Qt.callLater deferral would
+            // run AFTER closeMenu() has triggered Plugins.hide() and
+            // the Loader has torn this QML down, cancelling the
+            // deferred callback.
             const target = a.target, fn = a.fn || "toggle";
             const args = (a.args || []).map(root._expandHome);
-            Qt.callLater(() => Quickshell.execDetached(
-                ["quickshell", "ipc", "call", "--", target, fn].concat(args)));
+            Quickshell.execDetached(
+                ["quickshell", "ipc", "call", "--", target, fn].concat(args));
         } else if (a.type === "summon") {
-            // Sugar over `{type: "ipc", target: "shell", fn: "summon",
-            // args: [<id>, <payload>]}`. Used to open the new lazy-
-            // overlay/panel plugins (audio mixer, future bluetooth /
-            // network panels) from menu entries.
-            const id = a.id || "";
-            const payload = a.payload ? JSON.stringify(a.payload) : "";
-            Qt.callLater(() => Quickshell.execDetached(
-                ["quickshell", "ipc", "call", "--", "shell", "summon", id, payload]));
+            // Call Plugins.summon directly instead of bouncing through
+            // `shell summon` IPC. Same reason as above — and one
+            // singleton call is cheaper than a subprocess.
+            Plugins.summon(a.id || "", a.payload ? JSON.stringify(a.payload) : "");
         } else if (a.type === "tui") {
             NiriService.launchTui.apply(null, [a.name].concat((a.exec || []).map(root._expandHome)));
         } else if (a.type === "shell") {
@@ -191,14 +182,6 @@ Item {
         }
     }
 
-    IpcHandler {
-        target: "settings-menu"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closeMenu(); return "ok" }
-        function toggle(): string { root.toggleMenu(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     DialogShell {
         id: shell
         open: root.opened
@@ -211,12 +194,14 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        // Lazy-load the menu's interior — MenuView only instantiates
-        // on first open, then stays loaded for instant re-opens.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader stays around
+        // only because the sourceComponent → MenuView path is wired
+        // through Loader.onLoaded.
         Loader {
             id: menuLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
 
             sourceComponent: MenuView {
                 // Loader doesn't auto-stretch its item; the MenuView root
@@ -230,8 +215,14 @@ Item {
                 placeholder:    I18n.t("settings.placeholder")
 
                 onActionRequested: (action) => {
-                    root.closeMenu();
+                    // Dispatch FIRST: closeMenu() tears this QML down
+                    // synchronously (Plugins.hide unloads the outer
+                    // summon-Loader), so any code after closeMenu runs
+                    // in an invalidated context — `_dispatch` itself
+                    // becomes undefined. Run the action while we're
+                    // still alive, then close.
                     root._dispatch(action);
+                    root.closeMenu();
                 }
                 onCloseRequested: root.closeMenu()
             }

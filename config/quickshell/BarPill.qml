@@ -21,8 +21,8 @@ import Quickshell
 //
 // `active` lets the host tint the pill when its associated popover
 // is open. `onWheel` / `onRightClicked` are opt-in power gestures —
-// audio uses both (scroll = volume, right-click = wiremix); most
-// plugins ignore them.
+// audio uses both (scroll = volume, right-click = summon mixer panel);
+// most plugins ignore them.
 Item {
     id: root
 

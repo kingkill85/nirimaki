@@ -1,6 +1,4 @@
 import Quickshell
-import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.folderlistmodel
@@ -12,7 +10,8 @@ import qs
 // over the workspace, centred card, fuzzy filter, accent-coloured
 // selected row.
 //
-// Trigger: `quickshell ipc call -- theme-picker toggle`
+// Trigger: `quickshell ipc call shell toggle theme-picker`.
+// Lazy-summoned by the v2 plugin host.
 Item {
     id: root
 
@@ -21,15 +20,25 @@ Item {
     property int selectedIndex: 0
     property var themeNames: []         // alphabetically sorted
 
-    // Latched once the picker has been opened — keeps the lazy-loaded
-    // content tree alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open, seed selection to active theme.
+    Component.onCompleted: {
+        loadThemeList();
+        const cur = Theme.themeName;
+        const idx = themeNames.indexOf(cur);
+        selectedIndex = idx >= 0 ? idx : 0;
+        rebuild();
+        for (let i = 0; i < displayModel.count; i++) {
+            if (displayModel.get(i).name === cur) { selectedIndex = i; break; }
+        }
+        opened = true;
+    }
+
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("theme-picker");
         }
     }
 
@@ -141,14 +150,6 @@ Item {
 
     ListModel { id: displayModel }
 
-    IpcHandler {
-        target: "theme-picker"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closeMenu(); return "ok" }
-        function toggle(): string { root.toggleMenu(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     DialogShell {
         id: shell
         open: root.opened
@@ -161,12 +162,14 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        // Lazy-load the picker's interior — the ListView with theme
-        // rows only builds on first open.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper preserving the inner Component boundary
+        // (which keeps inner ids isolated from root).
         Loader {
             id: contentLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 

@@ -35,23 +35,28 @@ binds {
     // ===== Help =====
     // Mod+F1 — universal-keyboard-friendly (xkb name is the same on
     // every layout). Bare F1 would shadow apps' own help bind.
-    Mod+F1 hotkey-overlay-title="Keybinds" { spawn "quickshell" "ipc" "call" "--" "keybind-sheet" "toggle"; }
+    Mod+F1 hotkey-overlay-title="Keybinds" { spawn "quickshell" "ipc" "call" "shell" "toggle" "keybind-sheet" ""; }
 
     // ===== App launchers =====
     // Omarchy convention: Mod+Return / Mod+Space / Mod+Shift+<letter>.
+    // The trailing "" is the (unused) payload arg — `shell toggle` is
+    // typed `(id: string, payload: string)` and IPC rejects calls
+    // that omit it.
     Mod+Return       hotkey-overlay-title="Terminal: foot"         { spawn "foot"; }
-    Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "launcher" "toggle"; }
+    Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "shell" "toggle" "launcher" ""; }
     Mod+Shift+B      hotkey-overlay-title="Browser"                { spawn-sh "$HOME/.local/bin/nirimaki-browser-launch"; }
     Mod+Shift+E      hotkey-overlay-title="File explorer: nautilus" { spawn "nautilus"; }
 
     // ===== Pickers =====
-    // Omarchy uses the Mod+Ctrl+<key> family for pickers.
-    Mod+Ctrl+V           hotkey-overlay-title="Clipboard manager"   { spawn "quickshell" "ipc" "call" "--" "clipboard-picker"  "toggle"; }
-    Mod+E                hotkey-overlay-title="Emoji picker"        { spawn "quickshell" "ipc" "call" "--" "emoji-picker"      "toggle"; }
-    Mod+Ctrl+Space       hotkey-overlay-title="Background picker"   { spawn "quickshell" "ipc" "call" "--" "background-picker" "toggle"; }
-    Mod+Shift+Ctrl+Space hotkey-overlay-title="Theme picker"        { spawn "quickshell" "ipc" "call" "--" "theme-picker"      "toggle"; }
-    Mod+Escape           hotkey-overlay-title="Power menu"          { spawn "quickshell" "ipc" "call" "--" "power-menu"        "toggle"; }
-    Mod+Alt+Space        hotkey-overlay-title="Settings"            { spawn "quickshell" "ipc" "call" "--" "settings-menu"    "toggle"; }
+    // Omarchy uses the Mod+Ctrl+<key> family for pickers. All summons
+    // go through the shell IPC target — overlays are lazy-loaded by
+    // the v2 plugin host (kinds: [overlay/menu]).
+    Mod+Ctrl+V           hotkey-overlay-title="Clipboard manager"   { spawn "quickshell" "ipc" "call" "shell" "toggle" "clipboard-picker"  ""; }
+    Mod+E                hotkey-overlay-title="Emoji picker"        { spawn "quickshell" "ipc" "call" "shell" "toggle" "emoji-picker"      ""; }
+    Mod+Ctrl+Space       hotkey-overlay-title="Background picker"   { spawn "quickshell" "ipc" "call" "shell" "toggle" "background-picker" ""; }
+    Mod+Shift+Ctrl+Space hotkey-overlay-title="Theme picker"        { spawn "quickshell" "ipc" "call" "shell" "toggle" "theme-picker"      ""; }
+    Mod+Escape           hotkey-overlay-title="Power menu"          { spawn "quickshell" "ipc" "call" "shell" "toggle" "power-menu"        ""; }
+    Mod+Alt+Space        hotkey-overlay-title="Settings"            { spawn "quickshell" "ipc" "call" "shell" "toggle" "settings-menu"     ""; }
 
     // ===== Dictation =====
     // Mod+F9 toggles voxtype recording. Bare F9 would shadow apps'

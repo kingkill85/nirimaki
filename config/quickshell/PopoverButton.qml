@@ -11,7 +11,7 @@ import QtQuick
 // Two variants:
 //   - Primary   — accent border + accent text + faint accent fill. For
 //                 the "main" affordance the popover is built around
-//                 (run update, open bluetui, ...).
+//                 (run update, manage devices, …).
 //   - Secondary — fgDim border + fg text + faint fg fill. For neutral
 //                 toggles (mute, turn off, …).
 //   - Urgent    — urgent border + urgent text. For "destructive" or

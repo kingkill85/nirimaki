@@ -55,7 +55,7 @@ _vr_niri() {
 _vr_quickshell_ipc() {
   # Won't work during install (no session yet). Best-effort.
   if command -v quickshell >/dev/null 2>&1; then
-    if quickshell ipc call -- settings-menu ping >/dev/null 2>&1; then
+    if quickshell ipc call shell ping >/dev/null 2>&1; then
       ok "quickshell IPC alive"
     else
       warn "quickshell IPC not reachable (expected during install — verify after first niri login)"

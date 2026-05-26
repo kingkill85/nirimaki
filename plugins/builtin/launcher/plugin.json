@@ -1,11 +1,12 @@
 {
-  "id": "launcher",
-  "name": "Launcher",
+  "id":          "launcher",
+  "name":        "Launcher",
   "description": "Spotlight-style application + file launcher with calculator.",
-  "version": "1.0.0",
-  "author": "nirimaki",
-  "mount": "overlay",
-  "entry": "main.qml",
-  "ipc": "launcher",
-  "api": 1
+  "version":     "1.1.0",
+  "author":      "nirimaki",
+  "kinds":       ["overlay"],
+  "entryPoints": {
+    "overlay": "main.qml"
+  },
+  "api":         1
 }

@@ -1,6 +1,4 @@
 import Quickshell
-import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.folderlistmodel
@@ -17,7 +15,8 @@ import qs
 // theme, but a theme change resets the wallpaper. Acceptable
 // trade-off — wallpapers are theme-curated.
 //
-// Trigger: `quickshell ipc call -- background-picker toggle`
+// Trigger: `quickshell ipc call shell toggle background-picker`.
+// Lazy-summoned by the v2 plugin host.
 Item {
     id: root
 
@@ -26,15 +25,19 @@ Item {
     property int selectedIndex: 0
     property var bgs: []          // sorted list of absolute image paths
 
-    // Latched once the picker has been opened — keeps the lazy-loaded
-    // image grid alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open after collecting the listing.
+    Component.onCompleted: {
+        loadBgList();
+        rebuild();
+        opened = true;
+    }
+
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("background-picker");
         }
     }
 
@@ -202,14 +205,6 @@ Item {
 
     ListModel { id: displayModel }
 
-    IpcHandler {
-        target: "background-picker"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closeMenu(); return "ok" }
-        function toggle(): string { root.toggleMenu(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     DialogShell {
         id: shell
         open: root.opened
@@ -222,13 +217,14 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        // Lazy-load the image grid — first open builds the GridView
-        // and its image-loading delegates. Wallpaper picker is rare
-        // enough that paying the cost only on demand is a clean win.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper preserving the inner Component boundary
+        // (which keeps inner ids isolated from root).
         Loader {
             id: contentLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 

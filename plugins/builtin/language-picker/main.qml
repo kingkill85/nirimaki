@@ -1,6 +1,4 @@
 import Quickshell
-import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.folderlistmodel
@@ -12,7 +10,8 @@ import qs
 // first (before LC_MESSAGES / LANG) so the picker doubles as a
 // runtime locale switcher.
 //
-// Trigger: `quickshell ipc call -- language-picker toggle`
+// Trigger: `quickshell ipc call shell toggle language-picker`.
+// Lazy-summoned by the v2 plugin host.
 Item {
     id: root
 
@@ -21,15 +20,22 @@ Item {
     property int selectedIndex: 0
     property var entries: []   // [{ code, name }]
 
-    // Latched once the picker has been opened — keeps the lazy-loaded
-    // content tree alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open, seed selection to active locale.
+    Component.onCompleted: {
+        loadEntries();
+        rebuild();
+        for (let i = 0; i < displayModel.count; i++) {
+            if (displayModel.get(i).code === I18n.locale) { selectedIndex = i; break; }
+        }
+        opened = true;
+    }
+
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("language-picker");
         }
     }
 
@@ -154,14 +160,6 @@ Item {
 
     ListModel { id: displayModel }
 
-    IpcHandler {
-        target: "language-picker"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closeMenu(); return "ok" }
-        function toggle(): string { root.toggleMenu(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     DialogShell {
         id: shell
         open: root.opened
@@ -174,12 +172,14 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        // Lazy-load the picker's interior — first open builds the
-        // language ListView; rarely used so on-demand is a clean win.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper preserving the inner Component boundary
+        // (which keeps inner ids isolated from root).
         Loader {
             id: contentLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 

@@ -90,13 +90,18 @@ drop the key into `~/.config/niri/bindings.kdl` rebound to
 ## Plugin system (Phase K)
 
 The bar widgets, dialog overlays, bezels and toasts are **plugins** —
-QML drop-ins with a `plugin.json` manifest. The host is now down to 11
-files: shell.qml + Bar.qml (host surfaces), DialogShell + MenuView +
-PopupBus (UI primitives), Theme + I18n + NiriService + NotificationService
-+ UpdatesService (services), Plugins.qml (loader). Everything that
-*looks like a widget* — clock, audio, network, launcher, settings menu,
-power menu, OSD, notification toast, etc. — is a plugin under
-`plugins/builtin/`. 25 first-party plugins ship today.
+QML drop-ins with a `plugin.json` manifest. The host under
+`config/quickshell/` is itself a thin layer: `shell.qml` + `Bar.qml`
+(host surfaces), `DialogShell` + `MenuView` + `PopupBus` + the
+`BarPill`/`BarPopover`/`Popover*` + form-control primitives (Toggle,
+PanelSlider, Dropdown, SearchableDropdown, TextField, NumberField,
+Button, TabBar, Tooltip), the services (`Theme`, `I18n`, `Config`,
+`NiriService`, `AudioService`, `BluetoothService`, `NetworkService`,
+`NotificationService`, `UpdatesService`), and `Plugins.qml` (loader).
+Everything that *looks like a widget* — clock, audio, network,
+launcher, settings menu, power menu, OSD, notification toast, etc. —
+is a plugin under `plugins/builtin/`. 25 first-party plugins ship
+today.
 
 ### How plugins are discovered
 
@@ -128,9 +133,14 @@ legacy `mount` field. Each kind has its own lifecycle:
 | `service`    | eager     | headless, no UI surface (singleton-style) |
 
 Lazy kinds are loaded only when summoned, freeing memory until first
-use. The legacy `mount: overlay/bezel/toast` model keeps working
-unchanged — only plugins that explicitly set `kinds` use the new lazy
-path.
+use. The legacy `mount: bezel/toast` model is still used by `osd` and
+`notification-toast` (eager top-level mounts). `mount: overlay` is
+retired for first-party plugins — every overlay (launcher, the four
+pickers, power-menu, keybind-sheet, dev-gallery) and the settings
+menu now declares `kinds: ["overlay"|"menu"]` and is lazy-summoned via
+`shell toggle <id> ""`. The legacy `mount` path still works for
+third-party plugins that haven't migrated, but nothing in the repo
+relies on it for overlays anymore.
 
 ### Shell IPC
 
@@ -300,9 +310,12 @@ Uniform topbar behavior follows from BarPill + BarPopover: left-click
 opens the popover (or fires a plugin-specific action when there is no
 popover), and the chrome looks the same everywhere. Right-click, middle-
 click, and scroll are opt-in power gestures — audio uses scroll-to-adjust
-and right-click-to-wiremix; bluetooth uses right-click-to-bluetui;
-system-stats uses right-click-to-btop; weather uses middle-click-to-
-refresh; media uses scroll-to-skip and middle-click-to-play/pause.
+and right-click-to-mixer (summons the audio panel); bluetooth and
+network both use right-click-to-panel; system-stats uses
+right-click-to-btop; weather uses middle-click-to-refresh; media uses
+scroll-to-skip and middle-click-to-play/pause. wiremix / bluetui /
+nmcli stay installed as optional TUIs but are no longer the right-click
+target for any service-backed pill.
 
 Uniform popover *layout* follows from `PopoverHeader` / `PopoverDivider`
 / `PopoverActions` / `PopoverButton`: every popover composes

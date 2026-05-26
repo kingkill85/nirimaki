@@ -9,8 +9,8 @@
 #
 # Called by the SettingsMenu → Setup → Language drilldown leaves.
 # Equivalent to picking from the standalone LanguagePicker dialog —
-# that picker still works via `quickshell ipc call -- language-picker`
-# (used by Calendar's date-heading shortcut).
+# that picker still works via `quickshell ipc call shell summon
+# language-picker` (used by Calendar's date-heading shortcut).
 
 set -e
 

@@ -1,6 +1,5 @@
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import qs
 
@@ -10,8 +9,8 @@ import qs
 // in `{ e: "<emoji>", k: "<space-separated keywords>" }` shape).
 //
 // Activation pastes via wtype (same trick as the ClipboardPicker).
-// Trigger: `quickshell ipc call -- emoji-picker toggle` (bound to
-// Mod+E in niri config).
+// Trigger: `quickshell ipc call shell toggle emoji-picker` (bound to
+// Mod+E in niri config). Lazy-summoned by the v2 plugin host.
 //
 // Adaptations from upstream:
 //   - qs.Commons (Color.menu.* / Style.cornerRadius / OMARCHY_MENU_FONT)
@@ -27,15 +26,15 @@ Item {
     property int selectedIndex: 0
     property var emojis: []
 
-    // Latched once the picker has been opened — keeps the lazy-loaded
-    // content tree alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open.
+    Component.onCompleted: { opened = true; rebuildDisplay(); }
+
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("emoji-picker");
         }
     }
 
@@ -152,14 +151,6 @@ Item {
             "wl-copy '" + esc + "'; sleep 0.05; wtype '" + esc + "' 2>/dev/null || true"]);
     }
 
-    IpcHandler {
-        target: "emoji-picker"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closePicker(); return "ok" }
-        function toggle(): string { root.togglePicker(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     FileView {
         path: Quickshell.env("HOME") + "/.config/quickshell/emojis.json"
         onLoaded: root.loadEmojis(text())
@@ -177,13 +168,14 @@ Item {
 
         onCloseRequested: root.closePicker()
 
-        // Lazy-load the picker's interior — first open builds the
-        // GridView + grid cell delegates; the bar doesn't pay this
-        // cost at shell startup.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper kept only to preserve the inner Component
+        // boundary (which keeps inner ids isolated from root).
         Loader {
             id: contentLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 

@@ -9,10 +9,16 @@ where each remaining group plugs in.
 
 The big migration described in
 [`quickshell-migration-plan.md`](quickshell-migration-plan.md) is
-**nearly done**: the UI primitives, the plugin-kinds lifecycle, the
-shell.json config, and all three service-backed plugins (audio +
-bluetooth + network, each with its tabbed panel) are in. Only the
-Group G cleanup pass remains.
+**done**: the UI primitives, the plugin-kinds lifecycle, the
+shell.json config, all three service-backed plugins (audio +
+bluetooth + network, each with its tabbed panel), and the Group G
+cleanup pass (Phase R) are all in. The remaining nine legacy overlay
+plugins (launcher / emoji-picker / clipboard-picker / theme-picker /
+power-menu / background-picker / language-picker / keybind-sheet /
+settings-menu) were migrated to schema v2 lazy-summon, and their
+keybinds + cross-references now route through `shell toggle <id> ""`.
+Future work is feature-level (NightLight / DnD / bar settings editor /
+…), not migration-level.
 
 Run the dev gallery to eyeball the kit:
 
@@ -278,19 +284,24 @@ Deferred from this phase: hidden SSID entry, VPN section, saved-only
 profile management (NMSettings listing without a live AP), WPA-EAP
 enterprise UX. See `phase-q-network.md` for the full list.
 
-## Picking up Group G (Cleanup)
+## Group G (Cleanup) — done
 
-- Audit right-click handlers across plugins — every service-backed
-  bar pill right-clicks into its panel.
-- Decide whether `wiremix`, `bluetui`, `impala` stay in
-  `packages.txt` (probably yes, as optional power-user tools).
-- Migrate the remaining "legacy" overlay plugins (launcher,
-  emoji-picker, clipboard-picker, theme-picker, power-menu,
-  background-picker, language-picker) to `kinds: ["overlay"]` with
-  lazy summon. Their existing `mount: overlay` + own `IpcHandler`
-  pattern keeps working unchanged today, so this is purely a
-  cleanup pass.
-- Write a top-level `phase-r-cleanup.md`.
+Phase R closed out the migration:
+
+- Right-click audit confirmed; audio / bluetooth / network already
+  route right-click into their panel.
+- All nine legacy overlay plugins (launcher / emoji-picker /
+  clipboard-picker / theme-picker / power-menu / background-picker /
+  language-picker / keybind-sheet / settings-menu) migrated to
+  `kinds: ["overlay"|"menu"]`, lazy-summoned via `shell toggle`.
+  Per-plugin `IpcHandler` blocks were dropped.
+- `default/niri/bindings.kdl` keybinds rewritten to `quickshell ipc
+  call shell toggle <id> ""`.
+- `config/quickshell/settings-menu.json` switched its three remaining
+  `{ type: "ipc" }` entries to `{ type: "summon" }`.
+- `wiremix` / `bluetui` stay in `install/packaging.sh` as optional
+  TUIs. `impala` already removed during Phase Q.
+- Full breakdown in [`docs/phase-r-cleanup.md`](phase-r-cleanup.md).
 
 ## Things you'll want to know about the running system
 
@@ -311,5 +322,6 @@ enterprise UX. See `phase-q-network.md` for the full list.
 - AudioService / mixer → `docs/phase-o-audio.md`
 - BluetoothService / device manager → `docs/phase-p-bluetooth.md`
 - NetworkService / connection manager → `docs/phase-q-network.md`
+- Cleanup pass / legacy-overlay migration → `docs/phase-r-cleanup.md`
 - Big picture → `docs/quickshell-migration-plan.md`
 - Project conventions → `CLAUDE.md`

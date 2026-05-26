@@ -1,11 +1,12 @@
 {
-  "id": "settings-menu",
-  "name": "Settings menu",
+  "id":          "settings-menu",
+  "name":        "Settings menu",
   "description": "Unified settings drilldown — Style / Setup / Install / Remove / Update / Plugins / System.",
-  "version": "1.0.0",
-  "author": "nirimaki",
-  "mount": "overlay",
-  "entry": "main.qml",
-  "ipc": "settings-menu",
-  "api": 1
+  "version":     "1.1.0",
+  "author":      "nirimaki",
+  "kinds":       ["menu"],
+  "entryPoints": {
+    "menu": "main.qml"
+  },
+  "api":         1
 }

@@ -1,6 +1,5 @@
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import QtQuick.Controls
 import qs
@@ -18,7 +17,8 @@ import qs
 // under a synthetic "User overrides" header injected at concat time.
 //
 // Two columns: chord left, label right. Filter input on top.
-// Trigger: `quickshell ipc call -- keybind-sheet toggle`.
+// Trigger: `quickshell ipc call shell toggle keybind-sheet`.
+// Lazy-summoned by the v2 plugin host.
 Item {
     id: root
 
@@ -32,15 +32,16 @@ Item {
     property int currentIndex: 0
     property string searchText: ""
 
-    // Latched once the sheet has been opened — keeps the lazy-loaded
-    // content tree alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open. FileView onLoaded triggers an
+    // additional reparse once the kdl content is available.
+    Component.onCompleted: { reparse(); opened = true; }
+
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("keybind-sheet");
         }
     }
     readonly property string raw:
@@ -248,14 +249,6 @@ Item {
         onLoadFailed:   { root.rawUser = ""; if (root.opened) root.reparse(); }
     }
 
-    IpcHandler {
-        target: "keybind-sheet"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closeMenu(); return "ok" }
-        function toggle(): string { root.toggleMenu(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     DialogShell {
         id: shell
         open: root.opened
@@ -268,12 +261,14 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        // Lazy-load the sheet's interior — parses two kdl files and
-        // builds a long ListView; only on first open.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper preserving the inner Component boundary
+        // (which keeps inner ids isolated from root).
         Loader {
             id: contentLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 

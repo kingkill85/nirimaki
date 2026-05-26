@@ -3,8 +3,8 @@ import QtQuick
 // Footer row of equally-sized PopoverButtons inside a BarPopover.
 //
 //   PopoverActions {
-//       PopoverButton { label: "turn off";  onTriggered: ... }
-//       PopoverButton { label: "bluetui";   variant: PopoverButton.Primary; onTriggered: ... }
+//       PopoverButton { label: "turn off"; onTriggered: ... }
+//       PopoverButton { label: "manage";   variant: PopoverButton.Primary; onTriggered: ... }
 //   }
 //
 // Children laid out left-to-right, each one taking an equal share of

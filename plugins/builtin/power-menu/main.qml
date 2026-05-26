@@ -1,6 +1,4 @@
 import Quickshell
-import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import qs
 
@@ -14,8 +12,9 @@ import qs
 // providers) is a much larger task — deferred. This file gives us the
 // Phase C "Power menu" item: lock / suspend / logout / restart / shutdown.
 //
-// Trigger: `quickshell ipc call -- power-menu toggle` (bound to Mod+Shift+E
-// in niri config — replaces the default niri quit-confirmation dialog).
+// Trigger: `quickshell ipc call shell toggle power-menu` (bound to
+// Mod+Escape in niri config — replaces the default niri quit-confirmation
+// dialog). Lazy-summoned by the v2 plugin host.
 Item {
     id: root
 
@@ -34,15 +33,15 @@ Item {
     property string filterText: ""
     property int selectedIndex: 0
 
-    // Latched once the menu has been opened — keeps the lazy-loaded
-    // content tree alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open.
+    Component.onCompleted: { rebuild(); opened = true; }
+
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("power-menu");
         }
     }
 
@@ -127,14 +126,6 @@ Item {
 
     ListModel { id: displayModel }
 
-    IpcHandler {
-        target: "power-menu"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closeMenu(); return "ok" }
-        function toggle(): string { root.toggleMenu(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     DialogShell {
         id: shell
         open: root.opened
@@ -147,13 +138,13 @@ Item {
 
         onCloseRequested: root.closeMenu()
 
-        // Lazy-load the menu's interior — the Item + Column + ListView
-        // tree only instantiates on first open, and stays loaded for
-        // subsequent opens. The bar itself doesn't pay this cost at
-        // shell startup.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper preserving the inner Component boundary
+        // (which keeps inner ids isolated from root).
         Loader {
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 

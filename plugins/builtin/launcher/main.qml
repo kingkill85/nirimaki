@@ -1,33 +1,34 @@
 import QtQuick
 import QtQuick.Controls
 import Quickshell
-import Quickshell.Wayland
-import Quickshell.Io
 import qs
 
 // Application launcher styled to look + behave like Omarchy's walker.
-// One instance per shell (NOT per screen).
-// Trigger:   Mod+D → `quickshell ipc call launcher toggle`
+// One instance per shell (NOT per screen). Lazy-summoned via
+// `quickshell ipc call shell toggle launcher` — the outer Loader in
+// shell.qml only instantiates this QML once summoned, so the bar pays
+// nothing at startup.
 //
 // Surfaces are handled by DialogShell: scrim (no blur) + dialog
 // (blurred behind translucent card), matching Omarchy's look.
 Item {
     id: root
 
+    // Plays back to PopupBus._close + tracked by onOpenedChanged so
+    // writing `opened = false` from anywhere (Escape, click outside,
+    // app launch) tears the overlay down via Plugins.hide.
     property bool opened: false
 
-    // Drives the lazy-loaded ListView's currentIndex + TextInput's text
-    // from outside the content Component (which isolates inner ids).
+    // Drives the ListView's currentIndex + TextInput's text from
+    // outside the content Component (which isolates inner ids).
     property int currentIndex: 0
     property string searchText: ""
 
-    // Latched once the launcher has been opened — keeps the lazy-loaded
-    // content tree alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open and grab the popup gate.
+    Component.onCompleted: opened = true
 
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             searchText = "";
             currentIndex = 0;
             PopupBus.show(root);
@@ -35,6 +36,7 @@ Item {
             // Connections on root.opened — see Loader below.
         } else {
             PopupBus.hide(root);
+            Plugins.hide("launcher");
         }
     }
 
@@ -108,13 +110,14 @@ Item {
 
         onCloseRequested: root.opened = false
 
-        // Lazy-load the launcher's interior — the ListView + delegate
-        // tree only builds on first open. DesktopEntries itself is
-        // lazy via Quickshell, so the bar pays nothing at startup.
+        // The outer summon-Loader in shell.qml already gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper kept only to preserve the inner Component
+        // boundary (which keeps inner ids isolated from root).
         Loader {
             id: contentLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 
@@ -268,11 +271,4 @@ Item {
         }
     }
 
-    // ---- IPC ----
-    IpcHandler {
-        target: "launcher"
-        function toggle(): void { root.opened = !root.opened }
-        function show():   void { root.opened = true }
-        function hide():   void { root.opened = false }
-    }
 }

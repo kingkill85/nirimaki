@@ -1,6 +1,5 @@
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import qs
 
@@ -18,8 +17,9 @@ import qs
 // Theming adapted: qs.Commons (Color.menu.*, Style.cornerRadius, env
 // OMARCHY_MENU_FONT) → Theme.qml.
 //
-// Trigger: `quickshell ipc call -- clipboard-picker toggle`
-// (bound to Mod+Period in niri config).
+// Trigger: `quickshell ipc call shell toggle clipboard-picker`
+// (bound to Mod+Period in niri config). Lazy-summoned by the v2
+// plugin host.
 Item {
     id: root
 
@@ -28,15 +28,20 @@ Item {
     property int selectedIndex: 0
     property var items: []
 
-    // Latched once the picker has been opened — keeps the lazy-loaded
-    // content tree alive after first close so re-opens are instant.
-    property bool _everLoaded: false
+    // Loaded == summoned: snap to open and kick off the fetch.
+    Component.onCompleted: {
+        opened = true;
+        fetchProc.collected = "";
+        fetchProc.command = ["cliphist", "list"];
+        fetchProc.running = true;
+    }
+
     onOpenedChanged: {
         if (opened) {
-            _everLoaded = true;
             PopupBus.show(root);
         } else {
             PopupBus.hide(root);
+            Plugins.hide("clipboard-picker");
         }
     }
 
@@ -162,14 +167,6 @@ Item {
         }
     }
 
-    IpcHandler {
-        target: "clipboard-picker"
-        function summon(): string { root.open(); return "ok" }
-        function hide(): string   { root.closePicker(); return "ok" }
-        function toggle(): string { root.togglePicker(); return "ok" }
-        function ping(): string   { return "ok" }
-    }
-
     DialogShell {
         id: shell
         open: root.opened
@@ -182,12 +179,14 @@ Item {
 
         onCloseRequested: root.closePicker()
 
-        // Lazy-load the picker's interior — the ListView + preview
-        // pane only build on first open.
+        // The outer summon-Loader in shell.qml gates QML
+        // instantiation on first open; this inner Loader is now an
+        // always-on wrapper preserving the inner Component boundary
+        // (which keeps inner ids isolated from root).
         Loader {
             id: contentLoader
             anchors.fill: parent
-            active: root.opened || root._everLoaded
+            active: true
             sourceComponent: contentComponent
         }
 
