@@ -1,0 +1,11 @@
+{
+  "id": "start",
+  "name": "Start",
+  "description": "Logo button at the far left — opens the settings menu.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.left",
+  "before": "workspaces",
+  "entry": "main.qml",
+  "api": 1
+}
