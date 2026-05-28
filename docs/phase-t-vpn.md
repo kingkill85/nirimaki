@@ -154,13 +154,12 @@ here; reinventing every vendor's auth/profile/region UX isn't worth it.
   are fire-and-forget. The status label transitions from
   "Disconnected" through whatever interim states the provider
   reports to "Connected" on its own; no spinner / connecting UI.
-- **Hidden-network / credential prompts for NM VPNs.** Activating
-  a profile that needs interactive secrets (no `secret-flags 0`)
-  will silently fail — NM emits a polkit auth request and we
-  haven't wired a polkit agent into the shell yet. Workaround: set
-  secret-flags 0 + store the secret in the profile, or save the
-  secret in the keyring with `secret-tool` and prime nm-secret-agent
-  via the desktop session.
+- **Hidden-network / credential prompts for NM VPNs.** Resolved by
+  the polkit-gnome agent autostarted from `default/niri/autostart.kdl`
+  (see migration `1779963424.sh`). Activating a profile that needs
+  interactive secrets now pops a password dialog instead of silently
+  failing. The `secret-flags 0` / `secret-tool` workarounds still apply
+  if you want non-interactive activation.
 
 ## Files this phase touched
 

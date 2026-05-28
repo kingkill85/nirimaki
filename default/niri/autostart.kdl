@@ -32,6 +32,25 @@ environment {
 // that fall back to X11 for menus, …).
 spawn-at-startup "xwayland-satellite"
 
+// polkit auth agent — without one, GUI requests for elevated privileges
+// (Nautilus unlocking an internal LUKS drive, NetworkManager VPN secret
+// prompts, GNOME Disks operations) fail silently with "not authorized"
+// because polkit has no front-end to draw the password dialog. Niri ships
+// no agent of its own, so we autostart polkit-gnome — GTK-based, matches
+// the Nautilus / xdg-desktop-portal-gnome stack the rest of the install
+// pulls in.
+spawn-at-startup "/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1"
+
+// Secret-service daemon — provides org.freedesktop.secrets on the session
+// bus, the API every GTK app (Nautilus saving a LUKS passphrase,
+// NetworkManager-applet saving WiFi/VPN passwords, libsecret-using
+// tools generally) uses to persist secrets. Niri runs none of GNOME's
+// session services, so without this autostart DBus fails the activation
+// with "The name is not activatable" and secret-saving silently breaks.
+// Components: `secrets` (the API itself) + `ssh` (drop-in ssh-agent
+// replacement so `ssh-add` Just Works in this session).
+spawn-sh-at-startup "gnome-keyring-daemon --start --components=secrets,ssh >/dev/null 2>&1"
+
 // Quickshell is the bar/shell.
 spawn-at-startup "quickshell"
 

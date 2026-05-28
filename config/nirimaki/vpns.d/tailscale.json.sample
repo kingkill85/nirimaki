@@ -1,37 +1,43 @@
 {
   "_comment": [
-    "Tailscale provider for the VPN bar widget.",
+    "Tailscale provider for the VPN bar widget + network panel.",
     "",
-    "Drop the .sample suffix (or run `nirimaki tailscale install`,",
-    "which auto-activates this file) and Tailscale will show up in",
-    "the VPN bar pill's popover.",
+    "Drop the .sample suffix (or use Settings → Install → Service →",
+    "Tailscale, which auto-activates this file).",
     "",
-    "Requires `tailscale` in PATH (package: tailscale). connectCmd /",
-    "disconnectCmd both call the plain CLI, which only works when",
-    "the daemon is set to grant your user unprivileged control:",
+    "Requires `tailscale` in PATH. The Install step enables tailscaled",
+    "and runs `tailscale set --operator=$USER` so the panel's Connect /",
+    "Disconnect buttons work without sudo.",
     "",
-    "    sudo tailscale set --operator=$USER",
-    "",
-    "Otherwise `tailscale up/down` will demand sudo and the popover",
-    "buttons will silently fail. `nirimaki tailscale install` runs",
-    "the operator command for you; on existing installs run it once",
-    "manually.",
-    "",
-    "Initial sign-in still happens via `sudo tailscale up` from a",
-    "terminal — the connect button doesn't drive the device-auth",
-    "URL flow.",
+    "First-time sign-in needs the device-auth URL flow, which prints",
+    "to stdout. connectCmd inspects BackendState first: when it's",
+    "`NeedsLogin`, it opens a foot terminal showing the URL and",
+    "blocks on Enter so you can copy it. Once authenticated,",
+    "subsequent Connects just run `tailscale up` silently.",
     "",
     "statusLabelCmd extracts the connected hostname so the bar pill",
-    "tooltip reads 'Tailscale · my-laptop' instead of just",
-    "'Tailscale'."
+    "tooltip reads 'Tailscale · my-laptop' instead of just 'Tailscale'."
   ],
-  "id":               "tailscale",
-  "name":             "Tailscale",
-  "icon":             "󰦝",
+  "id":   "tailscale",
+  "name": "Tailscale",
+  "icon": "󰦝",
+
+  "install": {
+    "package": "tailscale",
+    "binary":  "tailscale",
+    "hint":    "Installs the tailscaled daemon, enables it, and grants your user passwordless control via `tailscale set --operator`.",
+    "postInstall": [
+      ["sudo", "systemctl", "enable", "--now", "tailscaled"],
+      ["sudo", "tailscale", "set", "--operator=$USER"]
+    ]
+  },
+
   "statusCmd":        ["sh", "-lc", "tailscale status --json | jq -r .BackendState"],
   "statusOnPattern":  "^Running$",
   "statusLabelCmd":   ["sh", "-lc", "tailscale status --json | jq -r '.Self.DNSName // .Self.HostName | rtrimstr(\".\")'"],
-  "connectCmd":       ["tailscale", "up"],
+  "connectCmd":       ["sh", "-lc",
+                       "state=$(tailscale status --json 2>/dev/null | jq -r .BackendState); if [ \"$state\" = Running ] || [ \"$state\" = Starting ]; then tailscale up; else exec foot -T 'Tailscale — Sign in' sh -lc 'echo \"Granting your user control of tailscaled (idempotent)…\"; echo; if ! sudo tailscale set --operator=\"$USER\"; then echo \"sudo failed.\"; read -p \"Press Enter to close… \" _; exit 1; fi; echo; tailscale up; echo; read -p \"Press Enter to close… \" _'; fi"],
   "disconnectCmd":    ["tailscale", "down"],
+  "removeCmd":        ["tailscale", "logout"],
   "pollSeconds":      5
 }

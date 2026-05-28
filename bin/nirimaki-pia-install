@@ -1,0 +1,45 @@
+#!/bin/bash
+# nirimaki:group=pia
+# nirimaki:summary=Install Private Internet Access (piactl CLI + GUI client)
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+. "$HOME/.local/bin/nirimaki-vpn-provider-helpers"
+
+nirimaki_banner "Private Internet Access" "Install"
+
+if command -v piactl >/dev/null 2>&1; then
+  echo "piavpn-bin is already installed."
+  echo "Re-syncing the piavpn.service enable state (idempotent)."
+else
+  echo "Installing:"
+  echo "  - piavpn-bin (AUR) — piactl CLI + pia-client GUI + piavpn.service daemon"
+fi
+
+vpn_locate_repo
+nirimaki_sudo_prime
+
+# AUR package is piavpn-bin (vendor-provided binary tarball). paru
+# handles the AUR build + its own sudo step internally.
+paru -S --needed --noconfirm piavpn-bin
+
+echo
+echo "Enabling piavpn.service (PIA daemon)…"
+# Without the daemon running, piactl times out and the network panel's
+# Connect button on the PIA row hangs forever. enable --now is
+# idempotent — re-runs are safe.
+sudo systemctl enable --now piavpn.service
+
+echo
+echo "  ✓ Private Internet Access installed."
+echo "  → Sign in via pia-client (Add → PIA in Network panel launches it)."
+echo "  → Once signed in, Connect/Disconnect on the PIA row work via piactl."
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null 2>&1 || true
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" pia-installed || true
+
+nirimaki_pause

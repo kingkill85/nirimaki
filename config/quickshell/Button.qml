@@ -42,7 +42,14 @@ Rectangle {
       : variant === Button.Urgent  ? Theme.urgent
       :                              Theme.fg
 
-    implicitWidth:  Math.max(80, label.implicitWidth + 2 * Theme.controlPadX)
+    // Icon-only mode (label === "" + iconLeading set) collapses the
+    // button to a square ~controlHeight, otherwise the standard 80-min
+    // width keeps text buttons readable.
+    readonly property bool _iconOnly: label === "" && iconLeading !== 0
+
+    implicitWidth: _iconOnly
+                     ? Theme.controlHeight
+                     : Math.max(80, _labelText.implicitWidth + 2 * Theme.controlPadX)
     height: Theme.controlHeight
     radius: Theme.radius
     opacity: enabled ? 1.0 : 0.4
@@ -54,14 +61,31 @@ Rectangle {
 
     Behavior on color { ColorAnimation { duration: 100 } }
 
-    Text {
-        id: label
+    Row {
         anchors.centerIn: parent
-        text: root.label
-        color: root._textColor
-        font.family: Theme.sansFamily
-        font.pixelSize: Theme.fontPx
-        font.bold: true
+        spacing: 6
+
+        // Nerd-Font glyph rendered in iconFamily. Hidden when iconLeading
+        // is 0 (default). Sized 2px above fontPx so the glyph optically
+        // matches the bold label text next to it.
+        Text {
+            visible: root.iconLeading !== 0
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.iconLeading !== 0 ? String.fromCodePoint(root.iconLeading) : ""
+            color: root._textColor
+            font.family: Theme.iconFamily
+            font.pixelSize: Theme.fontPx + 2
+        }
+        Text {
+            id: _labelText
+            visible: root.label !== ""
+            anchors.verticalCenter: parent.verticalCenter
+            text: root.label
+            color: root._textColor
+            font.family: Theme.sansFamily
+            font.pixelSize: Theme.fontPx
+            font.bold: true
+        }
     }
 
     MouseArea {

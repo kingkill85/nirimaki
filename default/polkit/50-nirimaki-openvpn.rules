@@ -1,0 +1,23 @@
+// Nirimaki — passwordless openvpn-client@.service control for wheel-
+// group users on local active sessions. Installed by the openvpn
+// provider template (config/nirimaki/vpns.d/openvpn.json.sample) so
+// the network panel's connect/disconnect buttons don't trigger a
+// polkit password dialog every time.
+//
+// Scope is intentionally narrow: only openvpn-client@*.service units,
+// only systemd manage-unit{,-files} actions. Everything else still
+// goes through the normal polkit decision path.
+
+polkit.addRule(function(action, subject) {
+    if (action.id != "org.freedesktop.systemd1.manage-units" &&
+        action.id != "org.freedesktop.systemd1.manage-unit-files") {
+        return;
+    }
+    var unit = action.lookup("unit");
+    if (!unit || unit.indexOf("openvpn-client@") != 0) {
+        return;
+    }
+    if (subject.local && subject.active && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

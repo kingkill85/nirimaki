@@ -1,0 +1,58 @@
+#!/bin/bash
+# nirimaki:group=openvpn
+# nirimaki:summary=Remove the Nirimaki OpenVPN integration (keeps the package)
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+. "$HOME/.local/bin/nirimaki-vpn-provider-helpers"
+
+nirimaki_banner "OpenVPN" "Remove"
+
+if ! command -v openvpn >/dev/null 2>&1; then
+  echo "openvpn is not installed — nothing to remove."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing:"
+echo "  - any running openvpn-client@*.service tunnels (stopped first)"
+echo "  - Nirimaki bar-widget entry (~/.config/nirimaki/vpns.d/openvpn.json)"
+echo "  - polkit rule (/etc/polkit-1/rules.d/50-nirimaki-openvpn.rules)"
+echo
+echo "Leaving in place:"
+echo "  - openvpn package (paru -Rns it yourself if desired)"
+echo "  - your /etc/openvpn/client/*.conf profiles"
+
+nirimaki_sudo_prime
+
+echo
+echo "Stopping any active openvpn-client tunnels…"
+mapfile -t ov_units < <(systemctl list-units --type=service --state=active \
+                          --no-legend 'openvpn-client@*' 2>/dev/null \
+                          | awk '{print $1}')
+if (( ${#ov_units[@]} == 0 )); then
+  echo "  (none active)"
+else
+  for u in "${ov_units[@]}"; do
+    echo "  systemctl stop $u"
+    sudo systemctl stop "$u" 2>/dev/null || true
+  done
+fi
+
+echo
+vpn_polkit_remove 50-nirimaki-openvpn.rules
+
+echo
+vpn_unregister openvpn
+
+echo
+echo "  ✓ OpenVPN removed from Nirimaki."
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null 2>&1 || true
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" openvpn-removed || true
+
+nirimaki_pause

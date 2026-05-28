@@ -1,0 +1,428 @@
+#!/bin/bash
+# nirimaki:group=feature
+# nirimaki:summary=Sourced library — shared VPN-provider install/remove plumbing
+# nirimaki:hidden=true
+#
+# Source (don't exec) from each `nirimaki-<provider>-{install,remove}`
+# script after the feature prelude:
+#
+#   . "$HOME/.local/bin/nirimaki-feature-prelude"
+#   . "$HOME/.local/bin/nirimaki-vpn-provider-helpers"
+#   nirimaki_banner "WireGuard" "Install"
+#   vpn_locate_repo
+#   nirimaki_sudo_prime
+#   sudo pacman -S --needed --noconfirm wireguard-tools
+#   vpn_polkit_install 50-nirimaki-wireguard.rules
+#   vpn_register wireguard          # copies .sample → .json, adds bar pill
+#
+# Symmetric pair on remove:
+#   vpn_unregister wireguard        # drops .json, drops pill if empty
+#   vpn_polkit_remove 50-nirimaki-wireguard.rules
+#
+# Helpers exposed:
+#   vpn_locate_repo           sets $NIRIMAKI_REPO if unset
+#   vpn_locate_sample <id>    resolves vpns.d/<id>.json.sample → exports $sample
+#   vpn_register <id>         .sample → .json + add pill
+#   vpn_unregister <id>       drop .json + drop pill if no providers remain
+#   vpn_pill_add              add vpn entry to shell.json bar.layout.right
+#   vpn_pill_remove_if_empty  drop vpn entry when nothing's left
+#   vpn_polkit_install <name> install default/polkit/<name> system-wide
+#   vpn_polkit_remove <name>  uninstall the same
+
+# Locate the repo root so vpn_register / vpn_polkit_install can find
+# the .sample files and shipped polkit rules. Mirrors nirimaki-update's
+# resolution strategy — $NIRIMAKI_REPO env var → ~/.config/quickshell
+# symlink walk → ~/.local/share/nirimaki.
+vpn_locate_repo() {
+  if [[ -n ${NIRIMAKI_REPO:-} && -d $NIRIMAKI_REPO ]]; then
+    export NIRIMAKI_REPO
+    return
+  fi
+  local repo=""
+  if [[ -L $HOME/.config/quickshell ]]; then
+    repo=$(git -C "$(readlink -f "$HOME/.config/quickshell")" rev-parse --show-toplevel 2>/dev/null || true)
+  fi
+  if [[ -z $repo ]]; then
+    local share="$HOME/.local/share/nirimaki"
+    if   [[ -L $share/default ]]; then repo=$(git -C "$(readlink -f "$share/default")" rev-parse --show-toplevel 2>/dev/null || true)
+    elif [[ -d $share/.git ]];    then repo="$share"
+    fi
+  fi
+  NIRIMAKI_REPO="$repo"
+  export NIRIMAKI_REPO
+}
+
+# Locate a provider's .sample file across dev-link and production-install
+# layouts. On success, exports $sample. On failure, returns 1 so a `&&`
+# chain bails out.
+vpn_locate_sample() {
+  local id="$1"
+  local vpns_dir="$HOME/.config/nirimaki/vpns.d"
+  for cand in \
+    "$vpns_dir/$id.json.sample" \
+    "${NIRIMAKI_REPO:-}/config/nirimaki/vpns.d/$id.json.sample" \
+    "$HOME/.local/share/nirimaki/config/nirimaki/vpns.d/$id.json.sample"
+  do
+    if [[ -n $cand && -e $cand ]]; then
+      sample="$cand"
+      export sample
+      return 0
+    fi
+  done
+  echo "vpn_locate_sample: $id.json.sample not found" >&2
+  return 1
+}
+
+# Copy <id>.json.sample → <id>.json (only if .json doesn't exist) and
+# add the vpn pill to shell.json's bar.layout.right.
+vpn_register() {
+  local id="$1"
+  local vpns_dir="$HOME/.config/nirimaki/vpns.d"
+  local cfg="$vpns_dir/$id.json"
+  if [[ -e $cfg ]]; then
+    echo "Existing $cfg kept — your customisations stay put."
+  elif vpn_locate_sample "$id"; then
+    mkdir -p "$vpns_dir"
+    cp -L -- "$sample" "$cfg"
+    echo "Registered $id with the Nirimaki VPN bar widget."
+  else
+    echo "Warning: $id.json.sample not found — VPN bar entry not registered."
+  fi
+  vpn_pill_add
+}
+
+# Add the vpn pill to shell.json bar.layout.right (after network if
+# present, else appended). Idempotent.
+vpn_pill_add() {
+  local shelljson="$HOME/.config/nirimaki/shell.json"
+  [[ -f $shelljson ]] || return
+  command -v jq >/dev/null 2>&1 || return
+  if jq -e '.bar.layout.right | map(.id) | index("vpn")' "$shelljson" >/dev/null 2>&1; then
+    return
+  fi
+  local tmp
+  tmp=$(mktemp "${shelljson}.XXXXXX")
+  jq '
+    .bar.layout.right as $r
+    | ($r | map(.id) | index("network")) as $i
+    | if $i == null
+      then .bar.layout.right += [{"id":"vpn"}]
+      else .bar.layout.right = ($r[0:$i+1] + [{"id":"vpn"}] + $r[$i+1:])
+      end
+  ' "$shelljson" > "$tmp" && mv -- "$tmp" "$shelljson"
+  echo "Added vpn pill to shell.json bar layout."
+}
+
+# Remove <id>.json. The .sample stays — it's a symlink back to the
+# repo, and a future re-install just re-activates it.
+vpn_unregister() {
+  local id="$1"
+  local cfg="$HOME/.config/nirimaki/vpns.d/$id.json"
+  if [[ -f $cfg ]]; then
+    rm -f -- "$cfg"
+    echo "Dropped $id VPN bar-widget entry."
+  fi
+  vpn_pill_remove_if_empty
+}
+
+# If no custom JSON files AND no NM VPN profiles remain, drop the vpn
+# pill from shell.json. Row spacing leaves a phantom gap around an
+# empty Loader slot, so the whole entry has to go to avoid that.
+vpn_pill_remove_if_empty() {
+  local shelljson="$HOME/.config/nirimaki/shell.json"
+  [[ -f $shelljson ]] || return
+  command -v jq >/dev/null 2>&1 || return
+  local custom=0 nm_count=0 total=0
+  if [[ -d $HOME/.config/nirimaki/vpns.d ]]; then
+    custom=$(find "$HOME/.config/nirimaki/vpns.d" -maxdepth 1 -name '*.json' ! -name '*.json.sample' 2>/dev/null | wc -l)
+  fi
+  if command -v nmcli >/dev/null 2>&1; then
+    nm_count=$(nmcli -t -f TYPE connection show 2>/dev/null | grep -cE '^(vpn|wireguard)$' || true)
+  fi
+  total=$((custom + nm_count))
+  if (( total == 0 )); then
+    local tmp
+    tmp=$(mktemp "${shelljson}.XXXXXX")
+    jq '.bar.layout.right |= map(select(.id != "vpn"))' "$shelljson" > "$tmp" && mv -- "$tmp" "$shelljson"
+    echo "Removed vpn pill from shell.json (no providers remain)."
+  fi
+}
+
+# Install/remove the polkit rule that grants wheel-group users on a
+# local active session passwordless control of <prefix>@.service.
+# <name> is the file basename — must exist at $NIRIMAKI_REPO/default/
+# polkit/<name>. Caller is expected to have run nirimaki_sudo_prime.
+# Polkit rules live in /etc/polkit-1/rules.d which is root:polkitd 0750
+# — regular users can't stat files inside. We can't reliably check
+# "is the rule present?" without sudo. To keep nirimaki-feature-state
+# fast and non-interactive, we drop a user-readable marker file under
+# /var/lib/nirimaki/polkit-markers/ alongside the polkit install, and
+# delete it on remove. feature-state checks the marker.
+vpn_polkit_install() {
+  local name="$1"
+  local src="${NIRIMAKI_REPO:-$HOME/.local/share/nirimaki}/default/polkit/$name"
+  local dest="/etc/polkit-1/rules.d/$name"
+  local marker_dir="/var/lib/nirimaki/polkit-markers"
+  local marker="$marker_dir/$name"
+  if sudo test -e "$dest"; then
+    echo "Polkit rule $name already installed."
+  elif [[ ! -e $src ]]; then
+    echo "Warning: $src not found — polkit rule not installed."
+    return
+  else
+    sudo install -m 0644 -- "$src" "$dest"
+    echo "Installed polkit rule $dest"
+  fi
+  # Marker (always touch so existing installs with no marker get one
+  # on the next install run — useful for users upgrading from older
+  # nirimaki versions).
+  sudo install -d -m 0755 "$marker_dir"
+  sudo install -m 0644 /dev/null "$marker"
+}
+
+vpn_polkit_remove() {
+  local name="$1"
+  local dest="/etc/polkit-1/rules.d/$name"
+  local marker="/var/lib/nirimaki/polkit-markers/$name"
+  if sudo test -e "$dest"; then
+    sudo rm -f -- "$dest"
+    echo "Removed polkit rule $dest"
+  fi
+  sudo rm -f -- "$marker" 2>/dev/null || true
+}
+
+# ---- Per-provider Add flows ----
+# Each function is called by VpnService.add<Provider>() with the form
+# values the network panel collected. The function:
+#   1. (sign-in providers) walks the user through the sign-in step
+#   2. writes vpns.d/<id>.json from the sample, jq-substituting the
+#      collected values into id, name, baseId, fields[]
+#   3. saves any secrets to the keyring
+#   4. adds the vpn pill to shell.json
+
+_vpn_sanitize_id() {
+  printf '%s\n' "$1" | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9-]+/-/g; s/-+/-/g; s/^-//; s/-$//'
+}
+
+# Bail out non-zero if vpns.d/<id>.json would clash with an existing
+# connection.  Caller is expected to pick a different name.
+_vpn_check_id_free() {
+  local id="$1"
+  if [[ -e "$HOME/.config/nirimaki/vpns.d/$id.json" ]]; then
+    echo "vpn: connection '$id' already exists" >&2
+    return 1
+  fi
+}
+
+# Tailscale: launch foot for device-auth, then register only if sign-in
+# succeeded. Foot is interactive so sudo can prompt — we use that to
+# (re-)set the operator if `tailscale up` complains about prefs access.
+# `tailscale up` blocks on the auth URL until the browser completes
+# the round-trip, so foot keeps the URL visible.
+vpn_add_tailscale() {
+  vpn_locate_sample tailscale || return 1
+  local cfg="$HOME/.config/nirimaki/vpns.d/tailscale.json"
+  if [[ -e $cfg ]]; then
+    echo "Tailscale connection already registered."
+    return 0
+  fi
+  foot -T 'Tailscale — Sign in' sh -lc '
+    echo "=== Tailscale device-auth ==="
+    echo
+    echo "Granting your user passwordless control of tailscaled (idempotent)…"
+    echo "(sudo will prompt for your password if it is not cached.)"
+    echo
+    if ! sudo tailscale set --operator="$USER"; then
+      echo
+      echo "Operator setup failed. Cannot proceed without sudo."
+      read -p "Press Enter to close… " _
+      exit 1
+    fi
+    echo
+    echo "Click the URL below in your browser to sign in:"
+    echo
+    tailscale up
+    echo
+    read -p "Press Enter to close… " _
+  ' || true
+  local state
+  state=$(tailscale status --json 2>/dev/null | jq -r .BackendState 2>/dev/null || echo "")
+  if [[ -n $state && $state != NeedsLogin && $state != NoState ]]; then
+    cp -L -- "$sample" "$cfg"
+    vpn_pill_add
+    echo "Tailscale connection added (BackendState=$state)."
+  else
+    echo "Sign-in not completed (BackendState=$state) — connection not added."
+    return 1
+  fi
+}
+
+# PIA: unified CLI sign-in. No pia-client GUI involved.
+#
+# Flow:
+#   1. piactl login <login_file>   — login_file has user/pass on 2 lines
+#   2. piactl background enable    — keeps daemon active w/o GUI client,
+#                                    so piactl connect works going forward
+#   3. cp sample → pia.json, add bar pill
+#
+# Credentials arrive via a 0600 tempfile under ~/.cache/nirimaki/
+# (path passed in argv, contents written by VpnService.addPia from
+# a base64-encoded blob). The tempfile is unlinked immediately after
+# piactl login reads it.
+vpn_add_pia() {
+  local credfile="$1"
+  if [[ -z $credfile || ! -e $credfile ]]; then
+    echo "vpn_add_pia: credential tempfile path required" >&2
+    return 1
+  fi
+  if ! command -v piactl >/dev/null 2>&1; then
+    echo "vpn_add_pia: piactl not in PATH — install piavpn-bin first" >&2
+    rm -f -- "$credfile" 2>/dev/null || true
+    return 1
+  fi
+  vpn_locate_sample pia || { rm -f -- "$credfile" 2>/dev/null || true; return 1; }
+  # piactl login reads the file by path. After login completes, drop
+  # the tempfile immediately so the password doesn't linger on disk.
+  if ! piactl login "$credfile"; then
+    echo "vpn_add_pia: piactl login failed — check credentials" >&2
+    rm -f -- "$credfile"
+    return 1
+  fi
+  rm -f -- "$credfile"
+  # Without background enable, piactl connect refuses to run unless
+  # pia-client GUI is also up. Enable it so the daemon stays alive
+  # standalone — that's the whole point of dropping the GUI.
+  piactl background enable >/dev/null || true
+  local cfg="$HOME/.config/nirimaki/vpns.d/pia.json"
+  if [[ ! -e $cfg ]]; then
+    cp -L -- "$sample" "$cfg"
+  fi
+  vpn_pill_add
+  echo "PIA signed in and registered."
+}
+
+# WireGuard: connection name → id, tunnel name fills fields[].tunnelName.
+# /etc/wireguard/<tunnel>.conf must exist (root-owned, 0600); we warn if
+# not but still create the JSON so the user can drop the conf later.
+vpn_add_wireguard() {
+  local conn_name="$1" tunnel="$2"
+  if [[ -z $conn_name || -z $tunnel ]]; then
+    echo "vpn_add_wireguard: connection name and tunnel name required" >&2
+    return 1
+  fi
+  local id; id=$(_vpn_sanitize_id "$conn_name")
+  [[ -z $id ]] && { echo "vpn_add_wireguard: empty id after sanitize" >&2; return 1; }
+  _vpn_check_id_free "$id" || return 1
+  vpn_locate_sample wireguard || return 1
+  local cfg="$HOME/.config/nirimaki/vpns.d/$id.json"
+  jq --arg id "$id" --arg name "$conn_name" --arg base wireguard \
+     --arg tunnel "$tunnel" \
+     '.id = $id | .name = $name | .baseId = $base
+      | .fields = ((.fields // []) | map(if .key == "tunnelName" then .value = $tunnel else . end))' \
+     "$sample" > "$cfg.tmp" && mv -- "$cfg.tmp" "$cfg"
+  vpn_pill_add
+  echo "WireGuard connection '$conn_name' added (tunnel=$tunnel)."
+  if [[ ! -e "/etc/wireguard/$tunnel.conf" ]]; then
+    echo "Note: /etc/wireguard/$tunnel.conf is missing — drop your config there before Connect."
+  fi
+}
+
+# OpenVPN: connection name → id, profile name fills fields[].profileName.
+# /etc/openvpn/client/<profile>.conf must exist.
+vpn_add_openvpn() {
+  local conn_name="$1" profile="$2"
+  if [[ -z $conn_name || -z $profile ]]; then
+    echo "vpn_add_openvpn: connection name and profile name required" >&2
+    return 1
+  fi
+  local id; id=$(_vpn_sanitize_id "$conn_name")
+  [[ -z $id ]] && { echo "vpn_add_openvpn: empty id after sanitize" >&2; return 1; }
+  _vpn_check_id_free "$id" || return 1
+  vpn_locate_sample openvpn || return 1
+  local cfg="$HOME/.config/nirimaki/vpns.d/$id.json"
+  jq --arg id "$id" --arg name "$conn_name" --arg base openvpn \
+     --arg profile "$profile" \
+     '.id = $id | .name = $name | .baseId = $base
+      | .fields = ((.fields // []) | map(if .key == "profileName" then .value = $profile else . end))' \
+     "$sample" > "$cfg.tmp" && mv -- "$cfg.tmp" "$cfg"
+  vpn_pill_add
+  echo "OpenVPN connection '$conn_name' added (profile=$profile)."
+  if [[ ! -e "/etc/openvpn/client/$profile.conf" ]]; then
+    echo "Note: /etc/openvpn/client/$profile.conf is missing — drop your config there before Connect."
+  fi
+}
+
+# NetExtender: collects server/domain/username into fields[], stores
+# password in the keyring under schema 'nirimaki-vpn' with the
+# connection id as attribute, AND creates the matching nxcli saved
+# connection (nxcli connect uses profile name + password — it doesn't
+# accept server/domain/user flags directly).
+#
+# Domain is auto-lowercased and must contain a dot — nxcli's validator
+# rejects ALL-CAPS or single-word domains ("NUPIS.DE", "NUPIS", "nupis"
+# all rejected; "nupis.de" accepted). SonicWall realm matching is
+# usually case-insensitive on the server side.
+#
+# Password arrives via a 0600 tempfile (so it doesn't show up in
+# /proc/<pid>/cmdline); we unlink immediately.
+vpn_add_netextender() {
+  local conn_name="$1" server="$2" domain="$3" username="$4" pwfile="$5"
+  if [[ -z $conn_name || -z $server || -z $domain || -z $username || -z $pwfile ]]; then
+    echo "vpn_add_netextender: name, server, domain, username, pwfile required" >&2
+    return 1
+  fi
+  if ! command -v secret-tool >/dev/null 2>&1; then
+    echo "vpn_add_netextender: secret-tool (libsecret) not installed" >&2
+    rm -f -- "$pwfile" 2>/dev/null || true
+    return 1
+  fi
+  if ! command -v nxcli >/dev/null 2>&1; then
+    echo "vpn_add_netextender: nxcli not installed — install netextender first" >&2
+    rm -f -- "$pwfile" 2>/dev/null || true
+    return 1
+  fi
+  local id; id=$(_vpn_sanitize_id "$conn_name")
+  if [[ -z $id ]]; then
+    echo "vpn_add_netextender: empty id after sanitize" >&2
+    rm -f -- "$pwfile" 2>/dev/null || true
+    return 1
+  fi
+  if ! _vpn_check_id_free "$id"; then
+    rm -f -- "$pwfile" 2>/dev/null || true
+    return 1
+  fi
+  if ! vpn_locate_sample netextender; then
+    rm -f -- "$pwfile" 2>/dev/null || true
+    return 1
+  fi
+  local password
+  password=$(<"$pwfile")
+  rm -f -- "$pwfile"
+  if [[ -z $password ]]; then
+    echo "vpn_add_netextender: empty password" >&2
+    return 1
+  fi
+  # Lowercase the domain — nxcli's validator rejects all-caps when we
+  # eventually hand the value over at Connect time.
+  local domain_lc; domain_lc=$(printf '%s' "$domain" | tr '[:upper:]' '[:lower:]')
+  # NOTE: we deliberately do NOT call `nxcli connection add` here.
+  # That step is part of Connect (see netextender.json.sample
+  # connectCmd) so a bad domain / unreachable server doesn't block
+  # the Add itself. Add stays pure file ops + keyring write; the row
+  # always appears in the panel.
+  printf '%s' "$password" \
+    | secret-tool store --label="NetExtender ($conn_name)" nirimaki-vpn "$id"
+  local cfg="$HOME/.config/nirimaki/vpns.d/$id.json"
+  jq --arg id "$id" --arg name "$conn_name" --arg base netextender \
+     --arg server "$server" --arg domain "$domain_lc" --arg user "$username" \
+     '.id = $id | .name = $name | .baseId = $base
+      | .fields = ((.fields // []) | map(
+           if   .key == "server"   then .value = $server
+           elif .key == "domain"   then .value = $domain
+           elif .key == "username" then .value = $user
+           else . end))' \
+     "$sample" > "$cfg.tmp" && mv -- "$cfg.tmp" "$cfg"
+  vpn_pill_add
+  echo "NetExtender connection '$conn_name' added (keyring entry + vpns.d JSON). nxcli profile is created on first Connect."
+}

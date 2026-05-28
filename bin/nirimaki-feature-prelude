@@ -104,14 +104,38 @@ nirimaki_sudo_prime() {
       sudo -n -v 2>/dev/null || exit 0
     done
   ) &
-  local refresher_pid=$!
-  # Install EXIT trap — also tear down the refresher on script exit.
-  # Preserves any existing trap (scripts don't currently set one, but
-  # future-proof).
-  trap "kill $refresher_pid 2>/dev/null || true" EXIT
+  # Stash the refresher pid in a script-scope global so the unified
+  # EXIT trap (installed at prelude source time, below) tears it down
+  # without us having to install a second trap that would clobber it.
+  __nirimaki_refresher_pid=$!
 }
 
 nirimaki_pause() {
   echo
   read -r -p "Press Enter to close… " _ || true
 }
+
+# ---- Unified EXIT trap ----
+# Two jobs: (1) tear down the sudo refresher if `nirimaki_sudo_prime`
+# was called; (2) pause on nonzero exit so the foot window stays open
+# long enough for the user to read the failure. Without this, any
+# `set -e` script that fails mid-way closes the terminal before the
+# user sees what went wrong (paru lock contention, pacman errors,
+# network drops during AUR build, …).
+#
+# Scripts that legitimately want to exit silently (e.g. early "nothing
+# to do" cases) should `exit 0` — only nonzero exits trigger the pause.
+__nirimaki_refresher_pid=""
+__nirimaki_on_exit() {
+  local rc=$?
+  [[ -n $__nirimaki_refresher_pid ]] \
+    && kill "$__nirimaki_refresher_pid" 2>/dev/null || true
+  if (( rc != 0 )); then
+    echo
+    echo "─────────────────────────────────────────────────────"
+    echo "  Script exited with status $rc"
+    echo "─────────────────────────────────────────────────────"
+    read -r -p "Press Enter to close… " _ || true
+  fi
+}
+trap __nirimaki_on_exit EXIT

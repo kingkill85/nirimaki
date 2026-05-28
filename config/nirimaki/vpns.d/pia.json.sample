@@ -1,22 +1,40 @@
 {
   "_comment": [
-    "Private Internet Access provider — `piactl` is the headless CLI",
-    "that ships with the PIA Linux client.",
+    "Private Internet Access — driven entirely via the piactl CLI,",
+    "no GUI / tray icon. The Network panel's Add form collects your",
+    "account credentials, hands them to `piactl login`, then runs",
+    "`piactl background enable` so the daemon stays up without",
+    "pia-client running.",
     "",
-    "Copy to ~/.config/nirimaki/vpns.d/pia.json (drop .sample). For",
-    "first-time setup run the PIA GUI client once (sign in, accept the",
-    "EULA, set region). After that piactl is enough for connect /",
-    "disconnect, and the bar pill will pick up the region as its",
-    "secondary label."
+    "Set a region below to override on every connect, or leave it",
+    "as `auto` to let the daemon pick. piactl runs against PIA's",
+    "user-session daemon (piavpn.service) — no sudo / polkit."
   ],
-  "id":               "pia",
-  "name":             "Private Internet Access",
-  "icon":             "󰒃",
+  "id":   "pia",
+  "name": "Private Internet Access",
+  "icon": "󰒃",
+
+  "install": {
+    "package": "piavpn-bin",
+    "binary":  "piactl",
+    "hint":    "AUR package `piavpn-bin`. Sign in via Network → VPN → Add connection."
+  },
+
+  "fields": [
+    { "key":     "region",
+      "label":   "Preferred region",
+      "help":    "PIA server region. `auto` picks the lowest-latency one.",
+      "type":    "dropdown",
+      "optionsCmd": ["piactl", "get", "regions"],
+      "value":   "auto" }
+  ],
+
   "statusCmd":        ["piactl", "get", "connectionstate"],
   "statusOnPattern":  "^Connected$",
   "statusLabelCmd":   ["piactl", "get", "region"],
-  "connectCmd":       ["piactl", "connect"],
+  "connectCmd":       ["sh", "-lc",
+    "if [ '{{region}}' != 'auto' ]; then piactl set region {{region}}; fi; piactl connect"],
   "disconnectCmd":    ["piactl", "disconnect"],
-  "setupCmd":         ["pia-client"],
+  "removeCmd":        ["piactl", "logout"],
   "pollSeconds":      5
 }

@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "OpenVPN client — driven via systemd's openvpn-client@.service.",
+    "",
+    "Place your .ovpn at /etc/openvpn/client/<name>.conf (root-",
+    "owned). If the .ovpn doesn't embed credentials, also drop",
+    "/etc/openvpn/client/<name>.creds (two lines: user, password)",
+    "and add `auth-user-pass <name>.creds` to the .conf. Then set",
+    "the profile name in the field below.",
+    "",
+    "Connect / disconnect run `systemctl start|stop",
+    "openvpn-client@<name>` and polkit decides — Nirimaki installs a",
+    "polkit rule (during this template's Install step) that grants",
+    "wheel-group users on a local active session passwordless",
+    "control of openvpn-client@*.service. So after Install,",
+    "connect/disconnect just work, no prompt.",
+    "",
+    "For an importable / GUI workflow, NetworkManager's OpenVPN",
+    "plugin (`nm-connection-editor`) is friendlier — those profiles",
+    "auto-appear in this same popover via nmcli."
+  ],
+  "id":   "openvpn",
+  "name": "OpenVPN",
+  "icon": "󰒃",
+  "multiInstance": true,
+
+  "install": {
+    "package": "openvpn",
+    "binary":  "openvpn",
+    "hint":    "Provides the openvpn binary + openvpn-client@.service unit. Place your .ovpn at /etc/openvpn/client/<name>.conf (root-owned) before connecting.",
+    "postInstall": [
+      ["sudo", "install", "-m", "0644",
+       "$NIRIMAKI_REPO/default/polkit/50-nirimaki-openvpn.rules",
+       "/etc/polkit-1/rules.d/50-nirimaki-openvpn.rules"]
+    ]
+  },
+
+  "fields": [
+    { "key":   "profileName",
+      "label": "Profile name",
+      "help":  "Base name of /etc/openvpn/client/<name>.conf.",
+      "type":  "text",
+      "value": "client" }
+  ],
+
+  "statusCmd":        ["systemctl", "is-active", "openvpn-client@{{profileName}}"],
+  "statusOnPattern":  "^active$",
+  "statusLabelCmd":   ["sh", "-lc", "ip -o -4 addr show tun0 2>/dev/null | awk '{print $4}' | cut -d/ -f1"],
+  "connectCmd":       ["systemctl", "start", "openvpn-client@{{profileName}}"],
+  "disconnectCmd":    ["systemctl", "stop",  "openvpn-client@{{profileName}}"],
+  "pollSeconds":      5
+}

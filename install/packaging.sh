@@ -54,6 +54,9 @@ _pkg_base() {
 #   - libnotify — notify-send for theme/webapp/update hooks.
 #   - noto-fonts-cjk/emoji/extra — CJK + emoji + less-common scripts.
 #     §2g (fontconfig) tunes CJK regional preference on top.
+#   - gvfs gvfs-smb — GIO mount backends; gvfs-smb gives Nautilus
+#     smb:// URI support (LAN/VPN file shares). gvfs pulls in trash /
+#     network / cdda / mtp backends as deps.
 _pkg_compositor() {
   section "Packages: compositor + shell + GUI baseline"
   pacman_install \
@@ -73,8 +76,10 @@ _pkg_compositor() {
     fontconfig ttf-jetbrains-mono-nerd \
     noto-fonts-cjk noto-fonts-emoji noto-fonts-extra \
     plymouth \
-    nautilus \
-    xdg-desktop-portal-gnome xdg-desktop-portal-gtk
+    nautilus gvfs gvfs-smb \
+    xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
+    polkit-gnome \
+    gnome-keyring
 }
 
 # §2c — terminal toolkit (phase H).

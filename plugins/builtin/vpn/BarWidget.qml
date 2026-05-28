@@ -19,15 +19,19 @@ Item {
     readonly property var active:    VpnService.activeProviders
     readonly property bool anyOn:    active.length > 0
 
-    // Hide the pill completely when nothing is configured — no NM VPN
-    // profiles AND no custom providers under vpns.d/. Boxes that
-    // don't use a VPN never see a stray shield icon on their bar.
+    // Hide the pill completely when nothing is configured AND no
+    // VPN package is installed. Boxes that don't use a VPN never see
+    // a stray shield icon on their bar; boxes that have installed a
+    // package but haven't added a connection still see the pill so
+    // they have a way to drive the panel.
     //
     // The Bar's pluginLoader watches the loaded item's `implicitWidth`
     // and collapses the slot when it hits zero, so we need to zero
     // BOTH visible *and* implicitWidth here (same pattern as
     // voxtype / screen-record / notifications).
-    readonly property bool hasAny:   VpnService.providers.length > 0
+    readonly property bool hasAny:
+        VpnService.providers.length > 0
+        || VpnService.addableProviders.length > 0
     visible: hasAny
 
     implicitHeight: hasAny ? Theme.barHeight    : 0
@@ -196,17 +200,21 @@ Item {
                 }
             }
 
-            PopoverDivider { visible: VpnService.providers.length > 0 }
+            PopoverDivider { }
 
-            // Footer hint pointing at the config dir for power users.
-            Text {
+            // Footer — "Manage VPNs…" deep-links to the network panel's
+            // VPN tab where the install / activate / configure UX lives.
+            PopoverActions {
                 width: parent.width
-                wrapMode: Text.WordWrap
-                text: I18n.t("vpn.popover.hint")
-                color: Theme.fgDim
-                font.family: Theme.sansFamily
-                font.pixelSize: Theme.fontPxSmall
-                horizontalAlignment: Text.AlignHCenter
+
+                PopoverButton {
+                    label: I18n.t("vpn.popover.manage")
+                    variant: PopoverButton.Secondary
+                    onTriggered: {
+                        popover.close();
+                        Plugins.summon("network", { focus: "vpn" });
+                    }
+                }
             }
         }
     }

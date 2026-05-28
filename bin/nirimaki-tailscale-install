@@ -29,82 +29,18 @@ echo "Enabling tailscaled.service…"
 sudo systemctl enable --now tailscaled.service
 
 echo
-echo "Bringing Tailscale up (accepts subnet routes; opens browser for auth)…"
-# `tailscale up` blocks until auth — pipes the auth URL to stderr,
-# user opens it in the browser, daemon finishes. --accept-routes
-# joins the user's tailnet subnets immediately. --operator=$USER
-# grants the invoking user unprivileged control over the daemon, so
-# future `tailscale up/down/status` calls don't need sudo (Nirimaki's
-# VPN bar widget connects + disconnects via the plain CLI). All flags
-# are idempotent on re-run.
-sudo tailscale up --accept-routes --operator="$USER" || true
-
-# Older installs that ran `tailscale up` before the --operator flag
-# was added still need the operator set explicitly; this no-ops on a
-# fresh install (the flag above already covered it).
 echo "Granting $USER operator access to the tailscale daemon…"
+# --operator=$USER grants the invoking user unprivileged control
+# over the daemon, so the network panel's Connect / Disconnect
+# buttons run plain `tailscale up/down` without sudo. Idempotent —
+# safe to re-run on existing installs.
+#
+# Note: the bring-up (`tailscale up`, which opens the device-auth
+# URL in a browser) is intentionally NOT run here. Install installs;
+# the user signs in by clicking Connect in Network → VPN → Tailscale.
+# Keeping the two concerns separate matches every other provider in
+# this family (wireguard / openvpn / pia / netextender).
 sudo tailscale set --operator="$USER" || true
-
-# Activate the Nirimaki VPN bar-widget entry for Tailscale if the
-# user hasn't already customised their own. The sample lives in the
-# repo (or in the share-dir copy that install.sh symlinks/copies);
-# locate it the same way nirimaki-update does so dev + end-user
-# installs both work.
-vpns_dir="$HOME/.config/nirimaki/vpns.d"
-ts_cfg="$vpns_dir/tailscale.json"
-ts_sample=""
-
-# Resolve the repo that's the source of truth on this box. ~/.config/
-# quickshell is dir-symlinked to REPO_DIR/config/quickshell by
-# install.sh, so its readlink target is the most reliable answer —
-# even on hybrid installs where ~/.local/share/nirimaki/ has its own
-# (older) .git directory alongside dev-link overlays.
-repo="${NIRIMAKI_REPO:-}"
-if [[ -z $repo && -L $HOME/.config/quickshell ]]; then
-  repo=$(git -C "$(readlink -f "$HOME/.config/quickshell")" rev-parse --show-toplevel 2>/dev/null || true)
-fi
-if [[ -z $repo ]]; then
-  share="$HOME/.local/share/nirimaki"
-  if   [[ -L $share/default ]]; then repo=$(git -C "$(readlink -f "$share/default")" rev-parse --show-toplevel 2>/dev/null || true)
-  elif [[ -d $share/.git ]];    then repo="$share"
-  fi
-fi
-for cand in \
-  "$HOME/.config/nirimaki/vpns.d/tailscale.json.sample" \
-  "$repo/config/nirimaki/vpns.d/tailscale.json.sample" \
-  "$HOME/.local/share/nirimaki/config/nirimaki/vpns.d/tailscale.json.sample"
-do
-  if [[ -e $cand ]]; then ts_sample="$cand"; break; fi
-done
-if [[ -n $ts_sample && ! -e $ts_cfg ]]; then
-  mkdir -p "$vpns_dir"
-  cp -L -- "$ts_sample" "$ts_cfg"
-  echo "Registered Tailscale with the Nirimaki VPN bar widget."
-elif [[ -z $ts_sample ]]; then
-  echo "Note: tailscale.json.sample not found — VPN bar entry not registered."
-fi
-
-# Make sure the vpn pill is in shell.json's bar.right (idempotent).
-# This is what makes the icon appear; the visible:hasAny binding in
-# BarWidget.qml only controls render-when-already-mounted, but Row
-# spacing leaves a phantom gap around an invisible-but-mounted
-# Loader, so we manage the layout array directly.
-shelljson="$HOME/.config/nirimaki/shell.json"
-if [[ -f $shelljson ]] && command -v jq >/dev/null 2>&1; then
-  if ! jq -e '.bar.layout.right | map(.id) | index("vpn")' "$shelljson" >/dev/null; then
-    # Insert after `network` if present, else append.
-    tmp=$(mktemp "${shelljson}.XXXXXX")
-    jq '
-      .bar.layout.right as $r
-      | ($r | map(.id) | index("network")) as $i
-      | if $i == null
-        then .bar.layout.right += [{"id":"vpn"}]
-        else .bar.layout.right = ($r[0:$i+1] + [{"id":"vpn"}] + $r[$i+1:])
-        end
-    ' "$shelljson" > "$tmp" && mv -- "$tmp" "$shelljson"
-    echo "Added vpn pill to shell.json bar layout."
-  fi
-fi
 
 # Install the admin console as a chromium webapp so users can manage
 # their tailnet from the apps menu without a browser bookmark.
@@ -123,7 +59,9 @@ fi
 
 echo
 echo "  ✓ Tailscale installed."
-echo "  → 'tailscale status' to see your tailnet."
+echo "  → Add a connection from Network → VPN → Add connection → Tailscale."
+echo "  → First Connect opens the device-auth URL in your browser."
+echo "  → 'tailscale status' to see your tailnet once connected."
 echo "  → Admin console: apps menu → Tailscale."
 
 [[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \

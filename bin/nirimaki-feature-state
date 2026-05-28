@@ -37,7 +37,57 @@ MISE_SHIMS="${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims"
 
 has_bin()    { command -v "$1" >/dev/null 2>&1; }
 has_pkg()    { pacman -Qi "$1" >/dev/null 2>&1; }
+has_file()   { [[ -e $1 ]]; }
 has_helix()  { has_bin hx || has_bin helix; }
+
+# ---- VPN feature bits ----
+# Two bits per VPN feature:
+#
+#   <name>             — binary on PATH (drives the Add dropdown and
+#                        the Settings Menu Remove entry visibility).
+#   <name>_configured  — binary AND every side-effect the install script
+#                        ships (polkit rule for wg/openvpn; systemd
+#                        service enabled for tailscale/pia/netextender).
+#                        Drives the Settings Menu Install visibility,
+#                        so Install hides only when the install script
+#                        has literally nothing left to do.
+#
+# Defining "configured" per provider keeps the menu UX consistent with
+# every other app (vscode, helix, …): Install hides when there's
+# nothing more to install. The check is just stricter for providers
+# whose install script does more than `paru -S <pkg>`.
+
+systemd_unit_enabled() {
+  # Unit-files marker for "enabled" / "static" / "alias". `disabled`
+  # and missing units (no rows) both count as not enabled. Use the
+  # system-level check; user-level units would need --user.
+  systemctl is-enabled "$1" >/dev/null 2>&1
+}
+
+has_nirimaki_polkit() {
+  # Polkit rules live in /etc/polkit-1/rules.d/ (root:polkitd 0750) —
+  # regular users can't stat them. vpn_polkit_install drops a user-
+  # readable marker at /var/lib/nirimaki/polkit-markers/<rule-name>
+  # alongside the rule, which we check here.
+  local rule_name="$1"
+  [[ -e "/var/lib/nirimaki/polkit-markers/$rule_name" ]]
+}
+
+vpn_wireguard_configured() {
+  has_bin wg-quick && has_nirimaki_polkit 50-nirimaki-wireguard.rules
+}
+vpn_openvpn_configured() {
+  has_bin openvpn  && has_nirimaki_polkit 50-nirimaki-openvpn.rules
+}
+vpn_tailscale_configured() {
+  has_bin tailscale && systemd_unit_enabled tailscaled.service
+}
+vpn_pia_configured() {
+  has_bin piactl && systemd_unit_enabled piavpn.service
+}
+vpn_netextender_configured() {
+  has_bin nxcli && systemd_unit_enabled NEService.service
+}
 
 emit() { printf '  "%s": %s,\n' "$1" "$2"; }
 yn()   { if "$@"; then echo true; else echo false; fi; }
@@ -45,7 +95,19 @@ yn()   { if "$@"; then echo true; else echo false; fi; }
 {
   echo '{'
   emit voxtype    "$(yn has_bin voxtype)"
-  emit tailscale  "$(yn has_bin tailscale)"
+
+  # VPN providers: <name> = binary present, <name>_configured = full
+  # install (binary + side-effects). See vpn_<name>_configured above.
+  emit tailscale              "$(yn has_bin tailscale)"
+  emit tailscale_configured   "$(yn vpn_tailscale_configured)"
+  emit wireguard              "$(yn has_bin wg-quick)"
+  emit wireguard_configured   "$(yn vpn_wireguard_configured)"
+  emit openvpn                "$(yn has_bin openvpn)"
+  emit openvpn_configured     "$(yn vpn_openvpn_configured)"
+  emit pia                    "$(yn has_bin piactl)"
+  emit pia_configured         "$(yn vpn_pia_configured)"
+  emit netextender            "$(yn has_bin nxcli)"
+  emit netextender_configured "$(yn vpn_netextender_configured)"
   emit bitwarden  "$(yn has_pkg bitwarden)"
   emit vscode     "$(yn has_bin code)"
   emit helix      "$(yn has_helix)"

@@ -1,0 +1,50 @@
+{
+  "_comment": [
+    "WireGuard tunnel — driven via systemd's wg-quick@.service unit.",
+    "",
+    "Place your config at /etc/wireguard/<name>.conf (root-owned,",
+    "0600). Then set the tunnel name in the field below. Connect /",
+    "disconnect run `systemctl start|stop wg-quick@<name>` and polkit",
+    "decides — Nirimaki installs a polkit rule (during this template's",
+    "Install step) that grants wheel-group users on a local active",
+    "session passwordless control of wg-quick@*.service. So after",
+    "Install, connect/disconnect just work, no prompt.",
+    "",
+    "Heads up — NetworkManager has a native WireGuard plugin and",
+    "those NM connections already auto-appear in this same popover",
+    "via nmcli. This template is the wg-quick + systemd path for",
+    "users who don't want NM ownership.",
+    "",
+    "Multi-tunnel: copy to wireguard-<name>.json with a distinct id."
+  ],
+  "id":   "wireguard",
+  "name": "WireGuard",
+  "icon": "󰖂",
+  "multiInstance": true,
+
+  "install": {
+    "package": "wireguard-tools",
+    "binary":  "wg-quick",
+    "hint":    "Provides wg-quick + the wg-quick@.service unit. Place your tunnel config at /etc/wireguard/<name>.conf (root-owned, 0600) before connecting.",
+    "postInstall": [
+      ["sudo", "install", "-m", "0644",
+       "$NIRIMAKI_REPO/default/polkit/50-nirimaki-wireguard.rules",
+       "/etc/polkit-1/rules.d/50-nirimaki-wireguard.rules"]
+    ]
+  },
+
+  "fields": [
+    { "key":   "tunnelName",
+      "label": "Tunnel name",
+      "help":  "Base name of /etc/wireguard/<name>.conf.",
+      "type":  "text",
+      "value": "wg0" }
+  ],
+
+  "statusCmd":        ["systemctl", "is-active", "wg-quick@{{tunnelName}}"],
+  "statusOnPattern":  "^active$",
+  "statusLabelCmd":   ["sh", "-lc", "wg show {{tunnelName}} endpoints 2>/dev/null | awk '{print $2; exit}'"],
+  "connectCmd":       ["systemctl", "start", "wg-quick@{{tunnelName}}"],
+  "disconnectCmd":    ["systemctl", "stop",  "wg-quick@{{tunnelName}}"],
+  "pollSeconds":      5
+}

@@ -1,0 +1,42 @@
+#!/bin/bash
+# nirimaki:group=openvpn
+# nirimaki:summary=Install OpenVPN + polkit rule for passwordless openvpn-client@
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+. "$HOME/.local/bin/nirimaki-vpn-provider-helpers"
+
+nirimaki_banner "OpenVPN" "Install"
+
+if command -v openvpn >/dev/null 2>&1; then
+  echo "openvpn is already installed."
+  echo "Re-syncing the polkit rule (idempotent)."
+else
+  echo "Installing:"
+  echo "  - openvpn (Arch official) — the openvpn binary + openvpn-client@.service unit"
+  echo "  - polkit rule granting wheel users passwordless control of openvpn-client@*.service"
+fi
+
+vpn_locate_repo
+nirimaki_sudo_prime
+
+sudo pacman -S --needed --noconfirm openvpn
+
+echo
+vpn_polkit_install 50-nirimaki-openvpn.rules
+
+echo
+echo "  ✓ OpenVPN installed."
+echo "  → Place your .ovpn at /etc/openvpn/client/<name>.conf (root-owned)."
+echo "  → If creds aren't embedded, drop /etc/openvpn/client/<name>.creds (user, pass)"
+echo "    and add 'auth-user-pass <name>.creds' to the .conf."
+echo "  → Add a connection from Network → VPN → Add connection → OpenVPN."
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null 2>&1 || true
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" openvpn-installed || true
+
+nirimaki_pause

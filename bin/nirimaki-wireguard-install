@@ -1,0 +1,41 @@
+#!/bin/bash
+# nirimaki:group=wireguard
+# nirimaki:summary=Install WireGuard tools + polkit rule for passwordless wg-quick@
+# nirimaki:requires-sudo=true
+
+set -e
+
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+. "$HOME/.local/bin/nirimaki-vpn-provider-helpers"
+
+nirimaki_banner "WireGuard" "Install"
+
+if command -v wg-quick >/dev/null 2>&1; then
+  echo "wireguard-tools is already installed."
+  echo "Re-syncing the polkit rule (idempotent)."
+else
+  echo "Installing:"
+  echo "  - wireguard-tools (Arch official) — wg, wg-quick + the wg-quick@.service unit"
+  echo "  - polkit rule granting wheel users passwordless control of wg-quick@*.service"
+fi
+
+vpn_locate_repo
+nirimaki_sudo_prime
+
+sudo pacman -S --needed --noconfirm wireguard-tools
+
+echo
+vpn_polkit_install 50-nirimaki-wireguard.rules
+
+echo
+echo "  ✓ WireGuard installed."
+echo "  → Drop your tunnel config at /etc/wireguard/<name>.conf (root-owned, 0600)."
+echo "  → Add a connection from Network → VPN → Add connection → WireGuard."
+echo "  → Connect / disconnect from the same panel; the polkit rule keeps it password-less."
+
+[[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
+  "$HOME/.local/bin/nirimaki-feature-state" >/dev/null 2>&1 || true
+[[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
+  "$HOME/.local/bin/nirimaki-hook-run" wireguard-installed || true
+
+nirimaki_pause
