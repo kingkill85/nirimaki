@@ -212,6 +212,19 @@ QtObject {
             "// up your changes on next open.",
             ""
         ];
+        // Normalize the layout to the origin: niri expects a contiguous
+        // arrangement anchored at (0,0). The drag canvas works in centered
+        // coordinates, so a freely-dragged layout can float with no output
+        // at the origin — which makes pointer transitions land oddly. Shift
+        // every output by the layout's min corner so the top-left monitor
+        // sits at 0,0 (shape is preserved; only the origin moves).
+        let minX = Infinity, minY = Infinity;
+        for (const m of snap) {
+            if (m.positionX < minX) minX = m.positionX;
+            if (m.positionY < minY) minY = m.positionY;
+        }
+        if (!isFinite(minX)) minX = 0;
+        if (!isFinite(minY)) minY = 0;
         for (const m of snap) {
             const mode = m.mode;
             lines.push("output \"" + _escape(m.id) + "\" {");
@@ -227,8 +240,8 @@ QtObject {
             if (m.transform && m.transform !== "Normal") {
                 lines.push("    transform \"" + _transformToKdl(m.transform) + "\"");
             }
-            lines.push("    position x=" + Math.round(m.positionX) +
-                       " y=" + Math.round(m.positionY));
+            lines.push("    position x=" + Math.round(m.positionX - minX) +
+                       " y=" + Math.round(m.positionY - minY));
             if (m.vrr) lines.push("    variable-refresh-rate");
             // Re-emit hand-edits. The snapshot's `extras` field wins
             // (so the panel's Custom-KDL textbox is authoritative when

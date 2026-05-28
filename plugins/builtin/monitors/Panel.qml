@@ -186,6 +186,59 @@ DialogShell {
                 return (cy - canvasFrame.offsetY) / scaleFactor + bbox.y;
             }
 
+            // Edge-magnetize: snap the dragged output's edges to a
+            // NEARBY output's edges so adjacent monitors line up pixel-
+            // perfect, while still allowing a free relative offset.
+            //
+            // Two guards keep it from "locking" the layout:
+            //   - small ~9 canvas-px pull, so most of the drag is free;
+            //   - per-monitor cross-axis gating — a monitor only pulls an
+            //     edge if it is within `band` on the OTHER axis. Without
+            //     this a distant monitor (e.g. one stacked far above)
+            //     would yank the vertical position to align with it, so
+            //     the relative height could never be changed.
+            // Each axis snaps independently (side-by-side AND top-aligned
+            // at once is fine). Axes with no magnet fall back to the
+            // round-to-10 loose snap. Returns the snapped virtual {x, y}.
+            function snap(index, vx, vy) {
+                const me = shell.working[index];
+                if (!me) return { x: Math.round(vx), y: Math.round(vy) };
+                const w = me.widthPx, h = me.heightPx;
+                const sf   = Math.max(0.0001, scaleFactor);
+                const tol  = 9  / sf;     // magnet radius (~9 canvas px)
+                const band = 48 / sf;     // cross-axis nearness gate (~48 canvas px)
+                const myL = vx, myR = vx + w, myT = vy, myB = vy + h;
+                let bestX = null, bestXd = tol;
+                let bestY = null, bestYd = tol;
+                for (let i = 0; i < shell.working.length; i++) {
+                    if (i === index) continue;
+                    const o = shell.working[i];
+                    const oL = o.positionX, oR = o.positionX + o.widthPx;
+                    const oT = o.positionY, oB = o.positionY + o.heightPx;
+                    const vGap = Math.max(0, oT - myB, myT - oB);   // vertical gap to o
+                    const hGap = Math.max(0, oL - myR, myL - oR);   // horizontal gap to o
+                    // X-edges only pull when o is vertically near (they
+                    // share a band) — i.e. when side-by-side makes sense.
+                    if (vGap <= band) {
+                        for (const c of [oR, oL - w, oL, oR - w]) {
+                            const d = Math.abs(c - vx);
+                            if (d < bestXd) { bestXd = d; bestX = c; }
+                        }
+                    }
+                    // Y-edges only pull when o is horizontally near.
+                    if (hGap <= band) {
+                        for (const c of [oB, oT - h, oT, oB - h]) {
+                            const d = Math.abs(c - vy);
+                            if (d < bestYd) { bestYd = d; bestY = c; }
+                        }
+                    }
+                }
+                return {
+                    x: Math.round(bestX !== null ? bestX : Math.round(vx / 10) * 10),
+                    y: Math.round(bestY !== null ? bestY : Math.round(vy / 10) * 10)
+                };
+            }
+
             Repeater {
                 model: shell.working
                 delegate: Rectangle {
@@ -216,12 +269,15 @@ DialogShell {
                         drag.maximumY: canvasFrame.height - tile.height
                         onPressed: shell.selectedIndex = tile.index
                         onReleased: {
-                            // Snap drag end to virtual pixels and
-                            // write the new position into the working
-                            // snapshot. Round to multiples of 10 for a
-                            // friendlier "loose snap" experience.
-                            const vx = Math.round(canvasFrame.cxToVx(tile.x) / 10) * 10;
-                            const vy = Math.round(canvasFrame.cyToVy(tile.y) / 10) * 10;
+                            // Magnetize the drop to neighbouring monitor
+                            // edges (pixel-perfect adjacency), falling back
+                            // to a round-to-10 loose snap per axis.
+                            const snapped = canvasFrame.snap(
+                                tile.index,
+                                canvasFrame.cxToVx(tile.x),
+                                canvasFrame.cyToVy(tile.y));
+                            const vx = snapped.x;
+                            const vy = snapped.y;
                             const i = tile.index;
                             shell.mutateSelected(o => { o.positionX = vx; o.positionY = vy; });
                             // selectedIndex may have changed via onPressed; reselect i to be safe
@@ -328,32 +384,28 @@ DialogShell {
                     width: (parent.width - 24) / 3
                     spacing: 6
                     Text {
-                        text: I18n.t("monitors.scale")
+                        // Label carries the live value so the slider doubles
+                        // as its own readout (snapped to the 0.05 commit grid).
+                        text: I18n.t("monitors.scale") + "  "
+                              + scaleSlider._snap(scaleSlider.liveValue).toFixed(2) + "×"
                         color: Theme.fgDim
                         font.family: Theme.sansFamily
                         font.pixelSize: Theme.fontPxSmall
                     }
-                    Dropdown {
+                    PanelSlider {
+                        id: scaleSlider
                         width: parent.width
-                        readonly property var choices: [
-                            { v: 1.0,  label: "1.0×" },
-                            { v: 1.25, label: "1.25×" },
-                            { v: 1.5,  label: "1.5×" },
-                            { v: 1.75, label: "1.75×" },
-                            { v: 2.0,  label: "2.0×" }
-                        ]
-                        model: choices
-                        textRole: "label"
-                        valueRole: "v"
-                        currentIndex: {
+                        minimum: 0.5
+                        maximum: 3.0
+                        step: 0.05            // wheel increment; drag is continuous
+                        value: {
                             const cur = shell.selectedOutput();
-                            if (!cur) return 0;
-                            for (let i = 0; i < choices.length; i++) {
-                                if (Math.abs(choices[i].v - cur.scale) < 0.001) return i;
-                            }
-                            return 0;
+                            return cur ? cur.scale : 1.0;
                         }
-                        onSelected: (i, item) => shell.mutateSelected(o => { o.scale = item.v; })
+                        // Continuous drag → snap to 0.05 so scales stay tidy
+                        // (1.35×, 1.6×, …) instead of 1.3742×.
+                        function _snap(v) { return Math.round(v / 0.05) * 0.05; }
+                        onReleased: (v) => shell.mutateSelected(o => { o.scale = _snap(v); })
                     }
                 }
             }
