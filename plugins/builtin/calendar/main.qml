@@ -55,8 +55,29 @@ Item {
 
     SystemClock {
         id: clockTimer
-        precision: SystemClock.Minutes
+        precision: SystemClock.Seconds
         onDateChanged: root.now = clockTimer.date
+    }
+
+    // Timezone abbreviation ("CEST", "PDT", …) for the clock header. Qt's
+    // "t" format yields the short zone name; if a build hands back the full
+    // name ("Central European Summer Time") we collapse it to its capitals,
+    // and if it gives nothing usable we fall back to a GMT±h offset.
+    function tzAbbr(d) {
+        const t = Qt.formatDateTime(d, "t");
+        if (t && t.length) {
+            if (t.indexOf(" ") !== -1) {
+                const caps = t.match(/[A-Z]/g);
+                if (caps && caps.length >= 2) return caps.join("");
+            }
+            if (!/^(UTC|GMT)/.test(t)) return t;     // already a tidy abbr
+            return t;                                 // "UTC+02:00" style — keep
+        }
+        const off = -d.getTimezoneOffset();          // minutes east of UTC
+        const sign = off >= 0 ? "+" : "-";
+        const h = Math.floor(Math.abs(off) / 60);
+        const mm = Math.abs(off) % 60;
+        return "GMT" + sign + h + (mm ? ":" + String(mm).padStart(2, "0") : "");
     }
 
     function shiftMonth(delta) {
@@ -115,7 +136,7 @@ Item {
             text: loc.toString(root.now, root.format)
             color: Theme.fg
             font.family: Theme.sansFamily
-            font.pixelSize: Theme.fontPx
+            font.pixelSize: Theme.barFontPx
         }
     }
 
@@ -126,12 +147,12 @@ Item {
         anchorItem: pill
 
         implicitWidth:  360
-        // Hard-coded height (header + day-header row + 6 week rows +
-        // margins) so the popup surface gets the right size at
-        // construction — gridCol lives inside a Loader and isn't built
-        // until first open, so binding to its size would render the
-        // popup window at 24 px tall for one frame.
-        implicitHeight: 320
+        // Hard-coded height (clock hero + divider + month nav +
+        // day-header row + 6 week rows + margins) so the popup surface
+        // gets the right size at construction — gridCol lives inside a
+        // Loader and isn't built until first open, so binding to its
+        // size would render the popup window at 24 px tall for one frame.
+        implicitHeight: 410
 
         readonly property int columnSpacing: 4
         readonly property real cellWidth:
@@ -152,6 +173,45 @@ Item {
             id: gridCol
             anchors.fill: parent
             spacing: Theme.popoverSpacing
+
+                // -------- Clock hero: big ticking time + timezone, full date --------
+                Column {
+                    width: parent.width
+                    spacing: 2
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 8
+
+                        Text {
+                            id: heroTime
+                            text: root.loc.toString(root.now, "HH:mm:ss")
+                            color: Theme.fg
+                            font.family: Theme.monoFamily
+                            font.pixelSize: 32
+                        }
+                        Text {
+                            // Baseline-align the small timezone tag to the
+                            // big clock so it sits on the same line.
+                            anchors.baseline: heroTime.baseline
+                            text: root.tzAbbr(root.now)
+                            color: Theme.fgDim
+                            font.family: Theme.sansFamily
+                            font.pixelSize: Theme.fontPxMedium
+                            font.bold: true
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: root.loc.toString(root.now, "dddd, d MMMM yyyy")
+                        color: Theme.fgDim
+                        font.family: Theme.sansFamily
+                        font.pixelSize: Theme.fontPxMedium
+                    }
+                }
+
+                PopoverDivider {}
 
                 // -------- Header: «  ‹  Month YYYY  ›  » --------
                 Item {
