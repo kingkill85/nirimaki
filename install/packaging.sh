@@ -57,6 +57,8 @@ _pkg_base() {
 #   - gvfs gvfs-smb — GIO mount backends; gvfs-smb gives Nautilus
 #     smb:// URI support (LAN/VPN file shares). gvfs pulls in trash /
 #     network / cdda / mtp backends as deps.
+#   - mpv — default video player. Keyboard-driven, GPU/Wayland output,
+#     VAAPI hwdec on AMD. Seeded as the default video handler in §2h.
 _pkg_compositor() {
   section "Packages: compositor + shell + GUI baseline"
   pacman_install \
@@ -77,6 +79,7 @@ _pkg_compositor() {
     noto-fonts-cjk noto-fonts-emoji noto-fonts-extra \
     plymouth \
     nautilus gvfs gvfs-smb \
+    mpv \
     xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
     polkit-gnome \
     gnome-keyring

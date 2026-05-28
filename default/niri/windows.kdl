@@ -137,6 +137,14 @@ window-rule {
     open-floating true
 }
 
+// mpv — default video player, floats like Steam rather than tiling
+// into a column. No forced size: mpv sizes its own window to the
+// video's dimensions, and niri centers floating windows by default.
+window-rule {
+    match app-id=r#"^mpv$"#
+    open-floating true
+}
+
 // ===== Steam =====
 // Omarchy `apps/steam.lua` parity: opacity 1.0, floats by default,
 // main window 1100×700, Friends List 460×800.
