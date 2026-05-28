@@ -2,7 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import qs
 
-// Workspaces pills for a given niri output.
+// Workspaces indicator for a given niri output. Omarchy-style: flat
+// glyphs, no pills — the visible workspace on this output shows a dot
+// (󱓻), the rest show their number, and empty workspaces dim out.
 // Reads from the shared NiriService singleton — no Process of its own.
 Item {
     id: root
@@ -27,26 +29,29 @@ Item {
                        .filter(w => w.output === root.outputName)
                        .sort((a, b) => a.idx - b.idx)
 
-            delegate: Rectangle {
+            delegate: Item {
                 required property var modelData
-                implicitWidth: Math.max(label.implicitWidth + 2 * Theme.padX,
-                                        Theme.barHeight - 2 * Theme.padY)
+                // `is_active` = visible on this output, `is_focused` =
+                // globally focused. The dot marks the visible one; accent
+                // tints it only on the focused monitor. Empty = no window.
+                readonly property bool here:  modelData.is_active
+                readonly property bool empty: !modelData.active_window_id
+
+                implicitWidth:  Math.max(label.implicitWidth + Theme.padX, 12)
                 implicitHeight: Theme.barHeight - 2 * Theme.padY
-                radius: Theme.radius
-                color: modelData.is_focused ? Theme.accent
-                                            : (modelData.is_active ? Theme.bgAlt : "transparent")
-                border.width: modelData.is_active && !modelData.is_focused ? 1 : 0
-                border.color: Theme.fgDim
 
                 Text {
                     id: label
                     anchors.centerIn: parent
-                    text: modelData.name && modelData.name.length
-                          ? modelData.name
-                          : String(modelData.idx)
-                    color: modelData.is_focused ? Theme.bg : Theme.fg
-                    font.family: Theme.sansFamily
-                    font.pixelSize: Theme.fontPx
+                    text: parent.here
+                          ? "󱓻"                       // nf-md-circle (active marker)
+                          : (modelData.name && modelData.name.length
+                             ? modelData.name
+                             : String(modelData.idx))
+                    color: modelData.is_focused ? Theme.accent : Theme.fg
+                    opacity: parent.here ? 1.0 : (parent.empty ? 0.4 : 0.85)
+                    font.family: parent.here ? Theme.iconFamily : Theme.sansFamily
+                    font.pixelSize: Theme.barFontPx
                 }
 
                 MouseArea {

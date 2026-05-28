@@ -40,7 +40,7 @@ Row {
                       .toString().charAt(0).toUpperCase()
                 color: Theme.fg
                 font.family: Theme.sansFamily
-                font.pixelSize: Theme.fontPx - 1
+                font.pixelSize: Theme.barFontPx - 1
                 font.bold: true
             }
 

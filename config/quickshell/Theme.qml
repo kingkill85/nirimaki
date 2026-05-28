@@ -51,7 +51,7 @@ QtObject {
     }
 
     // ===== Sizing tokens =====
-    readonly property int barHeight:   32
+    readonly property int barHeight:   26
     readonly property int padX:        10
     readonly property int padY:        4
     readonly property int gap:         6
@@ -61,7 +61,11 @@ QtObject {
     readonly property int focusBorder: 3
     readonly property int fontPx:      13
     readonly property int iconPx:      15
-    // Extra font-size tokens. `fontPx` (13) is the bar / popup body
+    // Bar-label text size. Held one notch below `fontPx` so the topbar
+    // reads as compact as Omarchy's waybar (font-size: 12px) without
+    // shrinking popovers / menus, which stay on `fontPx`.
+    readonly property int barFontPx:   12
+    // Extra font-size tokens. `fontPx` (13) is the popup body
     // size; the others cover sub-labels (small), secondary text
     // (medium), and the picker / launcher row text (large = 18 px, to
     // match Omarchy walker's `font-size: 18px`).

@@ -51,16 +51,8 @@ Item {
             font.family: Theme.iconFamily
             font.pixelSize: Theme.iconPx
         }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: root.muted ? I18n.t("audio.muted")
-                             : Math.round(root.volume * 100) + "%"
-            color: Theme.fg
-            font.family: Theme.sansFamily
-            font.pixelSize: Theme.fontPx
-            opacity: 0.85
-        }
+        // Icon-only in the bar (Omarchy parity). The level lives in the
+        // tooltip + popover header; muted state reads from the glyph (󰝟).
     }
 
     BarPopover {

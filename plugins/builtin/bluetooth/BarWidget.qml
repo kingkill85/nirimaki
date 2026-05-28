@@ -63,7 +63,7 @@ Item {
             text: root.connectedCount
             color: Theme.fg
             font.family: Theme.sansFamily
-            font.pixelSize: Theme.fontPx - 2
+            font.pixelSize: Theme.barFontPx - 2
             opacity: 0.85
         }
     }

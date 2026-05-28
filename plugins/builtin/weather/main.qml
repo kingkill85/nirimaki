@@ -219,7 +219,7 @@ Item {
             text: root.current ? (root.tempInt + "°") : ""
             color: Theme.fg
             font.family: Theme.sansFamily
-            font.pixelSize: Theme.fontPx
+            font.pixelSize: Theme.barFontPx
             opacity: 0.85
         }
     }

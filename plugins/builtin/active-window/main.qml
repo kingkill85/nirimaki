@@ -31,7 +31,7 @@ Item {
         id: titleMetrics
         text: root.title
         font.family: Theme.sansFamily
-        font.pixelSize: Theme.fontPx
+        font.pixelSize: Theme.barFontPx
     }
 
     Behavior on implicitWidth {
@@ -52,7 +52,7 @@ Item {
             text: root.title
             color: Theme.fg
             font.family: Theme.sansFamily
-            font.pixelSize: Theme.fontPx
+            font.pixelSize: Theme.barFontPx
             elide: Text.ElideRight
             opacity: 0.85
         }
