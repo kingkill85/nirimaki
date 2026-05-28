@@ -1,0 +1,74 @@
+#!/bin/bash
+# nirimaki:group=timezone
+# nirimaki:summary=Set the system timezone (fzf picker, or pass a zone)
+# nirimaki:args=[zone]
+#
+# Omarchy `omarchy-tz-select` parity. Two modes:
+#   nirimaki-timezone-set                 ← interactive: fzf over every
+#                                            zone, pre-selecting the current
+#   nirimaki-timezone-set Europe/Berlin   ← non-interactive: set directly
+#
+# Sets the zone system-wide with `sudo timedatectl set-timezone`, which
+# rewrites /etc/localtime persistently. Then restarts Quickshell so the
+# clock + calendar re-read the new zone — long-running processes cache
+# the timezone, so without the restart the bar keeps showing the old one
+# (this is why Omarchy restarts Waybar after the same operation).
+#
+# Launched from Settings → Setup → Timezone (exec-in-foot, so the fzf
+# picker + sudo prompt have a terminal). Cancel with Esc.
+
+set -e
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+current=$(timedatectl show --property=Timezone --value 2>/dev/null || true)
+
+if [[ $# -ge 1 ]]; then
+  # Non-interactive: caller already knows the zone.
+  choice="$1"
+  if ! timedatectl list-timezones 2>/dev/null | grep -qxF -- "$choice"; then
+    echo "Unknown timezone: $choice" >&2
+    echo "List valid zones with: timedatectl list-timezones" >&2
+    exit 1
+  fi
+else
+  # Interactive fzf picker, current zone pre-queried + highlighted.
+  nirimaki_banner "Timezone" "Select"
+
+  zones=$(timedatectl list-timezones 2>/dev/null || true)
+  if [[ -z $zones ]]; then
+    echo "Could not list timezones (timedatectl unavailable?)."
+    nirimaki_pause
+    exit 1
+  fi
+
+  # Show the full list (no --query/--select-1 — pre-querying the current
+  # zone + auto-select would resolve to the current zone and skip the UI
+  # entirely). Current zone is surfaced in the header instead.
+  choice=$(printf '%s\n' "$zones" | fzf \
+      --prompt="Timezone » " \
+      --header="Current: ${current:-unknown}   (type to filter · Esc to cancel)") || {
+    echo "Cancelled."
+    nirimaki_pause
+    exit 0
+  }
+fi
+
+if [[ -z $choice || $choice == "$current" ]]; then
+  echo "No change — already $current."
+  [[ -t 0 ]] && nirimaki_pause
+  exit 0
+fi
+
+nirimaki_sudo_prime
+sudo timedatectl set-timezone "$choice"
+echo
+echo "Timezone is now set to $choice."
+
+# Restart Quickshell so the bar clock re-reads the zone. Launch via the
+# user-facing symlink path (see CLAUDE.md — quickshell keys IPC lookups
+# off the literal path the user passed) and fully detach so the new
+# instance outlives this foot window.
+quickshell list --all 2>&1 | grep "Process ID" | awk '{print $3}' | xargs -r kill 2>/dev/null || true
+setsid -f quickshell -p "$HOME/.config/quickshell/shell.qml" >/dev/null 2>&1 || true
+
+[[ -t 0 ]] && nirimaki_pause

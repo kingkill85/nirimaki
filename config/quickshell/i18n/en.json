@@ -13,6 +13,8 @@
 
   "keybinds.placeholder":   "Keybinds — type to filter",
 
+  "start.tooltip":                  "Menu",
+
   "settings.placeholder":           "Settings",
   "settings.style":                 "Style",
   "settings.style.theme":           "Theme",
@@ -39,6 +41,7 @@
   "settings.setup.language.system": "System default",
   "settings.setup.language.en":     "English",
   "settings.setup.language.de":     "Deutsch",
+  "settings.setup.timezone":        "Timezone",
   "settings.setup.edit":            "Edit config",
   "settings.setup.edit.monitors":   "Monitors",
   "settings.setup.edit.bindings":   "Keybinds",

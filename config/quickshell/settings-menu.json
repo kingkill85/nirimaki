@@ -46,7 +46,7 @@
                 "children": ["setup.audio", "setup.bluetooth", "setup.network",
                              "setup.monitors",
                              "setup.browser", "setup.editor", "setup.language",
-                             "setup.edit"] },
+                             "setup.timezone", "setup.edit"] },
   "setup.audio":     { "icon": "󰓃", "labelKey": "settings.setup.audio",
                        "action": { "type": "summon", "id": "audio" } },
   "setup.bluetooth": { "icon": "󰂯", "labelKey": "settings.setup.bluetooth",
@@ -94,6 +94,11 @@
   "setup.language.de":     { "icon": "󰗊", "labelKey": "settings.setup.language.de",
                              "action": { "type": "exec",
                                          "cmd": ["$HOME/.local/bin/nirimaki-locale-set", "de"] } },
+
+  "setup.timezone":        { "icon": "󰥔", "labelKey": "settings.setup.timezone",
+                             "action": { "type": "exec-in-foot",
+                                         "appId": "tui-nirimaki-timezone-set",
+                                         "cmd":   ["$HOME/.local/bin/nirimaki-timezone-set"] } },
 
   "setup.edit":           { "icon": "󱇧", "labelKey": "settings.setup.edit",
                             "children": ["setup.edit.monitors", "setup.edit.bindings",

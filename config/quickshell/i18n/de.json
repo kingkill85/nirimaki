@@ -65,6 +65,8 @@
   "keybind.title.volume-down":               "Lautstärke runter",
   "keybind.title.volume-up":                 "Lautstärke rauf",
 
+  "start.tooltip":                  "Menü",
+
   "settings.placeholder":           "Einstellungen",
   "settings.style":                 "Erscheinungsbild",
   "settings.style.theme":           "Theme",
@@ -91,6 +93,7 @@
   "settings.setup.language.system": "Systemstandard",
   "settings.setup.language.en":     "English",
   "settings.setup.language.de":     "Deutsch",
+  "settings.setup.timezone":        "Zeitzone",
   "settings.setup.edit":            "Konfig bearbeiten",
   "settings.setup.edit.monitors":   "Monitore",
   "settings.setup.edit.bindings":   "Tastenkürzel",
