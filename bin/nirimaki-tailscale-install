@@ -60,7 +60,7 @@ fi
 echo
 echo "  ✓ Tailscale installed."
 echo "  → Add a connection from Network → VPN → Add connection → Tailscale."
-echo "  → First Connect opens the device-auth URL in your browser."
+echo "  → Adding it opens a terminal with the device-auth URL — click it to sign in."
 echo "  → 'tailscale status' to see your tailnet once connected."
 echo "  → Admin console: apps menu → Tailscale."
 

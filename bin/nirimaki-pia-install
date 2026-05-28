@@ -34,8 +34,9 @@ sudo systemctl enable --now piavpn.service
 
 echo
 echo "  ✓ Private Internet Access installed."
-echo "  → Sign in via pia-client (Add → PIA in Network panel launches it)."
-echo "  → Once signed in, Connect/Disconnect on the PIA row work via piactl."
+echo "  → Add it from Network → VPN → Add connection → Private Internet Access."
+echo "    The form collects your PIA username + password and signs in via"
+echo "    piactl (no GUI client involved). Connect/Disconnect then work on the PIA row."
 
 [[ -x $HOME/.local/bin/nirimaki-feature-state ]] && \
   "$HOME/.local/bin/nirimaki-feature-state" >/dev/null 2>&1 || true
