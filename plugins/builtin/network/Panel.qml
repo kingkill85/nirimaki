@@ -340,25 +340,34 @@ DialogShell {
                     font.italic: true
                 }
 
-                Column {
+                // Active list — Flickable so many adapters scroll (gotcha 5).
+                Flickable {
+                    id: wiredFlick
                     visible: NetworkService.wiredDevices.length > 0
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    spacing: 12
+                    anchors.fill: parent
+                    contentWidth: width
+                    contentHeight: wiredCol.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
 
-                    Text {
-                        text: I18n.t("network.section.interfaces")
-                        color: Theme.fgDim
-                        font.family: Theme.sansFamily
-                        font.pixelSize: Theme.fontPx - 2
-                        font.bold: true
-                        font.letterSpacing: 2
-                    }
+                    Column {
+                        id: wiredCol
+                        width: wiredFlick.width
+                        spacing: 12
 
-                    Repeater {
-                        model: NetworkService.wiredDevices
-                        delegate: wiredRow
+                        Text {
+                            text: I18n.t("network.section.interfaces")
+                            color: Theme.fgDim
+                            font.family: Theme.sansFamily
+                            font.pixelSize: Theme.fontPx - 2
+                            font.bold: true
+                            font.letterSpacing: 2
+                        }
+
+                        Repeater {
+                            model: NetworkService.wiredDevices
+                            delegate: wiredRow
+                        }
                     }
                 }
             }
