@@ -8,22 +8,49 @@ set -e
 . "$HOME/.local/bin/nirimaki-feature-prelude"
 nirimaki_banner "Bitwarden" "Install"
 
+# The desktop GUI (electron) installs from extra/ with no fuss. The
+# `bw` CLI is split out deliberately: Arch's extra/bitwarden-cli pins
+# nodejs-lts-jod, which conflicts with the rolling `nodejs` and would
+# force a system-wide Node downgrade. We use the AUR `-bin` (a prebuilt
+# SEA binary, deps libgcc/libstdc++ only) instead — no Node at all, and
+# it tracks upstream's latest release.
 if command -v bitwarden >/dev/null 2>&1; then
-  echo "bitwarden is already installed."
+  echo "bitwarden (desktop) is already installed."
 else
-  echo "Installing:"
-  echo "  - bitwarden     (Arch official; desktop UI)"
-  echo "  - bitwarden-cli (Arch official; \`bw\` CLI for scripting)"
+  echo "Installing bitwarden (extra/; electron desktop UI)."
+fi
+
+# AUR helpers handle their own sudo internally.
+if   command -v paru >/dev/null 2>&1; then aur=paru
+elif command -v yay  >/dev/null 2>&1; then aur=yay
+else
+  aur=""
 fi
 
 nirimaki_sudo_prime
 
-sudo pacman -S --needed --noconfirm bitwarden bitwarden-cli
+# Desktop GUI — always from the official repo, no Node involvement.
+sudo pacman -S --needed --noconfirm bitwarden
+
+# CLI — AUR `bitwarden-cli-bin` (prebuilt, no Node dep). Best-effort:
+# the desktop install above is the primary deliverable, so a missing
+# AUR helper warns rather than aborting.
+if [[ -n $aur ]]; then
+  echo
+  echo "Installing bitwarden-cli-bin (AUR; prebuilt \`bw\`, no Node dep)."
+  $aur -S --needed --noconfirm bitwarden-cli-bin
+else
+  echo
+  echo "  ! No AUR helper (paru / yay) found — skipping the \`bw\` CLI."
+  echo "    The desktop app is installed. To add the CLI later, install"
+  echo "    an AUR helper and run: paru -S bitwarden-cli-bin"
+fi
 
 echo
 echo "  ✓ Bitwarden installed."
 echo "  → Launch from the apps menu (Mod+Space) → Bitwarden."
-echo "  → CLI: \`bw login\` to authenticate, then \`bw get password <name>\`."
+command -v bw >/dev/null 2>&1 && \
+  echo "  → CLI: \`bw login\` to authenticate, then \`bw get password <name>\`."
 
 [[ -x $HOME/.local/bin/nirimaki-hook-run ]] && \
   "$HOME/.local/bin/nirimaki-hook-run" bitwarden-installed || true

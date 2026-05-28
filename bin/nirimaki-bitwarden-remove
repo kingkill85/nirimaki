@@ -8,20 +8,26 @@ set -e
 . "$HOME/.local/bin/nirimaki-feature-prelude"
 nirimaki_banner "Bitwarden" "Remove"
 
-if ! pacman -Qi bitwarden >/dev/null 2>&1 \
-     && ! pacman -Qi bitwarden-cli >/dev/null 2>&1; then
+# CLI ships as the AUR `bitwarden-cli-bin`; older installs may still
+# have the official `bitwarden-cli`. Remove whichever is present.
+pkgs=()
+for p in bitwarden bitwarden-cli-bin bitwarden-cli; do
+  pacman -Qi "$p" >/dev/null 2>&1 && pkgs+=("$p")
+done
+
+if [[ ${#pkgs[@]} -eq 0 ]]; then
   echo "bitwarden is not installed — nothing to do."
   nirimaki_pause
   exit 0
 fi
 
-echo "Removing bitwarden + bitwarden-cli."
+echo "Removing: ${pkgs[*]}."
 echo "Your encrypted vault data in ~/.config/Bitwarden is left in place"
 echo "(re-install will pick it back up)."
 
 nirimaki_sudo_prime
 
-sudo pacman -Rns --noconfirm bitwarden bitwarden-cli 2>/dev/null || true
+sudo pacman -Rns --noconfirm "${pkgs[@]}" 2>/dev/null || true
 
 echo
 echo "  ✓ Bitwarden removed."

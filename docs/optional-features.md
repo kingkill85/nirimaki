@@ -50,7 +50,7 @@ in the config for slightly better accuracy than `auto`.
 
 | Where | `Install / Remove → Service → Bitwarden` |
 |-------|------------------------------------------|
-| Bins  | `bitwarden` (desktop UI) + `bitwarden-cli` (`bw` CLI for scripting) — both Arch official |
+| Bins  | `bitwarden` (desktop UI, extra/) + `bitwarden-cli-bin` (`bw` CLI, AUR). The CLI is the AUR prebuilt rather than extra/`bitwarden-cli` because the latter pins `nodejs-lts-jod`, which conflicts with the rolling `nodejs` and would force a system-wide Node downgrade. The `-bin` SEA binary has no Node dep. Needs an AUR helper (paru/yay); if absent, only the desktop app installs. |
 | Persistence | Encrypted vault stays in `~/.config/Bitwarden/` even after remove. Re-install picks up where you left off; nuke that dir manually if you really want a clean slate. |
 | Window rule | Floats by default + blocked from screen capture (covered by the same niri rule as 1Password / KeePassXC). |
 
