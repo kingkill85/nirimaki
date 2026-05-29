@@ -188,6 +188,14 @@ echo "== Seeding ~/.config/tmux/tmux.conf (copy-once, never overwritten) =="
 mkdir -p "$HOME/.config/tmux"
 seed_user_file "$REPO_DIR/config/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf"
 
+echo "== Seeding ~/.config/fastfetch/ (copy-once, never overwritten) =="
+# config.jsonc + the wordmark logo it references. Whole-file user-owned;
+# logo/key colors use named palette entries so they track the active
+# terminal theme without a regeneration step.
+mkdir -p "$HOME/.config/fastfetch"
+seed_user_file "$REPO_DIR/config/fastfetch/config.jsonc" "$HOME/.config/fastfetch/config.jsonc"
+seed_user_file "$REPO_DIR/config/fastfetch/logo.txt" "$HOME/.config/fastfetch/logo.txt"
+
 echo "== Seeding + linking ~/.config/fish/ =="
 # config.fish is user-owned (per Omarchy convention — fish loads
 # conf.d/* first, then config.fish, so the user file always gets the

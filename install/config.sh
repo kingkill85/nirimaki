@@ -129,6 +129,13 @@ _cfg_links() {
   mkdir -p "$HOME/.config/tmux"
   seed_user_file "$REPO_DIR/config/tmux/tmux.conf" "$HOME/.config/tmux/tmux.conf"
 
+  # fastfetch: whole-file user-owned. config.jsonc + the wordmark logo
+  # it references. Logo/key colors use named palette entries so they
+  # track the terminal theme — no regeneration step needed.
+  mkdir -p "$HOME/.config/fastfetch"
+  seed_user_file "$REPO_DIR/config/fastfetch/config.jsonc" "$HOME/.config/fastfetch/config.jsonc"
+  seed_user_file "$REPO_DIR/config/fastfetch/logo.txt" "$HOME/.config/fastfetch/logo.txt"
+
   # fish: config.fish + fish_plugins are OVERWRITTEN unconditionally on
   # every install.sh run. Some distros (CachyOS, ...) pre-seed their own
   # ~/.config/fish/config.fish with the user's home as part of the

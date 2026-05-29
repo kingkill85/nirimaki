@@ -37,5 +37,43 @@ video/quicktime=mpv.desktop
 video/mpeg=mpv.desktop
 video/x-flv=mpv.desktop
 video/3gpp=mpv.desktop
+video/3gpp2=mpv.desktop
 video/ogg=mpv.desktop
 video/x-ogm+ogg=mpv.desktop
+video/x-theora+ogg=mpv.desktop
+video/x-ms-wmv=mpv.desktop
+video/x-ms-asf=mpv.desktop
+application/ogg=mpv.desktop
+
+# Directories → Nautilus.
+inode/directory=org.gnome.Nautilus.desktop
+
+# Images → imv (Wayland image viewer).
+image/png=imv.desktop
+image/jpeg=imv.desktop
+image/gif=imv.desktop
+image/webp=imv.desktop
+image/bmp=imv.desktop
+image/tiff=imv.desktop
+
+# PDFs → Evince (GNOME Document Viewer).
+application/pdf=org.gnome.Evince.desktop
+
+# Text / code → nvim (opens in the default terminal via nvim.desktop).
+text/plain=nvim.desktop
+text/english=nvim.desktop
+text/x-makefile=nvim.desktop
+text/x-c++hdr=nvim.desktop
+text/x-c++src=nvim.desktop
+text/x-chdr=nvim.desktop
+text/x-csrc=nvim.desktop
+text/x-c=nvim.desktop
+text/x-c++=nvim.desktop
+text/x-java=nvim.desktop
+text/x-moc=nvim.desktop
+text/x-pascal=nvim.desktop
+text/x-tcl=nvim.desktop
+text/x-tex=nvim.desktop
+application/x-shellscript=nvim.desktop
+application/xml=nvim.desktop
+text/xml=nvim.desktop
