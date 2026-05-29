@@ -75,8 +75,6 @@ binds {
     // Quake-style drop-down terminal — Mod+grave (`). Single floating
     // foot instance; toggle spawns / closes.
     Mod+grave hotkey-overlay-title="Toggle drop-down terminal" { spawn-sh "$HOME/.local/bin/nirimaki-quake-toggle"; }
-    // Screen reader (orca). Allowed when locked.
-    Super+Alt+S allow-when-locked=true hotkey-overlay-title="Toggle screen reader" { spawn-sh "pkill orca || exec orca"; }
     Mod+Shift+P hotkey-overlay-title="Power off monitors"                          { power-off-monitors; }
 
     // ===== Screenshot / recording =====
