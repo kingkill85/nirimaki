@@ -425,7 +425,8 @@ config/quickshell/  Bar.qml, DialogShell.qml, the 9 dialogs,
 config/theme/
   templates/        kitty.conf.tpl, btop.theme.tpl,
                     niri-theme.kdl.tpl, qt-colors.conf.tpl
-  themes/<name>/    colors.toml, backgrounds/, preview.png, …
+  themes/<name>/    colors.toml, backgrounds/, icons.theme,
+                    neovim.lua (+ light.mode for light themes)
 bin/                nirimaki-theme-set, nirimaki-theme-list,
                     nirimaki-wallpaper-apply, nirimaki-osd, nirimaki-screenrecord,
                     nirimaki-audio-output-volume, nirimaki-audio-input-mute,

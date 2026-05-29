@@ -205,7 +205,7 @@ config/
   fish/ foot/ tmux/ nvim/   shell + terminal + editor configs
   theme/
     templates/  per-app .tpl rendered by nirimaki-theme-set
-    themes/     22 themes (colors.toml + backgrounds + previews)
+    themes/     20 themes (colors.toml + backgrounds + icons.theme + neovim.lua)
   nirimaki/     user-overrides skeleton (hooks/extensions/themed samples)
   applications/ repo-owned .desktop launchers
 default/        upgrade-tracked niri defaults + bash rc + SDDM theme
