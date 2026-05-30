@@ -212,12 +212,23 @@ if [[ -f $CURRENT_DIR/light.mode ]]; then
 else
   color_scheme="prefer-dark";  prefer_dark="true"
 fi
-# Modern GTK3+: Adwaita ships ONE theme (light) and dark is selected via
-# the `prefer-dark-theme` flag + freedesktop color-scheme. The legacy
-# `Adwaita-dark` theme name only exists if `gnome-themes-extra` is
-# installed — without that package GTK silently falls back to light.
-# Keep the name as `Adwaita` and let the flag drive light/dark.
+# GTK3 dark selection: the `prefer-dark-theme` flag + freedesktop
+# color-scheme is enough for apps that honour the hint, but some GTK3
+# CSD apps override it from their own prefs — notably Remmina, which
+# forces gtk-application-prefer-dark-theme from its `dark_theme` pref
+# and so renders light no matter what we set here. Naming a *genuine*
+# dark theme sidesteps that: Adwaita-dark is dark CSS, not a hint, so
+# every GTK3 app picks it up. It only exists with `gnome-themes-extra`
+# installed, so fall back to plain Adwaita + the flag when it's absent
+# (GTK silently falls back to light if we name a missing theme).
 gtk_theme="Adwaita"
+if [[ $prefer_dark == "true" ]]; then
+  for d in "$HOME/.themes/Adwaita-dark" \
+           "$HOME/.local/share/themes/Adwaita-dark" \
+           /usr/share/themes/Adwaita-dark; do
+    [[ -d $d ]] && { gtk_theme="Adwaita-dark"; break; }
+  done
+fi
 
 icon_theme=""
 [[ -f $CURRENT_DIR/icons.theme ]] && icon_theme=$(< "$CURRENT_DIR/icons.theme")
