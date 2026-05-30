@@ -31,6 +31,69 @@ Item {
     // (and any time `ifname` changes while the popover is showing).
     property var info: ({})   // { ip4, gateway, dns[], speed }
 
+    // Live throughput for the primary iface, sampled while the popover is
+    // open. Quickshell.Networking / NetworkService expose no byte counters,
+    // so read /sys/class/net/<if>/statistics directly and diff per tick.
+    property real rxRate: 0       // bytes/sec
+    property real txRate: 0
+    property real _prevRx: -1     // <0 = no baseline yet (first sample)
+    property real _prevTx: -1
+    readonly property int rateIntervalMs: 2000
+
+    function _resetRates() {
+        root._prevRx = -1; root._prevTx = -1;
+        root.rxRate = 0; root.txRate = 0;
+    }
+
+    // Human-readable transfer rate: B/s → KB/s → MB/s → GB/s.
+    function fmtRate(bps) {
+        if (!bps || bps < 1) return "0 B/s";
+        const u = ["B/s", "KB/s", "MB/s", "GB/s"];
+        let i = 0, v = bps;
+        while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+        return (i === 0 || v >= 100 ? Math.round(v) : v.toFixed(1)) + " " + u[i];
+    }
+
+    function _sampleRate() {
+        const name = root.ifname;
+        if (!name) { root._resetRates(); return; }
+        rateProc.command = ["cat",
+            "/sys/class/net/" + name + "/statistics/rx_bytes",
+            "/sys/class/net/" + name + "/statistics/tx_bytes"];
+        rateProc.running = true;
+    }
+
+    Process {
+        id: rateProc
+        stdout: StdioCollector {
+            id: rateOut
+            waitForEnd: true
+            onStreamFinished: {
+                const nums = String(rateOut.text || "").trim().split(/\s+/);
+                if (nums.length < 2) return;
+                const rx = parseInt(nums[0]) || 0;
+                const tx = parseInt(nums[1]) || 0;
+                // First sample only sets the baseline (rate stays 0); a real
+                // rate appears on the next tick from the byte delta.
+                if (root._prevRx >= 0) {
+                    const dt = root.rateIntervalMs / 1000;
+                    root.rxRate = Math.max(0, (rx - root._prevRx) / dt);
+                    root.txRate = Math.max(0, (tx - root._prevTx) / dt);
+                }
+                root._prevRx = rx;
+                root._prevTx = tx;
+            }
+        }
+    }
+
+    Timer {
+        interval: root.rateIntervalMs
+        running:  popover.popupOpen && root.connected
+        repeat:   true
+        triggeredOnStart: true   // grab the baseline the moment it opens
+        onTriggered: root._sampleRate()
+    }
+
     function _refreshInfo() {
         const name = root.ifname;
         if (!name) { root.info = ({}); return; }
@@ -117,11 +180,11 @@ Item {
 
         // Re-query IP/gateway/DNS each time the popover opens, and
         // any time the active interface changes while it's showing.
-        onPopupOpenChanged: if (popupOpen) root._refreshInfo()
+        onPopupOpenChanged: if (popupOpen) { root._resetRates(); root._refreshInfo(); }
         Connections {
             target: root
             function onIfnameChanged() {
-                if (popover.popupOpen) root._refreshInfo();
+                if (popover.popupOpen) { root._resetRates(); root._refreshInfo(); }
             }
         }
 
@@ -237,6 +300,21 @@ Item {
                        font.pixelSize: Theme.fontPx - 2
                        elide: Text.ElideRight
                        width: 200 }
+
+                // Live throughput — updated every rateIntervalMs while open.
+                Text { text: I18n.t("network.down"); color: Theme.fgDim
+                       font.family: Theme.sansFamily
+                       font.pixelSize: Theme.fontPx - 2 }
+                Text { text: "󰇚  " + root.fmtRate(root.rxRate); color: Theme.fg
+                       font.family: Theme.monoFamily
+                       font.pixelSize: Theme.fontPx - 2 }
+
+                Text { text: I18n.t("network.up"); color: Theme.fgDim
+                       font.family: Theme.sansFamily
+                       font.pixelSize: Theme.fontPx - 2 }
+                Text { text: "󰕒  " + root.fmtRate(root.txRate); color: Theme.fg
+                       font.family: Theme.monoFamily
+                       font.pixelSize: Theme.fontPx - 2 }
             }
 
             PopoverDivider { visible: root.connected && card._topAps.length > 0 }

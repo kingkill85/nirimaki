@@ -166,6 +166,8 @@
   "network.iface":        "Schnittstelle",
   "network.security":     "Sicherheit",
   "network.link":         "Verbindung",
+  "network.down":         "Empfang",
+  "network.up":           "Senden",
   "network.duplex":       "Duplex",
   "network.close":        "Schließen",
   "network.bar.panel":    "verwalten",
@@ -264,7 +266,11 @@
 
   "stats.system": "System",
   "stats.cpu":    "CPU",
+  "stats.gpu":    "GPU",
   "stats.memory": "Speicher",
+  "stats.disk":   "Datenträger",
+  "stats.swap":   "Swap",
+  "stats.uptime": "seit",
   "stats.load":   "Last",
 
   "weather.feels":    "GEFÜHLT",
@@ -275,6 +281,7 @@
   "lock.password":     "Passwort",
   "lock.bad_password": "Falsches Passwort",
 
+  "audio.title":              "Audio",
   "audio.mixer":              "Audio-Mixer",
   "audio.summary":            "{0} Ausgänge · {1} Eingänge · {2} Apps",
   "audio.tab.output":         "Ausgang",

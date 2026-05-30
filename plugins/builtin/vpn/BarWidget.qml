@@ -52,7 +52,9 @@ Item {
     }
 
     readonly property string icon:  anyOn ? "󰦝" : "󰦞"   // shield-check / shield-outline
-    readonly property color  color: anyOn ? Theme.accent : Theme.fgDim
+    // Neutral fg when active, fgDim when off — matches audio/network/bluetooth.
+    // Connected state still reads from the glyph (check vs outline).
+    readonly property color  color: anyOn ? Theme.fg : Theme.fgDim
 
     BarPill {
         id: pill

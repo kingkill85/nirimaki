@@ -114,6 +114,8 @@
   "network.iface":        "Interface",
   "network.security":     "Security",
   "network.link":         "Link",
+  "network.down":         "Download",
+  "network.up":           "Upload",
   "network.duplex":       "duplex",
   "network.close":        "Close",
   "network.bar.panel":    "manage",
@@ -212,7 +214,11 @@
 
   "stats.system": "System",
   "stats.cpu":    "CPU",
+  "stats.gpu":    "GPU",
   "stats.memory": "Memory",
+  "stats.disk":   "Disk",
+  "stats.swap":   "Swap",
+  "stats.uptime": "up",
   "stats.load":   "Load",
 
   "weather.feels":    "FEELS",
@@ -223,6 +229,7 @@
   "lock.password":     "Password",
   "lock.bad_password": "Wrong password",
 
+  "audio.title":              "Audio",
   "audio.mixer":              "Audio mixer",
   "audio.summary":            "{0} outputs · {1} inputs · {2} apps",
   "audio.tab.output":         "Output",
