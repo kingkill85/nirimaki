@@ -62,6 +62,10 @@ _pkg_base() {
 #   - imv — default image viewer (Wayland). Seeded for image/* in §2h.
 #   - evince — default PDF viewer (GNOME Document Viewer). Seeded for
 #     application/pdf in §2h.
+#   - capitaine-cursors — the cursor theme nirimaki-theme-set drives
+#     (capitaine-cursors-light on dark themes, capitaine-cursors on
+#     light). Ships both variants; lands in /usr/share/icons, which is
+#     on the default XCURSOR_PATH (~/.local/share/icons is NOT).
 _pkg_compositor() {
   section "Packages: compositor + shell + GUI baseline"
   pacman_install \
@@ -78,6 +82,7 @@ _pkg_compositor() {
     playerctl brightnessctl \
     pavucontrol \
     qt5ct qt6ct gnome-themes-extra \
+    capitaine-cursors \
     fontconfig ttf-jetbrains-mono-nerd \
     noto-fonts-cjk noto-fonts-emoji noto-fonts-extra \
     plymouth \

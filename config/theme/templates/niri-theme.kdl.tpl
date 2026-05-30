@@ -46,3 +46,17 @@ layout {
     struts {
     }
 }
+
+// Cursor — one family (Capitaine), variant chosen by MODE not by
+// theme: nirimaki-theme-set reads the active theme's light.mode marker
+// and writes a light (white) cursor for dark themes, a dark (black) one
+// for light themes. Same shape either way, so it looks consistent across
+// the set. niri uses this for its own pointer AND exports it as
+// XCURSOR_THEME/XCURSOR_SIZE to spawned + XWayland clients; theme-set
+// also mirrors it into gsettings (GTK) and ~/.icons/default (X11
+// fallback) so every surface agrees. Loaded before the user niri files,
+// so a `cursor {}` block in ~/.config/niri/* still wins.
+cursor {
+    xcursor-theme "{{ cursor_theme }}"
+    xcursor-size {{ cursor_size }}
+}

@@ -89,6 +89,27 @@ for entry in "$src"/*; do
 done
 printf '%s\n' "$name" >"$CURRENT_DIR/theme.name"
 
+# ===== Cursor (mode-based, not per-theme) =====
+# One cursor family — Capitaine — with the variant picked by light/dark
+# MODE rather than per theme. A light (white) cursor reads on dark
+# backgrounds; a dark (black) cursor reads on light ones; both are the
+# same shape, so the pointer looks consistent across every theme.
+# Capitaine ships in the official `extra` repo (capitaine-cursors), so
+# it installs to /usr/share/icons — on the default XCURSOR_PATH, which
+# ~/.local/share/icons is NOT.
+#
+# light.mode marker (present in current/ for light themes) selects the
+# variant. Computed here, before the template loop, so {{ cursor_theme }}
+# / {{ cursor_size }} can be substituted into niri-theme.kdl below. Also
+# fed to gsettings (GTK), GTK settings.ini, and ~/.icons/default/
+# index.theme (the X11 / XWayland fallback) further down.
+if [[ -f $CURRENT_DIR/light.mode ]]; then
+  cursor_theme="capitaine-cursors"
+else
+  cursor_theme="capitaine-cursors-light"
+fi
+cursor_size=32
+
 # ===== Render templates =====
 # Build a sed script of {{ key }} → value substitutions from
 # current/colors.toml. Three variants per colour:
@@ -115,6 +136,12 @@ if [[ -d $TEMPLATES_DIR ]]; then
       printf 's|{{ %s_rgb }}|%s|g\n' "$key" "$(hex_to_rgb "$val")" >>"$sed_script"
     fi
   done <"$CURRENT_DIR/colors.toml"
+
+  # Cursor isn't a colour — append its substitutions by hand so the
+  # niri-theme.kdl {{ cursor_theme }} / {{ cursor_size }} placeholders
+  # resolve (see the mode-based block above).
+  printf 's|{{ cursor_theme }}|%s|g\n' "$cursor_theme" >>"$sed_script"
+  printf 's|{{ cursor_size }}|%s|g\n'  "$cursor_size"  >>"$sed_script"
 
   # Collect templates: union of TEMPLATES_DIR + user-themed overrides.
   # The user dir wins by basename — drop a `<name>.tpl` into
@@ -239,7 +266,17 @@ if command -v gsettings >/dev/null 2>&1; then
   gsettings set org.gnome.desktop.interface color-scheme "$color_scheme"
   gsettings set org.gnome.desktop.interface gtk-theme    "$gtk_theme"
   gsettings set org.gnome.desktop.interface icon-theme   "$icon_theme"
+  gsettings set org.gnome.desktop.interface cursor-theme "$cursor_theme"
+  gsettings set org.gnome.desktop.interface cursor-size  "$cursor_size"
 fi
+
+# X11 / XWayland fallback. Apps that don't read gsettings/env (many
+# XWayland clients, some GTK CSD) resolve the cursor via the "default"
+# icon theme, which inherits whatever ~/.icons/default/index.theme names.
+# Point it at the active phinger variant so they match the rest.
+mkdir -p "$HOME/.icons/default"
+printf '[Icon Theme]\nName=Default\nComment=Nirimaki default cursor\nInherits=%s\n' \
+  "$cursor_theme" > "$HOME/.icons/default/index.theme"
 
 # Mirror to settings.ini so GTK-chrome apps that read the toolkit theme
 # rather than the freedesktop portal still go dark — notably Electron /
@@ -266,6 +303,8 @@ for gtk in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.
   gtk_upsert "$gtk" "gtk-application-prefer-dark-theme" "$prefer_dark"
   gtk_upsert "$gtk" "gtk-theme-name"      "$gtk_theme"
   gtk_upsert "$gtk" "gtk-icon-theme-name" "$icon_theme"
+  gtk_upsert "$gtk" "gtk-cursor-theme-name" "$cursor_theme"
+  gtk_upsert "$gtk" "gtk-cursor-theme-size" "$cursor_size"
 done
 
 # ===== Remmina =====
