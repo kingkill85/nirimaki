@@ -27,6 +27,15 @@ QtObject {
     }
 
     function snapshot(n) {
+        // Surface non-default actions to the toast as {identifier, text}.
+        // The "default" action is the body-click handler (see activate())
+        // so it never becomes a button.
+        const acts = [];
+        const src = n.actions || [];
+        for (let i = 0; i < src.length; i++) {
+            if (src[i].identifier === "default") continue;
+            acts.push({ identifier: src[i].identifier, text: src[i].text || src[i].identifier });
+        }
         return {
             id:         n.id,
             originalId: n.id,
@@ -35,6 +44,7 @@ QtObject {
             summary:    n.summary  || "",
             body:       n.body     || "",
             urgency:    n.urgency,
+            actions:    acts,
             timestamp:  Date.now(),
             ref:        n
         };
@@ -55,10 +65,53 @@ QtObject {
         while (popups.length > 0) dismiss(0);
     }
 
+    // Fire the notification's "default" action (freedesktop convention:
+    // the action invoked when the body is clicked) then dismiss. Lets a
+    // click on a chat toast open the right conversation instead of just
+    // clearing it. No-op for notifications that ship no default action.
+    function activate(idx) {
+        if (idx < 0 || idx >= popups.length) return;
+        const item = popups[idx];
+        if (item && item.ref) {
+            try {
+                if (item.ref.tracked) {
+                    const acts = item.ref.actions || [];
+                    for (let i = 0; i < acts.length; i++) {
+                        if (acts[i].identifier === "default") { acts[i].invoke(); break; }
+                    }
+                }
+            } catch (e) {}
+        }
+        dismiss(idx);
+    }
+
+    // Invoke a named (non-default) action button, then dismiss.
+    function invokeAction(idx, identifier) {
+        if (idx < 0 || idx >= popups.length) return;
+        const item = popups[idx];
+        if (item && item.ref) {
+            try {
+                if (item.ref.tracked) {
+                    const acts = item.ref.actions || [];
+                    for (let i = 0; i < acts.length; i++) {
+                        if (acts[i].identifier === identifier) { acts[i].invoke(); break; }
+                    }
+                }
+            } catch (e) {}
+        }
+        dismiss(idx);
+    }
+
     property NotificationServer _server: NotificationServer {
         keepOnReload:           false
         imageSupported:         false
-        actionsSupported:       false
+        // Chromium's NotificationPlatformBridgeLinux refuses to use the
+        // freedesktop daemon unless GetCapabilities advertises BOTH "body"
+        // and "actions" — otherwise it falls back to its own in-window
+        // message center (MISSING_REQUIRED_CAPABILITIES). Every webapp runs
+        // in Chromium, so this must stay true for their notifications to
+        // reach this toast at all.
+        actionsSupported:       true
         bodyMarkupSupported:    true
         bodyHyperlinksSupported: false
         persistenceSupported:   true

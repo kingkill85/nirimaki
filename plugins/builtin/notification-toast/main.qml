@@ -44,6 +44,7 @@ Item {
                 model: NotificationService.popups
 
                 delegate: Rectangle {
+                    id: toastCard
                     required property var modelData
                     required property int index
 
@@ -111,6 +112,52 @@ Item {
                             font.family: Theme.sansFamily
                             font.pixelSize: Theme.fontPx - 3
                         }
+
+                        // Action buttons (Reply / Mark as read / …). z:1 so
+                        // each button's MouseArea wins over the card-wide
+                        // dismiss handler below.
+                        Row {
+                            id: actionRow
+                            visible: (modelData.actions || []).length > 0
+                            anchors.right: parent.right
+                            spacing: 6
+                            topPadding: 4
+                            z: 1
+
+                            Repeater {
+                                model: toastCard.modelData.actions || []
+                                delegate: Rectangle {
+                                    id: actionBtn
+                                    required property var modelData
+                                    radius: Theme.radius * 0.6
+                                    implicitWidth: actionLabel.implicitWidth + 18
+                                    implicitHeight: actionLabel.implicitHeight + 10
+                                    color: actionMouse.containsMouse
+                                        ? Qt.rgba(Theme.fg.r, Theme.fg.g, Theme.fg.b, 0.12)
+                                        : "transparent"
+                                    border.color: Theme.cardBorderColor
+                                    border.width: Theme.cardBorderWidth
+
+                                    Text {
+                                        id: actionLabel
+                                        anchors.centerIn: parent
+                                        text: actionBtn.modelData.text
+                                        color: Theme.fg
+                                        font.family: Theme.sansFamily
+                                        font.pixelSize: Theme.fontPx - 2
+                                    }
+
+                                    MouseArea {
+                                        id: actionMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: NotificationService.invokeAction(
+                                            toastCard.index, actionBtn.modelData.identifier)
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Lifetime progress bar at the bottom.
@@ -132,7 +179,12 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                        onClicked: NotificationService.dismiss(index)
+                        // Left-click activates the default action (e.g. opens
+                        // the chat conversation) then clears; middle-click just
+                        // clears.
+                        onClicked: (e) => e.button === Qt.MiddleButton
+                            ? NotificationService.dismiss(index)
+                            : NotificationService.activate(index)
                     }
                 }
             }
