@@ -1,0 +1,39 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Render + launch deckmaster against the configured deck
+# nirimaki:args=[--foreground]
+#
+# Spawned from niri autostart. Self-gating: a no-op (exit 0) when
+# deckmaster isn't installed or no Elgato device (VID 0fd9) is plugged
+# in, so it's safe to autostart on every machine.
+#
+# PATH is forced to include ~/.local/bin because niri's spawn
+# environment doesn't (gotcha #1) — deckmaster's `exec` key actions
+# call `nirimaki …` / `nirimaki-audio-…`, which live there.
+
+export PATH="$HOME/.local/bin:$PATH"
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/nirimaki/streamdeck"
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/nirimaki/streamdeck.json"
+[[ -f $CONFIG ]] || CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/nirimaki/streamdeck.json.sample"
+
+# deckmaster present?
+command -v deckmaster >/dev/null 2>&1 || exit 0
+
+# Elgato device present? Dependency-free check via sysfs (0fd9 = Elgato).
+have_deck() {
+  local f
+  for f in /sys/bus/usb/devices/*/idVendor; do
+    [[ -r $f ]] || continue
+    [[ $(< "$f") == "0fd9" ]] && return 0
+  done
+  return 1
+}
+have_deck || exit 0
+
+nirimaki-streamdeck-generate || exit 1
+
+brightness=$(jq -r '.brightness // 70' "$CONFIG" 2>/dev/null)
+[[ $brightness =~ ^[0-9]+$ ]] || brightness=70
+
+exec deckmaster -deck "$CACHE_DIR/main.deck" -brightness "$brightness"

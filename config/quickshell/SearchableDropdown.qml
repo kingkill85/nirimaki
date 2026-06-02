@@ -29,6 +29,7 @@ Item {
 
     property bool _open: false
     property string _query: ""
+    property bool _syncing: false   // guards programmatic field-text writes
 
     signal selected(int index, var item)
 
@@ -87,7 +88,21 @@ Item {
         root.currentIndex = i;
         root.selected(i, _itemAt(i));
         root.close();
+        // Show the chosen item in the field (header doubles as search box,
+        // so without this it would keep displaying the stale query).
+        _setText(_textOf(_itemAt(i)));
     }
+    // Set the field text without triggering a re-filter / re-open.
+    function _setText(t) {
+        root._syncing = true;
+        search.text = t;
+        root._syncing = false;
+    }
+    // Keep the field showing the current selection whenever it isn't being
+    // actively searched (initial value, external currentIndex changes).
+    onCurrentIndexChanged: if (!search.inputFocused)
+                               _setText(currentIndex >= 0 ? currentText : "");
+    Component.onCompleted: if (currentIndex >= 0) _setText(currentText);
 
     implicitWidth:  240
     implicitHeight: Theme.controlHeight
@@ -97,7 +112,21 @@ Item {
         anchors.fill: parent
         placeholder: root.placeholder
         leadingIcon: ""    // nf-fa-search
+        onInputFocusedChanged: {
+            if (inputFocused) {
+                // Entering search: clear the displayed selection, show the
+                // full list, let the user type to filter.
+                root._setText("");
+                root._query = "";
+                if (!root._open) root.open();
+            } else {
+                // Leaving without the popup driving it: restore the
+                // displayed selection.
+                root._setText(root.currentIndex >= 0 ? root.currentText : "");
+            }
+        }
         onTextChanged: {
+            if (root._syncing) return;
             root._query = text;
             if (!root._open) root.open();
         }

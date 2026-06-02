@@ -1,0 +1,155 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Install deckmaster + udev rule for Elgato Stream Deck control
+# nirimaki:requires-sudo=true
+#
+# Optional feature install (mirrors nirimaki-voxtype-install). Installs
+# deckmaster from the AUR, drops a uaccess udev rule so the device is
+# reachable without root, and optionally registers Teams as a webapp.
+# Idempotent: re-runs cleanly when already installed.
+
+set -e
+
+# shellcheck source=nirimaki-feature-prelude
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Stream Deck control" "Install"
+
+if command -v deckmaster >/dev/null 2>&1; then
+  echo "deckmaster is already installed at $(command -v deckmaster)."
+  echo "Re-confirming the udev rule only."
+else
+  echo "Installing:"
+  echo "  - deckmaster  (AUR; headless daemon that drives the Stream Deck)"
+  echo "  - a uaccess udev rule so the device works without root"
+fi
+
+nirimaki_sudo_prime
+
+# ---- package ----
+echo
+if ! command -v deckmaster >/dev/null 2>&1; then
+  if   command -v paru >/dev/null 2>&1; then aur=paru
+  elif command -v yay  >/dev/null 2>&1; then aur=yay
+  else
+    echo "No AUR helper found (paru / yay). Install one, then retry." >&2
+    exit 1
+  fi
+  echo "Installing deckmaster via $aur…"
+  $aur -S --needed --noconfirm deckmaster
+fi
+
+# ---- udev rule (uaccess; no broad 0666) ----
+# Locate the shipped rule: packaged install lands it under
+# /usr/share/nirimaki/; dev install reads it from the repo via the
+# `nirimaki` symlink chain.
+locate_rule() {
+  local self repo
+  self=$(readlink -f "$HOME/.local/bin/nirimaki" 2>/dev/null) || self=""
+  [[ -n $self ]] && repo="${self%/bin/*}"
+  local candidates=(
+    "${NIRIMAKI_REPO:-}/assets/udev/99-nirimaki-streamdeck.rules"
+    "${repo:-}/assets/udev/99-nirimaki-streamdeck.rules"
+    "/usr/share/nirimaki/udev/99-nirimaki-streamdeck.rules"
+  )
+  local p
+  for p in "${candidates[@]}"; do
+    [[ -r $p ]] && { printf '%s' "$p"; return; }
+  done
+}
+
+rule_src=$(locate_rule)
+rule_dst=/etc/udev/rules.d/99-nirimaki-streamdeck.rules
+if [[ -n $rule_src ]]; then
+  echo
+  echo "Installing udev rule → $rule_dst"
+  sudo install -m 644 "$rule_src" "$rule_dst"
+  sudo udevadm control --reload
+  # Re-fire the `add` event on the already-attached device so
+  # systemd-logind grants the uaccess ACL right now — without this a
+  # rule only takes effect on the *next* plug-in, leaving deckmaster
+  # unable to open the device immediately after install.
+  sudo udevadm trigger --action=add --attr-match=idVendor=0fd9 2>/dev/null \
+    || sudo udevadm trigger
+  sudo udevadm settle 2>/dev/null || true
+else
+  echo "WARNING: couldn't find 99-nirimaki-streamdeck.rules to install." >&2
+fi
+
+# ---- systemd user service (auto-restart on crash) ----
+# A user unit owns the deck's lifecycle: it starts at login, stops at
+# logout, and — crucially — relaunches deckmaster if it dies. This is
+# why there's no longer a niri autostart line for the deck.
+locate_unit() {
+  local self repo
+  self=$(readlink -f "$HOME/.local/bin/nirimaki" 2>/dev/null) || self=""
+  [[ -n $self ]] && repo="${self%/bin/*}"
+  local candidates=(
+    "${NIRIMAKI_REPO:-}/assets/systemd/nirimaki-streamdeck.service"
+    "${repo:-}/assets/systemd/nirimaki-streamdeck.service"
+    "/usr/share/nirimaki/systemd/nirimaki-streamdeck.service"
+  )
+  local p
+  for p in "${candidates[@]}"; do
+    [[ -r $p ]] && { printf '%s' "$p"; return; }
+  done
+}
+
+unit_src=$(locate_unit)
+unit_dst="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/nirimaki-streamdeck.service"
+if [[ -n $unit_src ]]; then
+  echo
+  echo "Installing systemd user service (auto-restarts the deck)…"
+  install -Dm 644 "$unit_src" "$unit_dst"
+  systemctl --user daemon-reload
+  systemctl --user enable nirimaki-streamdeck.service >/dev/null 2>&1 || true
+else
+  echo "WARNING: couldn't find nirimaki-streamdeck.service to install." >&2
+fi
+
+# ---- start it now + confirm it stays up ----
+# Device present? (0fd9 = Elgato). Same dependency-free sysfs check the
+# start script uses.
+have_deck() {
+  local f
+  for f in /sys/bus/usb/devices/*/idVendor; do
+    [[ -r $f ]] || continue
+    [[ $(< "$f") == "0fd9" ]] && return 0
+  done
+  return 1
+}
+
+echo
+echo "  ✓ Stream Deck control installed."
+echo "  → A systemd user service runs the deck and restarts it if it dies."
+echo "  → Customise it visually: Settings menu → Setup → Stream Deck."
+echo "    (the editor writes ~/.config/nirimaki/streamdeck.json for you.)"
+echo
+if ! have_deck; then
+  echo "  Plug in your Stream Deck — it'll start at your next login,"
+  echo "  or right away with:  nirimaki streamdeck restart"
+else
+  # Hand the running daemon over to systemd: stop any directly-spawned
+  # instance, then start the unit fresh.
+  pkill -x deckmaster 2>/dev/null || true
+  sleep 0.3
+  systemctl --user restart nirimaki-streamdeck.service 2>/dev/null || true
+  live=""
+  for _ in 1 2 3 4 5 6 7 8; do
+    sleep 0.5
+    systemctl --user is-active --quiet nirimaki-streamdeck.service && { live=1; break; }
+  done
+  if [[ -n $live ]]; then
+    echo "  ✓ It's live — the keys should be lit now."
+  else
+    echo "  ! The service didn't come up (device access not granted yet)."
+    echo "    Unplug + replug the Stream Deck once, then:  nirimaki streamdeck restart"
+  fi
+fi
+
+# Refresh the SettingsMenu install/remove filter.
+if [[ -x $HOME/.local/bin/nirimaki-feature-state ]]; then
+  "$HOME/.local/bin/nirimaki-feature-state" 2>/dev/null || true
+fi
+
+nirimaki_pause

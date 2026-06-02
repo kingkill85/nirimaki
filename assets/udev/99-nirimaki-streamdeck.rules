@@ -1,0 +1,6 @@
+# Elgato Stream Deck — grant the logged-in user access without root.
+# TAG+="uaccess" lets systemd-logind hand the device to the active
+# session (cleaner than a broad MODE="0666"). Covers every Stream Deck
+# model under Elgato's vendor id 0fd9.
+SUBSYSTEM=="usb",  ATTRS{idVendor}=="0fd9", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0fd9", TAG+="uaccess"

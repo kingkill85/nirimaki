@@ -1,0 +1,33 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Write streamdeck.json from a JSON argument + reload the deck (internal)
+# nirimaki:hidden=true
+#
+# Persistence backend for the Stream Deck GUI editor (the streamdeck-editor
+# plugin). The editor hands us the full layout as one JSON argument
+# (argv-passed, so no shell-quoting hazard); we validate it, write it
+# atomically to ~/.config/nirimaki/streamdeck.json, then reload deckmaster
+# so the keys update. Falls back to reading stdin if no argument is given.
+
+set -euo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/nirimaki/streamdeck.json"
+
+json="${1:-}"
+[[ -n $json ]] || json="$(cat)"
+
+# Reject anything that isn't valid JSON before we touch the live file.
+if ! printf '%s' "$json" | jq -e . >/dev/null 2>&1; then
+  echo "nirimaki-streamdeck-set: refusing to write — input is not valid JSON" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$CONFIG")"
+# Pretty-print through jq + atomic rename so a partial write can't leave
+# the config truncated.
+printf '%s' "$json" | jq . > "$CONFIG.tmp"
+mv "$CONFIG.tmp" "$CONFIG"
+
+# deckmaster has no hot-reload. Use restart (not reload) so saving from
+# the editor brings the deck back even if the daemon had died.
+exec "$HOME/.local/bin/nirimaki-streamdeck-restart"

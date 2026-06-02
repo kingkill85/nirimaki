@@ -1,0 +1,34 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Regenerate the deck + restart deckmaster (picks up config/theme changes)
+#
+# deckmaster has no hot-reload, so changing streamdeck.json or switching
+# themes needs a restart. Called by the theme-set hook
+# (hooks/theme-set.d/) and runnable by hand after editing the config.
+#
+# Only acts when deckmaster is already running — so the theme-set hook
+# is a no-op for users who don't use a Stream Deck.
+
+export PATH="$HOME/.local/bin:$PATH"
+
+# systemd-managed install: defer to the unit so we don't race its
+# supervisor. Restart only when it's already active (keeps the
+# only-if-running contract — the theme hook never resurrects a deck the
+# user stopped).
+if systemctl --user cat nirimaki-streamdeck.service >/dev/null 2>&1; then
+  systemctl --user is-active --quiet nirimaki-streamdeck.service \
+    && exec systemctl --user restart nirimaki-streamdeck.service
+  exit 0
+fi
+
+# Legacy direct-process path (dev installs / no unit).
+pgrep -x deckmaster >/dev/null 2>&1 || exit 0
+
+pkill -x deckmaster 2>/dev/null || true
+# Give the HID handle a moment to release before re-claiming it.
+for _ in 1 2 3 4 5; do
+  pgrep -x deckmaster >/dev/null 2>&1 || break
+  sleep 0.1
+done
+
+setsid -f nirimaki-streamdeck-start >/dev/null 2>&1

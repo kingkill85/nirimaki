@@ -1,0 +1,79 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Remove Stream Deck control (deckmaster + udev rule + generated decks)
+# nirimaki:requires-sudo=true
+#
+# Optional-feature uninstall (mirrors nirimaki-voxtype-remove). Stops
+# deckmaster, removes it from the AUR, drops the uaccess udev rule, and
+# clears the generated .deck cache. Leaves the user's hand-authored
+# ~/.config/nirimaki/streamdeck.json in place (harmless once the daemon
+# is gone; preserved for a future reinstall). Idempotent.
+
+set -e
+
+# shellcheck source=nirimaki-feature-prelude
+. "$HOME/.local/bin/nirimaki-feature-prelude"
+
+nirimaki_banner "Stream Deck control" "Remove"
+
+rule_dst=/etc/udev/rules.d/99-nirimaki-streamdeck.rules
+
+if ! command -v deckmaster >/dev/null 2>&1 && [[ ! -f $rule_dst ]]; then
+  echo "Stream Deck control is not installed — nothing to do."
+  nirimaki_pause
+  exit 0
+fi
+
+echo "Removing:"
+echo "  - the running deckmaster daemon (stop)"
+echo "  - deckmaster package (via your AUR helper)"
+echo "  - the uaccess udev rule $rule_dst"
+echo "  - generated decks under ~/.cache/nirimaki/streamdeck"
+echo
+echo "Keeping your ~/.config/nirimaki/streamdeck.json layout."
+
+# Package + udev removal both need root. Prime once.
+nirimaki_sudo_prime
+
+echo
+echo "Stopping the deck service + daemon…"
+# Tear down the user service first so it doesn't relaunch deckmaster.
+unit_dst="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/nirimaki-streamdeck.service"
+if systemctl --user cat nirimaki-streamdeck.service >/dev/null 2>&1; then
+  systemctl --user disable --now nirimaki-streamdeck.service 2>/dev/null || true
+fi
+rm -f "$unit_dst"
+systemctl --user daemon-reload 2>/dev/null || true
+pkill -x deckmaster 2>/dev/null || true
+
+echo "Uninstalling deckmaster…"
+if   command -v paru >/dev/null 2>&1; then aur=paru
+elif command -v yay  >/dev/null 2>&1; then aur=yay
+else aur="" ; fi
+
+if command -v deckmaster >/dev/null 2>&1; then
+  if [[ -n $aur ]]; then
+    $aur -Rns --noconfirm deckmaster 2>/dev/null || true
+  else
+    echo "  (no AUR helper found — skip package removal, but cleanup the rest)"
+  fi
+fi
+
+if [[ -f $rule_dst ]]; then
+  echo "Removing udev rule…"
+  sudo rm -f "$rule_dst"
+  sudo udevadm control --reload
+fi
+
+rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/nirimaki/streamdeck"
+
+echo
+echo "  ✓ Stream Deck control removed."
+echo "    (the autostart entry self-gates to a no-op now that deckmaster is gone)."
+
+# Refresh the SettingsMenu install/remove filter.
+if [[ -x $HOME/.local/bin/nirimaki-feature-state ]]; then
+  "$HOME/.local/bin/nirimaki-feature-state" 2>/dev/null || true
+fi
+
+nirimaki_pause

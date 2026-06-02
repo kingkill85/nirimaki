@@ -1,0 +1,162 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Render streamdeck.json → themed deckmaster .deck files (internal)
+# nirimaki:hidden=true
+#
+# Translates the friendly ~/.config/nirimaki/streamdeck.json into one
+# deckmaster `.deck` (TOML) per page under
+# ~/.cache/nirimaki/streamdeck/, pulling key colors from the live theme
+# palette (~/.config/theme/current/colors.toml) so the deck follows the
+# active Nirimaki theme.
+#
+# Why a generator: deckmaster's native config is TOML with a low-level
+# widget/action vocabulary and X11-only window widgets that don't work
+# on niri. We keep a clean JSON surface (high-level action types) and
+# compile it down to `exec` actions over the existing `nirimaki` CLI +
+# `niri msg action`, which work fine on Wayland.
+
+set -euo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/nirimaki/streamdeck.json"
+# Fall back to the shipped sample so the deck works out of the box
+# before the user copies it to streamdeck.json.
+[[ -f $CONFIG ]] || CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/nirimaki/streamdeck.json.sample"
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/nirimaki/streamdeck"
+COLORS="${XDG_CONFIG_HOME:-$HOME/.config}/theme/current/colors.toml"
+
+if [[ ! -f $CONFIG ]]; then
+  echo "nirimaki-streamdeck-generate: no streamdeck.json (or sample) found" >&2
+  exit 1
+fi
+if ! jq -e . "$CONFIG" >/dev/null 2>&1; then
+  echo "nirimaki-streamdeck-generate: $CONFIG is not valid JSON" >&2
+  exit 1
+fi
+
+# Pull a #rrggbb value for a colors.toml key, with a fallback.
+read_color() {
+  local key="$1" fallback="$2" hex=""
+  [[ -f $COLORS ]] && hex=$(awk -F= -v k="$key" '
+    $0 ~ "^"k"[[:space:]]*=" { gsub(/["#[:space:]]/, "", $2); print $2; exit }
+  ' "$COLORS" 2>/dev/null) || true
+  if [[ $hex =~ ^[0-9A-Fa-f]{6}$ ]]; then printf '#%s' "$hex"; else printf '%s' "$fallback"; fi
+}
+
+FG=$(read_color foreground "#fefefe")
+ACCENT=$(read_color accent "#d497de")
+
+# Resolve a key's `icon` value to a real raster file deckmaster can open.
+# The editor stores either an absolute path (webapp .desktop icons) or a
+# freedesktop icon *name* (e.g. "firefox"); we also tolerate a leftover
+# Quickshell `image://icon/` prefix. deckmaster has NO SVG support and
+# aborts on an icon it can't decode (which would blank the whole deck), so
+# we resolve names to a PNG, prefer a deck-sized one, and skip anything
+# that doesn't land on a readable png/jpg/gif.
+resolve_icon() {
+  local name="${1#image://icon/}"
+  [[ -n $name ]] || return 1
+
+  # Absolute path: accept only decodable raster formats (no svg).
+  if [[ $name == /* ]]; then
+    [[ -r $name ]] || return 1
+    case "${name,,}" in
+      *.png|*.jpg|*.jpeg|*.gif|*.bmp) printf '%s' "$name"; return 0 ;;
+      *) return 1 ;;
+    esac
+  fi
+
+  # Icon name: search theme dirs for a PNG, preferring deck-friendly sizes.
+  local bases=("$HOME/.local/share/icons" "$HOME/.icons" /usr/share/icons)
+  local sizes=(96x96 128x128 64x64 256x256 48x48 512x512 384x384 32x32) s f
+  for s in "${sizes[@]}"; do
+    f=$(find "${bases[@]}" -path "*/$s/*" -name "$name.png" -print -quit 2>/dev/null)
+    [[ -n $f ]] && { printf '%s' "$f"; return 0; }
+  done
+  [[ -r /usr/share/pixmaps/$name.png ]] && { printf '%s' "/usr/share/pixmaps/$name.png"; return 0; }
+  f=$(find "${bases[@]}" /usr/share/pixmaps -name "$name.png" -print -quit 2>/dev/null)
+  [[ -n $f ]] && { printf '%s' "$f"; return 0; }
+  return 1
+}
+
+# Build a map { rawIconValue: resolvedPngPath } for every icon the config
+# references, so the per-key jq render can look its icon up by the value
+# stored in the JSON. Unresolved icons are simply absent → that key falls
+# back to its text label.
+build_icon_map() {
+  local ic p map='{}'
+  while IFS= read -r ic; do
+    [[ -n $ic ]] || continue
+    p=$(resolve_icon "$ic") || continue
+    map=$(jq -c --arg k "$ic" --arg v "$p" '. + {($k): $v}' <<<"$map")
+  done < <(jq -r '[.. | objects | .icon? // empty] | unique[]' "$CONFIG" 2>/dev/null)
+  printf '%s' "$map"
+}
+ICONMAP=$(build_icon_map)
+
+mkdir -p "$CACHE_DIR"
+# Clear stale page files so a renamed/removed page doesn't linger.
+rm -f "$CACHE_DIR"/*.deck 2>/dev/null || true
+
+# jq program: render one page's button array → deckmaster TOML.
+# Each high-level `type` maps to a button/status widget + an `exec`
+# (or `deck` page-switch) action. @json gives correctly-quoted TOML
+# basic strings for labels and command lines.
+render_page() {
+  local page="$1"
+  jq -r --arg page "$page" --arg fg "$FG" --arg accent "$ACCENT" --argjson icons "$ICONMAP" '
+    def jstr: @json;
+    def widget:
+      if .type == "status" then
+        ( .widget // "command" ) as $w
+        | if $w == "time" then
+            "  [keys.widget]\n    id = \"time\"\n    [keys.widget.config]\n      format = \((.format // "%H:%i")|jstr)\n      color = \($fg|jstr)\n"
+          elif $w == "top" then
+            "  [keys.widget]\n    id = \"top\"\n    [keys.widget.config]\n      mode = \((.metric // "cpu")|jstr)\n      color = \($fg|jstr)\n      fillColor = \($accent|jstr)\n"
+          else
+            "  [keys.widget]\n    id = \"command\"\n    [keys.widget.config]\n      command = \((.cmd // "true")|jstr)\n      color = \($fg|jstr)\n"
+          end
+      else
+        "  [keys.widget]\n    id = \"button\"\n    [keys.widget.config]\n"
+        + ( ($icons[(.icon // "")] // "") as $ip
+            | if $ip != "" then "      icon = \($ip|jstr)\n" else "" end )
+        + "      label = \((.label // .app // .name // "")|jstr)\n"
+        + "      color = \($fg|jstr)\n      fontsize = 10\n"
+      end;
+    def action:
+      if .type == "status" then ""
+      elif .type == "page" then
+        "  [keys.action]\n    deck = \("\(.page).deck"|jstr)\n"
+      else
+        "  [keys.action]\n    exec = \(
+          ( if .type == "webapp"    then "nirimaki streamdeck focus-app nirimaki-webapp-\(.app)"
+            elif .type == "app"       then "nirimaki streamdeck focus-app \(if (.reopen // "focus") == "launch" then "--launch " else "" end)\(.id // .cmd // "true")"
+            elif .type == "mic-mute"  then "nirimaki-audio-input-mute"
+            elif .type == "volume"    then "nirimaki-audio-output-volume \(.action // "mute-toggle")"
+            elif .type == "theme"     then "nirimaki theme set \(.name)"
+            elif .type == "workspace" then "niri msg action focus-workspace \(.n)"
+            elif .type == "niri"      then "niri msg action \(.action)"
+            else (.cmd // .app // "true")
+            end ) | jstr )\n"
+      end;
+    ( .pages[$page] // [] )
+      | map("[[keys]]\n  index = \(.index)\n" + widget + action)
+      | join("\n")
+  ' "$CONFIG"
+}
+
+mapfile -t pages < <(jq -r '.pages | keys[]' "$CONFIG")
+if [[ ${#pages[@]} -eq 0 ]]; then
+  echo "nirimaki-streamdeck-generate: no pages defined in $CONFIG" >&2
+  exit 1
+fi
+
+for page in "${pages[@]}"; do
+  render_page "$page" > "$CACHE_DIR/$page.deck"
+done
+
+# main.deck is the entry point deckmaster is launched against.
+if [[ ! -f $CACHE_DIR/main.deck ]]; then
+  # No page literally named "main" — promote the first page.
+  cp "$CACHE_DIR/${pages[0]}.deck" "$CACHE_DIR/main.deck"
+fi

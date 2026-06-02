@@ -1,0 +1,11 @@
+#!/bin/bash
+# Re-theme the Stream Deck when the Nirimaki theme changes.
+#
+# Activate it: drop the `.sample` suffix and `chmod +x` this file:
+#   cd ~/.config/nirimaki/hooks/theme-set.d
+#   cp streamdeck-reload.sample streamdeck-reload && chmod +x streamdeck-reload
+#
+# deckmaster has no hot-reload, so this regenerates the deck (with the
+# new palette) and restarts it. It's a no-op when deckmaster isn't
+# running, so it's harmless to leave enabled.
+exec "$HOME/.local/bin/nirimaki-streamdeck-reload"

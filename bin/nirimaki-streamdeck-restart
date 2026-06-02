@@ -1,0 +1,30 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=(Re)start the Stream Deck daemon — brings it back even if it died
+#
+# Unlike `reload` (which is a deliberate no-op when deckmaster isn't
+# already running, so the theme hook never resurrects a deck you stopped),
+# this ALWAYS ensures the deck is up. It's the recovery path: wired to the
+# editor's Save + "Restart" button so a crashed daemon can be revived
+# without a terminal.
+#
+# If the systemd user unit manages the deck we defer to it (so we don't
+# race its supervisor); otherwise we manage the process directly.
+
+export PATH="$HOME/.local/bin:$PATH"
+
+command -v deckmaster >/dev/null 2>&1 || { echo "deckmaster is not installed."; exit 0; }
+
+# systemd-managed? `systemctl --user cat` succeeds only if the unit exists.
+if systemctl --user cat nirimaki-streamdeck.service >/dev/null 2>&1; then
+  exec systemctl --user restart nirimaki-streamdeck.service
+fi
+
+# Direct process management (dev installs / no unit yet).
+pkill -x deckmaster 2>/dev/null || true
+# Let the HID handle release before re-claiming it.
+for _ in 1 2 3 4 5; do
+  pgrep -x deckmaster >/dev/null 2>&1 || break
+  sleep 0.1
+done
+setsid -f nirimaki-streamdeck-start >/dev/null 2>&1

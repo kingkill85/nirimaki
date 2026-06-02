@@ -1,0 +1,16 @@
+{
+  "id":          "streamdeck-editor",
+  "name":        "Stream Deck editor",
+  "description": "Visual editor for the Stream Deck layout — pick a key, assign an action, save.",
+  "version":     "1.0.0",
+  "author":      "nirimaki",
+  "kinds":       ["panel"],
+  "entryPoints": {
+    "panel": "Panel.qml"
+  },
+  "api":         1,
+  "requires": {
+    "binary":       "deckmaster",
+    "install_hint": "Install Stream Deck control to edit your deck layout."
+  }
+}

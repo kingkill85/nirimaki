@@ -1,0 +1,90 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Focus a running app by desktop id, else launch it (internal)
+# nirimaki:args=<desktop-id-or-app-id>
+# nirimaki:hidden=true
+#
+# Launch-or-focus primitive behind `app` and `webapp` deck keys. Given a
+# freedesktop desktop-entry id (the basename of a .desktop file, e.g.
+# `firefox`, `org.gnome.Nautilus`, `nirimaki-webapp-ms-teams`), it:
+#
+#   1. focuses an already-open window for that app, matching on the
+#      niri app_id, the .desktop's StartupWMClass, or — for chromium
+#      `--app=` webapps that report their own `chrome-<host>__-<profile>`
+#      app_id — the webapp's URL host; else
+#   2. launches it via `gtk-launch <id>` (which resolves the .desktop
+#      across every XDG application dir, system + user + flatpak).
+#
+# Falls back to treating the argument as a bare command when no matching
+# .desktop exists. X11-style window switching doesn't exist on niri, so
+# focusing goes through `niri msg` (the IPC NiriService.qml uses).
+
+export PATH="$HOME/.local/bin:$PATH"
+
+# --launch forces a fresh launch even when the app is already open (the
+# per-key "Launch new" choice in the editor); without it we focus an
+# existing window first.
+force_launch=0
+if [[ ${1:-} == "--launch" ]]; then force_launch=1; shift; fi
+
+target="${1:-}"
+[[ -n $target ]] || { echo "Usage: $(basename "$0") [--launch] <desktop-id>" >&2; exit 1; }
+
+# Locate <target>.desktop across the standard application directories.
+locate_desktop() {
+  local d dirs=(
+    "${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    "$HOME/.local/share/flatpak/exports/share/applications"
+    /var/lib/flatpak/exports/share/applications
+    /usr/local/share/applications
+    /usr/share/applications
+  )
+  # Honor XDG_DATA_DIRS too, if set.
+  local IFS=:
+  for d in ${XDG_DATA_DIRS:-}; do dirs+=("$d/applications"); done
+  for d in "${dirs[@]}"; do
+    [[ -r "$d/$target.desktop" ]] && { printf '%s' "$d/$target.desktop"; return; }
+  done
+}
+
+desktop=$(locate_desktop)
+
+# Build the set of app_id candidates we'll accept as "this app is open".
+wmclass="" host=""
+if [[ -n $desktop ]]; then
+  wmclass=$(awk -F= '/^StartupWMClass=/{ sub(/^StartupWMClass=/, ""); print; exit }' "$desktop")
+  url=$(awk -F= '/^Exec=/{ sub(/^Exec=/, ""); print; exit }' "$desktop" \
+          | grep -oE 'https?://[^ ]+' | head -n1)
+  host=$(printf '%s' "$url" | sed -E 's#^https?://##; s#/.*$##')
+fi
+
+id=""
+if [[ $force_launch -eq 0 ]]; then
+  id=$(niri msg --json windows 2>/dev/null \
+         | jq -r --arg a "$target" --arg w "$wmclass" --arg h "$host" '
+             def lc: ascii_downcase;
+             map(select(
+                   (.app_id | lc) == ($a | lc)
+                   or ($w != "" and (.app_id | lc) == ($w | lc))
+                   or ($h != "" and (.app_id | lc | contains($h | lc)))
+                 ))
+             | .[0].id // empty')
+fi
+if [[ -n $id ]]; then
+  exec niri msg action focus-window --id "$id"
+fi
+
+# Not open — launch it.
+if [[ -n $desktop ]] && command -v gtk-launch >/dev/null 2>&1; then
+  # gtk-launch takes the id without the .desktop suffix and resolves it
+  # itself, so Terminal=true entries and field codes are handled right.
+  setsid -f gtk-launch "$target" >/dev/null 2>&1
+elif [[ -n $desktop ]]; then
+  # No gtk-launch — run the .desktop's Exec, stripped of field codes.
+  exec_line=$(awk -F= '/^Exec=/{ sub(/^Exec=/, ""); print; exit }' "$desktop")
+  exec_line=${exec_line//%[a-zA-Z]/}
+  setsid -f sh -c "$exec_line" >/dev/null 2>&1
+else
+  # Generic fallback: treat the argument as a runnable command.
+  setsid -f sh -c "$target" >/dev/null 2>&1
+fi

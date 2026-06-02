@@ -1,0 +1,27 @@
+[Unit]
+Description=Nirimaki Stream Deck control (deckmaster)
+Documentation=https://github.com/muesli/deckmaster
+# Bind to the graphical session so it starts at login and stops at
+# logout (no orphaned deckmaster across sessions). niri imports
+# WAYLAND_DISPLAY / NIRI_SOCKET / DBus into the systemd --user
+# environment, so deckmaster's `exec` key actions (niri msg, nirimaki …)
+# resolve correctly from here.
+PartOf=graphical-session.target
+After=graphical-session.target
+# Stop relaunching if it crashes immediately and repeatedly (e.g. a bad
+# config) — surface the failure instead of busy-looping forever.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# The start script forces ~/.local/bin onto PATH, regenerates the .deck
+# files from streamdeck.json + the live theme, then exec's deckmaster.
+# It self-gates to exit 0 when deckmaster isn't installed or no Elgato
+# device is attached — a clean exit, so on-failure won't relaunch it.
+ExecStart=%h/.local/bin/nirimaki-streamdeck-start
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target

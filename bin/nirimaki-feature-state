@@ -95,6 +95,7 @@ yn()   { if "$@"; then echo true; else echo false; fi; }
 {
   echo '{'
   emit voxtype    "$(yn has_bin voxtype)"
+  emit streamdeck "$(yn has_bin deckmaster)"
 
   # VPN providers: <name> = binary present, <name>_configured = full
   # install (binary + side-effects). See vpn_<name>_configured above.

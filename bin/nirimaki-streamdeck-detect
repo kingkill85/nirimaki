@@ -1,0 +1,36 @@
+#!/bin/bash
+# nirimaki:group=streamdeck
+# nirimaki:summary=Detect the connected Stream Deck model + key grid (internal)
+# nirimaki:hidden=true
+#
+# Prints the connected Elgato Stream Deck's key grid as JSON, e.g.
+#   {"cols":5,"rows":3,"keys":15,"model":"Stream Deck MK.2","pid":"0080"}
+# Used by the editor to size its grid to the actual hardware. Falls back
+# to the 15-key 5×3 layout when no device is attached or the model is
+# unknown, so the editor always has something sane to draw.
+
+pid=""
+for d in /sys/bus/usb/devices/*; do
+  [[ -r $d/idVendor ]] || continue
+  [[ $(<"$d/idVendor") == 0fd9 ]] || continue
+  pid=$(<"$d/idProduct"); break
+done
+
+# Grid per known product id (cols × rows). Elgato keeps the vendor id
+# 0fd9 across the line; the product id selects the model.
+cols=5; rows=3; model="Stream Deck"
+case "$pid" in
+  0063|0090) cols=3; rows=2; model="Stream Deck Mini" ;;
+  006c|008f) cols=8; rows=4; model="Stream Deck XL" ;;
+  0084)      cols=4; rows=2; model="Stream Deck +" ;;
+  009a)      cols=4; rows=2; model="Stream Deck Neo" ;;
+  0086)      cols=3; rows=1; model="Stream Deck Pedal" ;;
+  0080|00b8|00b9) cols=5; rows=3; model="Stream Deck MK.2" ;;
+  0060)      cols=5; rows=3; model="Stream Deck" ;;
+  006d)      cols=5; rows=3; model="Stream Deck V2" ;;
+esac
+
+printf '{"cols":%d,"rows":%d,"keys":%d,"model":%s,"pid":%s}\n' \
+  "$cols" "$rows" "$((cols * rows))" \
+  "$(printf '%s' "$model" | jq -R .)" \
+  "$(printf '%s' "${pid:-}" | jq -R .)"

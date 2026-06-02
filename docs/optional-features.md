@@ -34,6 +34,64 @@ in the config for slightly better accuracy than `auto`.
 
 ---
 
+## Stream Deck — Elgato hardware control
+
+| Where | `Install → Stream Deck` (CLI: `nirimaki streamdeck install`) |
+|-------|-------------------------------------------------------------|
+| Engine | [`deckmaster`](https://github.com/muesli/deckmaster) (AUR) — headless daemon that owns USB-HID + key image rendering |
+| Access | uaccess udev rule `/etc/udev/rules.d/99-nirimaki-streamdeck.rules` (no root) |
+| Editor | GUI: `Settings → Setup → Stream Deck` — the `streamdeck-editor` panel plugin (only loads when deckmaster is installed). The key grid auto-sizes to the connected model (`nirimaki-streamdeck-detect` maps the USB product id → cols×rows: Mini 3×2, Original/MK.2 5×3, XL 8×4, +/Neo 4×2; falls back to saved `cols`/`rows` or 5×3 offline). The "Launch app" action chooses from installed apps (same `DesktopEntries` source as the launcher); footer has **Restart** + **Save & apply** |
+| Config | `~/.config/nirimaki/streamdeck.json` — friendly JSON the editor reads/writes; works from the shipped sample out of the box |
+| Lifecycle | `nirimaki-streamdeck.service` (systemd **user** unit, `assets/systemd/`) owns the daemon: starts at login, stops at logout, and `Restart=on-failure` relaunches deckmaster if it crashes. There is no niri-autostart line — the unit replaces it |
+| Recovery | If the deck goes dark: the editor's **Restart** button, or `nirimaki streamdeck restart` (start-from-dead; the editor is reachable whenever deckmaster is *installed*, even when not running) |
+| Re-theme | Activate `~/.config/nirimaki/hooks/theme-set.d/streamdeck-reload.sample` (drop `.sample`, `chmod +x`) for live recolor on theme switch |
+
+The GUI editor (`plugins/builtin/streamdeck-editor/`) is a lazy
+`panel` plugin with `requires.binary: deckmaster`, so it's only
+summonable when the daemon is installed — and the Setup menu entry is
+`visibleWhen` the `streamdeck` feature is installed. It edits in-memory
+and persists on **Save** via `nirimaki-streamdeck-set` (validate → write
+→ reload). 5×3 key grid, per-key action editor, page add/delete,
+brightness slider.
+
+**Why a wrapper, not deckmaster directly:** deckmaster's native config
+is low-level TOML and its `recentWindow`/`keycode` widgets are X11-only
+(dead on niri). `nirimaki-streamdeck-generate` compiles our JSON into
+per-page `.deck` files under `~/.cache/nirimaki/streamdeck/`, mapping
+high-level action `type`s onto `exec` actions over the existing
+`nirimaki` CLI + `niri msg action` (which work on Wayland), and pulls
+key colors from `~/.config/theme/current/colors.toml`.
+
+Action `type`s: `webapp` (launch-or-focus via `nirimaki-streamdeck-focus-app`),
+`mic-mute`, `volume`, `theme`, `workspace`, `niri`, `exec`, `app`,
+`page` (deck switch), `status` (`time` / `top` cpu·memory / `command`
+widgets). Keys: index 0–14, left-to-right, top-to-bottom.
+
+`nirimaki-streamdeck-start` forces `~/.local/bin` onto `PATH` before
+exec'ing deckmaster — otherwise its `exec` key actions couldn't find the
+`nirimaki*` helpers (gotcha #1). niri imports `WAYLAND_DISPLAY` /
+`NIRI_SOCKET` / DBus into the systemd `--user` environment, so the unit's
+`niri msg` key actions resolve correctly.
+
+Icons are validated in `nirimaki-streamdeck-generate`: it strips
+Quickshell's `image://icon/` prefix and emits a key icon **only** when it
+resolves to a readable raster file (png/jpg/…). deckmaster aborts on an
+icon it can't open — which would blank the whole deck — so unresolved
+icons are dropped and the key falls back to its text label.
+
+Tested against the Stream Deck **Original V2** (`0fd9:006d`, 15 keys).
+Other Elgato models share VID `0fd9`, so the udev rule + deckmaster
+cover them, and the editor grid auto-sizes to the detected model. The
+shipped sample layout assumes 15 keys, but indices beyond a smaller
+deck's key count simply don't render on that hardware.
+
+**Not yet:** per-theme icon *tinting* (deckmaster places icons
+un-tinted; v1 leans on themed label `color` + the `time`/`top`
+`fillColor`). Set an absolute `"icon"` path on any key (or via the
+editor's "Icon path" field) to use your own image.
+
+---
+
 ## Tailscale — mesh VPN
 
 | Where | `Install / Remove → Service → Tailscale` |

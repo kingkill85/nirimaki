@@ -23,6 +23,11 @@ Rectangle {
     property alias inputMethodHints: input.inputMethodHints
     property alias readOnly: input.readOnly
     property alias selectByMouse: input.selectByMouse
+    // True while the inner input holds keyboard focus. TextField isn't a
+    // FocusScope, so the outer Item's activeFocus doesn't track the inner
+    // TextInput — expose it explicitly for consumers like SearchableDropdown
+    // that want to react to focus (e.g. open a list on click).
+    readonly property alias inputFocused: input.activeFocus
 
     property string placeholder: ""
     property string leadingIcon: ""

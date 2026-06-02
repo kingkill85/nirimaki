@@ -81,3 +81,8 @@ spawn-sh-at-startup "swayidle -w timeout 300 'quickshell -p $HOME/.config/quicks
 // (Mod+Period). `wl-paste --watch` runs cliphist forever, recording
 // every wl-clipboard selection. Needs `cliphist` + `wl-clipboard`.
 spawn-sh-at-startup "wl-paste --watch cliphist store"
+
+// Stream Deck control (optional) is NOT autostarted here — it's owned by
+// the `nirimaki-streamdeck.service` systemd user unit (installed by
+// `nirimaki streamdeck install`), which starts it at login, stops it at
+// logout, and relaunches deckmaster if it crashes.

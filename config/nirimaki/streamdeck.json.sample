@@ -1,0 +1,36 @@
+{
+  "//": "Nirimaki Stream Deck layout. Copy this to streamdeck.json and edit.",
+  "//brightness": "0-100. Applied at launch.",
+  "//pages": "Each page maps a deck name to up to 15 keys (index 0-14, left-to-right, top-to-bottom).",
+  "//types": "webapp|mic-mute|volume|theme|workspace|niri|exec|app|page|status",
+  "//theme": "Key text color follows the active Nirimaki theme automatically.",
+
+  "version": 1,
+  "brightness": 70,
+  "pages": {
+    "main": [
+      { "index": 0, "type": "webapp", "app": "teams", "label": "Teams" },
+      { "index": 1, "type": "mic-mute", "label": "Mic" },
+      { "index": 2, "type": "volume", "action": "mute-toggle", "label": "Mute" },
+
+      { "index": 5, "type": "workspace", "n": 1, "label": "WS 1" },
+      { "index": 6, "type": "workspace", "n": 2, "label": "WS 2" },
+      { "index": 7, "type": "niri", "action": "focus-column-left", "label": "‹ Col" },
+      { "index": 8, "type": "niri", "action": "focus-column-right", "label": "Col ›" },
+      { "index": 9, "type": "page", "page": "tools", "label": "Tools ›" },
+
+      { "index": 10, "type": "status", "widget": "time", "format": "%H:%i" },
+      { "index": 11, "type": "status", "widget": "top", "metric": "cpu" },
+      { "index": 12, "type": "status", "widget": "top", "metric": "memory" },
+      { "index": 13, "type": "theme", "name": "tokyo-night", "label": "Tokyo" },
+      { "index": 14, "type": "volume", "action": "raise", "label": "Vol +" }
+    ],
+    "tools": [
+      { "index": 0, "type": "page", "page": "main", "label": "‹ Back" },
+      { "index": 1, "type": "exec", "cmd": "quickshell ipc call shell toggle theme-picker \"\"", "label": "Themes" },
+      { "index": 2, "type": "app", "cmd": "foot", "label": "Term" },
+      { "index": 3, "type": "exec", "cmd": "niri msg action toggle-overview", "label": "Overview" },
+      { "index": 14, "type": "status", "widget": "command", "cmd": "date +%a" }
+    ]
+  }
+}
