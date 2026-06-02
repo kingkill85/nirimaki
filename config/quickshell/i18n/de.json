@@ -66,6 +66,7 @@
   "keybind.title.volume-up":                 "Lautstärke rauf",
 
   "start.tooltip":                  "Menü",
+  "keyboard-layout.tooltip":        "Tastaturbelegung",
 
   "settings.placeholder":           "Einstellungen",
   "settings.style":                 "Erscheinungsbild",

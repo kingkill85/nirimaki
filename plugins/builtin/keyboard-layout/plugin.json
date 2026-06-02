@@ -1,0 +1,11 @@
+{
+  "id": "keyboard-layout",
+  "name": "Keyboard layout",
+  "description": "Current XKB keyboard layout; click to cycle to the next. Hidden when only one layout is configured.",
+  "version": "1.0.0",
+  "author": "nirimaki",
+  "mount": "bar.right",
+  "after": "system-stats",
+  "entry": "main.qml",
+  "api": 1
+}

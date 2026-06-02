@@ -14,6 +14,7 @@
   "keybinds.placeholder":   "Keybinds — type to filter",
 
   "start.tooltip":                  "Menu",
+  "keyboard-layout.tooltip":        "Keyboard layout",
 
   "settings.placeholder":           "Settings",
   "settings.style":                 "Style",
