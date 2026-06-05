@@ -58,7 +58,7 @@ Item {
                     border.width: Theme.cardBorderWidth
 
                     readonly property real lifetime:
-                        NotificationService.durationFor(modelData.urgency)
+                        NotificationService.durationFor(modelData.urgency, modelData.expireTimeout)
                     property real progress: 1.0
                     readonly property bool ticking:
                         lifetime > 0 && !mouse.containsMouse

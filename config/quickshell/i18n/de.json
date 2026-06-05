@@ -265,6 +265,13 @@
   "updates.many":  "Updates verfügbar",
   "updates.run":   "Update ausführen",
 
+  "notifications.title":   "Benachrichtigungen",
+  "notifications.one":     "Benachrichtigung",
+  "notifications.many":    "Benachrichtigungen",
+  "notifications.empty":   "Keine Benachrichtigungen",
+  "notifications.clear":   "Alle löschen",
+  "notifications.tooltip": "Benachrichtigungen",
+
   "stats.system": "System",
   "stats.cpu":    "CPU",
   "stats.gpu":    "GPU",

@@ -13,15 +13,34 @@ QtObject {
     // body, urgency, timestamp, ref }.
     property var popups: []
 
-    readonly property int count: popups.length
+    // history: notifications that have left the toast stack (auto-expired,
+    // clicked away, or dismissed) but are kept for later review in the
+    // notification center. Newest first, capped at `historyLimit`. These
+    // are plain records — the live `ref` is dropped, so actions can't be
+    // re-invoked from history (it's read-only).
+    property var history: []
+    readonly property int historyLimit: 50
 
-    function durationFor(urgency) {
+    readonly property int count: popups.length
+    readonly property int historyCount: history.length
+
+    function durationFor(urgency, expireTimeout) {
         // freedesktop notify-send default urgency is "normal"; theme
         // switch + most install/remove flows fall under normal. Bumped
         // from 3/5 → 6/10 so multi-line bodies are readable without
         // hover-to-pause. Hover still pauses the lifetime bar; click
-        // still dismisses. Critical stays sticky.
-        if (urgency === NotificationUrgency.Critical) return 0;
+        // still dismisses.
+        //
+        // Honor a client-requested timeout when one is supplied
+        // (Quickshell exposes expireTimeout in seconds, -1 when unset).
+        // Critical is NOT sticky-forever: Chromium maps every Teams /
+        // chat webapp message (requireInteraction) onto urgency=critical,
+        // so an infinite lifetime there means the toast stack only ever
+        // grows until hand-dismissed. Give critical a long-but-finite
+        // window instead so genuine alerts still linger noticeably.
+        if (expireTimeout !== undefined && expireTimeout > 0)
+            return expireTimeout * 1000;
+        if (urgency === NotificationUrgency.Critical) return 20000;
         if (urgency === NotificationUrgency.Low)      return 6000;
         return 10000;
     }
@@ -44,6 +63,10 @@ QtObject {
             summary:    n.summary  || "",
             body:       n.body     || "",
             urgency:    n.urgency,
+            expireTimeout: n.expireTimeout,
+            // Transient notifications (freedesktop hint) are explicitly
+            // "do not persist" — they leave no trace in the center.
+            transient:  n.transient || false,
             actions:    acts,
             timestamp:  Date.now(),
             ref:        n
@@ -56,6 +79,7 @@ QtObject {
         if (item && item.ref) {
             try { if (item.ref.tracked) item.ref.dismiss(); } catch (e) {}
         }
+        if (item) root._archive(item);
         const next = popups.slice();
         next.splice(idx, 1);
         popups = next;
@@ -64,6 +88,36 @@ QtObject {
     function dismissAll() {
         while (popups.length > 0) dismiss(0);
     }
+
+    // Move a toast snapshot into the history list. Drops the live ref
+    // (history is read-only), skips transient notifications, and dedups
+    // by replaces-id so an app that updates a toast in place leaves one
+    // entry rather than a trail.
+    function _archive(item) {
+        if (!item || item.transient) return;
+        const rec = {
+            id:        item.originalId,
+            app:       item.app,
+            appIcon:   item.appIcon,
+            summary:   item.summary,
+            body:      item.body,
+            urgency:   item.urgency,
+            timestamp: item.timestamp
+        };
+        const pruned = history.filter(h => h.id !== item.originalId);
+        const next = [rec].concat(pruned);
+        if (next.length > historyLimit) next.length = historyLimit;
+        history = next;
+    }
+
+    function removeFromHistory(idx) {
+        if (idx < 0 || idx >= history.length) return;
+        const next = history.slice();
+        next.splice(idx, 1);
+        history = next;
+    }
+
+    function clearHistory() { history = []; }
 
     // Fire the notification's "default" action (freedesktop convention:
     // the action invoked when the body is clicked) then dismiss. Lets a

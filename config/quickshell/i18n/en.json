@@ -213,6 +213,13 @@
   "updates.many":  "updates available",
   "updates.run":   "Run update",
 
+  "notifications.title":   "Notifications",
+  "notifications.one":     "notification",
+  "notifications.many":    "notifications",
+  "notifications.empty":   "No notifications",
+  "notifications.clear":   "Clear all",
+  "notifications.tooltip": "Notifications",
+
   "stats.system": "System",
   "stats.cpu":    "CPU",
   "stats.gpu":    "GPU",
