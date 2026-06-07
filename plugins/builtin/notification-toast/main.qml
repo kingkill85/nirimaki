@@ -72,7 +72,9 @@ Item {
                             progress -= 50.0 / lifetime;
                             if (progress <= 0) {
                                 progress = 0;
-                                NotificationService.dismiss(index);
+                                // Park (don't discard) so it lands in the
+                                // center still clickable-to-open.
+                                NotificationService.park(index);
                             }
                         }
                     }

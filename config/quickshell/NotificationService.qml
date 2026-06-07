@@ -13,11 +13,13 @@ QtObject {
     // body, urgency, timestamp, ref }.
     property var popups: []
 
-    // history: notifications that have left the toast stack (auto-expired,
-    // clicked away, or dismissed) but are kept for later review in the
-    // notification center. Newest first, capped at `historyLimit`. These
-    // are plain records — the live `ref` is dropped, so actions can't be
-    // re-invoked from history (it's read-only).
+    // history: notifications parked in the center after their toast timed
+    // out untouched. Newest first, capped at `historyLimit`. Unlike a plain
+    // log, each record keeps its live `ref` and the notification is left
+    // OPEN on the server — so its "default" action (the click-to-open-the-
+    // conversation handler that Chromium routes to the webapp's service
+    // worker) can still be fired later from the center. Notifications are
+    // only closed on explicit discard / clear / activation.
     property var history: []
     readonly property int historyLimit: 50
 
@@ -46,14 +48,21 @@ QtObject {
     }
 
     function snapshot(n) {
-        // Surface non-default actions to the toast as {identifier, text}.
-        // The "default" action is the body-click handler (see activate())
-        // so it never becomes a button.
+        // Surface real actions to the toast as {identifier, text}, dropping
+        // the two pseudo-actions Chromium injects into every webapp
+        // notification:
+        //   - "default"  → the body-click handler (see activate()), never a button.
+        //   - "settings" → Chromium's "manage this site's notifications" entry.
+        //                  Invoking it just tries to open Chromium's settings
+        //                  page, which goes nowhere from an app-mode webapp
+        //                  window — so it renders as a dead button (the Teams
+        //                  "Einstellung" button). Drop it rather than show it.
         const acts = [];
         const src = n.actions || [];
         for (let i = 0; i < src.length; i++) {
-            if (src[i].identifier === "default") continue;
-            acts.push({ identifier: src[i].identifier, text: src[i].text || src[i].identifier });
+            const id = src[i].identifier;
+            if (id === "default" || id === "settings") continue;
+            acts.push({ identifier: id, text: src[i].text || id });
         }
         return {
             id:         n.id,
@@ -73,87 +82,137 @@ QtObject {
         };
     }
 
-    function dismiss(idx) {
-        if (idx < 0 || idx >= popups.length) return;
-        const item = popups[idx];
-        if (item && item.ref) {
-            try { if (item.ref.tracked) item.ref.dismiss(); } catch (e) {}
-        }
-        if (item) root._archive(item);
+    // --- ref helpers -----------------------------------------------------
+
+    function _action(ref, id) {
+        try {
+            if (ref && ref.tracked) {
+                const acts = ref.actions || [];
+                for (let i = 0; i < acts.length; i++)
+                    if (acts[i].identifier === id) return acts[i];
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function _invoke(ref, id) {
+        const a = _action(ref, id);
+        if (a) { try { a.invoke(); return true; } catch (e) {} }
+        return false;
+    }
+
+    // Close the notification on the server (sends NotificationClosed, which
+    // Chromium turns into the webapp's `notificationclose` event).
+    function _close(ref) {
+        try { if (ref && ref.tracked) ref.dismiss(); } catch (e) {}
+    }
+
+    function _removePopup(idx) {
         const next = popups.slice();
         next.splice(idx, 1);
         popups = next;
+    }
+
+    // --- toast-stack actions ---------------------------------------------
+
+    // Toast timed out untouched: keep the notification OPEN and stash it
+    // (with its live ref) in the center so its default action stays firable.
+    function park(idx) {
+        if (idx < 0 || idx >= popups.length) return;
+        const item = popups[idx];
+        _removePopup(idx);
+        root._toCenter(item);
+    }
+
+    // User explicitly discarded the toast (middle-click): close it for good,
+    // don't park it.
+    function dismiss(idx) {
+        if (idx < 0 || idx >= popups.length) return;
+        _close(popups[idx].ref);
+        _removePopup(idx);
     }
 
     function dismissAll() {
         while (popups.length > 0) dismiss(0);
     }
 
-    // Move a toast snapshot into the history list. Drops the live ref
-    // (history is read-only), skips transient notifications, and dedups
-    // by replaces-id so an app that updates a toast in place leaves one
-    // entry rather than a trail.
-    function _archive(item) {
-        if (!item || item.transient) return;
+    // Left-click on a live toast: fire the "default" action (jump to the
+    // conversation), then close + drop it — a clicked notification is done.
+    function activate(idx) {
+        if (idx < 0 || idx >= popups.length) return;
+        const ref = popups[idx].ref;
+        _invoke(ref, "default");
+        _close(ref);
+        _removePopup(idx);
+    }
+
+    // Invoke a named (non-default) action button, then close + drop.
+    function invokeAction(idx, identifier) {
+        if (idx < 0 || idx >= popups.length) return;
+        const ref = popups[idx].ref;
+        _invoke(ref, identifier);
+        _close(ref);
+        _removePopup(idx);
+    }
+
+    // --- notification center ---------------------------------------------
+
+    // Park a snapshot into the center, holding its live ref. Skips transient
+    // notifications (closing them outright), and dedups by replaces-id so an
+    // app that updated a toast in place leaves one entry — the superseded
+    // ref is closed so Chromium doesn't keep a stale notification around.
+    function _toCenter(item) {
+        if (!item) return;
+        if (item.transient) { _close(item.ref); return; }
         const rec = {
-            id:        item.originalId,
-            app:       item.app,
-            appIcon:   item.appIcon,
-            summary:   item.summary,
-            body:      item.body,
-            urgency:   item.urgency,
-            timestamp: item.timestamp
+            id:         item.originalId,
+            app:        item.app,
+            appIcon:    item.appIcon,
+            summary:    item.summary,
+            body:       item.body,
+            urgency:    item.urgency,
+            timestamp:  item.timestamp,
+            ref:        item.ref,
+            // Clickable-to-jump only if the notification shipped a default
+            // action (chat webapps do; `notify-send` theme toasts don't).
+            actionable: _action(item.ref, "default") !== null
         };
-        const pruned = history.filter(h => h.id !== item.originalId);
-        const next = [rec].concat(pruned);
-        if (next.length > historyLimit) next.length = historyLimit;
+        const keep = [];
+        for (let i = 0; i < history.length; i++) {
+            if (history[i].id === rec.id) _close(history[i].ref);
+            else keep.push(history[i]);
+        }
+        const next = [rec].concat(keep);
+        if (next.length > historyLimit) {
+            for (let i = historyLimit; i < next.length; i++) _close(next[i].ref);
+            next.length = historyLimit;
+        }
+        history = next;
+    }
+
+    // Click a center entry: fire its default action (jump to the Teams
+    // conversation), close the notification, and drop the entry.
+    function activateHistory(idx) {
+        if (idx < 0 || idx >= history.length) return;
+        const rec = history[idx];
+        _invoke(rec.ref, "default");
+        _close(rec.ref);
+        const next = history.slice();
+        next.splice(idx, 1);
         history = next;
     }
 
     function removeFromHistory(idx) {
         if (idx < 0 || idx >= history.length) return;
         const next = history.slice();
-        next.splice(idx, 1);
+        const gone = next.splice(idx, 1)[0];
+        if (gone) _close(gone.ref);
         history = next;
     }
 
-    function clearHistory() { history = []; }
-
-    // Fire the notification's "default" action (freedesktop convention:
-    // the action invoked when the body is clicked) then dismiss. Lets a
-    // click on a chat toast open the right conversation instead of just
-    // clearing it. No-op for notifications that ship no default action.
-    function activate(idx) {
-        if (idx < 0 || idx >= popups.length) return;
-        const item = popups[idx];
-        if (item && item.ref) {
-            try {
-                if (item.ref.tracked) {
-                    const acts = item.ref.actions || [];
-                    for (let i = 0; i < acts.length; i++) {
-                        if (acts[i].identifier === "default") { acts[i].invoke(); break; }
-                    }
-                }
-            } catch (e) {}
-        }
-        dismiss(idx);
-    }
-
-    // Invoke a named (non-default) action button, then dismiss.
-    function invokeAction(idx, identifier) {
-        if (idx < 0 || idx >= popups.length) return;
-        const item = popups[idx];
-        if (item && item.ref) {
-            try {
-                if (item.ref.tracked) {
-                    const acts = item.ref.actions || [];
-                    for (let i = 0; i < acts.length; i++) {
-                        if (acts[i].identifier === identifier) { acts[i].invoke(); break; }
-                    }
-                }
-            } catch (e) {}
-        }
-        dismiss(idx);
+    function clearHistory() {
+        for (let i = 0; i < history.length; i++) _close(history[i].ref);
+        history = [];
     }
 
     property NotificationServer _server: NotificationServer {

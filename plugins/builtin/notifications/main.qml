@@ -118,10 +118,21 @@ Item {
                     readonly property bool critical:
                         modelData.urgency === NotificationUrgency.Critical
 
+                    // Click an actionable entry to fire its default action —
+                    // jumps the webapp (e.g. Teams) to the originating
+                    // conversation, the same handler the toast click uses.
                     MouseArea {
                         id: rowHover
                         anchors.fill: parent
                         hoverEnabled: true
+                        cursorShape: histCard.modelData.actionable
+                                     ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: {
+                            if (histCard.modelData.actionable) {
+                                NotificationService.activateHistory(histCard.index);
+                                popover.close();
+                            }
+                        }
                     }
 
                     // Remove-this-one affordance, top-right. Fades in on hover.
