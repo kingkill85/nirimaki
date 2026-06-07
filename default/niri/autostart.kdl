@@ -73,9 +73,12 @@ spawn-sh-at-startup "$HOME/.local/bin/nirimaki-feature-state"
 spawn-sh-at-startup "$HOME/.local/bin/nirimaki-font-menu-refresh"
 
 // Idle: lock after 5 min, power off displays after 10 min, lock
-// before suspend. Niri auto-powers monitors back on at any input —
-// no `resume` action needed.
-spawn-sh-at-startup "swayidle -w timeout 300 'quickshell -p $HOME/.config/quickshell/lock/shell.qml' timeout 600 'niri msg action power-off-monitors' before-sleep 'quickshell -p $HOME/.config/quickshell/lock/shell.qml'"
+// before suspend. The lock screen is a WlSessionLock client spawned
+// directly (NOT loginctl lock-session — it never touches logind, so a
+// lock-session LockedHint would stick and stop the second lock from
+// firing). Explicit `resume` power-on guarantees monitors come back on
+// the wake/before-sleep paths, not only on raw input.
+spawn-sh-at-startup "swayidle -w timeout 300 'quickshell -p $HOME/.config/quickshell/lock/shell.qml' timeout 600 'niri msg action power-off-monitors' resume 'niri msg action power-on-monitors' before-sleep 'quickshell -p $HOME/.config/quickshell/lock/shell.qml'"
 
 // Clipboard history daemon for the Quickshell ClipboardPicker
 // (Mod+Period). `wl-paste --watch` runs cliphist forever, recording
