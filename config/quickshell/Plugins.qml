@@ -68,6 +68,14 @@ QtObject {
     // Plugins that care read this at instantiation time; reset on hide.
     property var summonPayload: ({})
 
+    // Top-bar visibility (Omarchy's Mod+Shift+Space waybar toggle parity).
+    // Runtime-only state — every per-screen Bar binds its `visible` to
+    // this, so flipping it hides/shows all bars at once and the
+    // PanelWindow drops its exclusive zone so windows reflow to fill.
+    // Not persisted: resets to visible on shell restart, matching
+    // waybar's SIGUSR1 toggle.
+    property bool barVisible: true
+
     readonly property string _userPath:
         Quickshell.env("HOME") + "/.config/nirimaki/plugins.json"
 
@@ -455,6 +463,14 @@ done
             return "ok";
         }
         function ping(): string { return "ok"; }
+
+        // Top-bar visibility — Omarchy waybar-toggle parity.
+        function toggleBar(): string {
+            bus.barVisible = !bus.barVisible;
+            return bus.barVisible ? "shown" : "hidden";
+        }
+        function showBar(): string { bus.barVisible = true;  return "ok"; }
+        function hideBar(): string { bus.barVisible = false; return "ok"; }
     }
 
     // Re-derive layout whenever shell.json changes. Config's properties

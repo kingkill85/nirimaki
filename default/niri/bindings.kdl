@@ -46,6 +46,7 @@ binds {
     Mod+Space        hotkey-overlay-title="App launcher"           { spawn "quickshell" "ipc" "call" "shell" "toggle" "launcher" ""; }
     Mod+Shift+B      hotkey-overlay-title="Browser"                { spawn-sh "$HOME/.local/bin/nirimaki-browser-launch"; }
     Mod+Shift+E      hotkey-overlay-title="File explorer: nautilus" { spawn "nautilus"; }
+    Mod+Shift+Space  hotkey-overlay-title="Toggle top bar"          { spawn "quickshell" "ipc" "call" "shell" "toggleBar"; }
 
     // ===== Pickers =====
     // Omarchy uses the Mod+Ctrl+<key> family for pickers. All summons

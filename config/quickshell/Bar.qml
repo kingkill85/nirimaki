@@ -29,6 +29,11 @@ PanelWindow {
     color: Theme.bg
     exclusionMode: ExclusionMode.Auto
 
+    // Toggled by `quickshell ipc call shell toggleBar` (Mod+Shift+Space).
+    // Hiding unmaps the layer surface, which releases the exclusive zone
+    // so windows reflow over the freed strip — like Omarchy's waybar toggle.
+    visible: Plugins.barVisible
+
     // Single template for every mount. setSource would reject unknown
     // properties — we use onLoaded with a feature-detect instead so
     // plugins only opt into the host context they actually need.
