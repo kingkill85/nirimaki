@@ -5,6 +5,11 @@
 //
 // Wiki: https://niri-wm.github.io/niri/Configuration:-Input
 //
+// NOTE: niri only auto-detects your keyboard layout from systemd-localed
+// (localectl) while the `xkb {}` block is EMPTY. The moment you set any
+// xkb field here — layout, options, … — auto-detection turns off and you
+// must spell out `layout` yourself (it falls back to "us" otherwise).
+//
 // Example (German keyboard, caps as ctrl, disabled focus-follows-mouse):
 //
 //     input {
@@ -20,4 +25,18 @@
 //             natural-scroll
 //         }
 //         // focus-follows-mouse off (remove to disable)
+//     }
+//
+// Omarchy parity — make Caps Lock a Compose key (type accents, symbols
+// and emoji via sequences, e.g. Caps then ' then e → é). Set `layout`
+// to your own since this disables locale1 auto-detect:
+//
+//     input {
+//         keyboard {
+//             xkb {
+//                 layout "us"
+//                 options "compose:caps"
+//             }
+//             numlock
+//         }
 //     }
